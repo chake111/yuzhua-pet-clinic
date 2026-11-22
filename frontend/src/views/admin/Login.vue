@@ -1,9 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { useAdminStore } from '@/stores/admin'
 import { resolveDemoPreset } from '@/utils/demoPreset'
+import { toast } from '@/utils/toast'
 import LoginForm from '@/components/LoginForm.vue'
 
 const store = useAdminStore()
@@ -12,7 +12,7 @@ const router = useRouter()
 const preset = computed(() => resolveDemoPreset('admin', route.query.demo))
 
 function onLoginSuccess(vo) {
-  ElMessage.success(`欢迎，${vo.name || vo.username}`)
+  toast.success(`欢迎，${vo.name || vo.username}`)
   router.replace(route.query.redirect || (vo.role === 'DOCTOR' ? '/admin/appointments' : '/admin/dashboard'))
 }
 </script>

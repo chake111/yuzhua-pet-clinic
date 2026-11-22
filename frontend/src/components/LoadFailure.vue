@@ -5,7 +5,7 @@ defineEmits(['retry'])
 <template>
   <section class="load-failure pc-card" role="alert">
     <p>暂时无法加载，请稍后重试</p>
-    <el-button @click="$emit('retry')">重新加载</el-button>
+    <button type="button" class="el-button" @click="$emit('retry')"><span>重新加载</span></button>
   </section>
 </template>
 

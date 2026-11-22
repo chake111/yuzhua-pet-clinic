@@ -1,7 +1,7 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight } from '@element-plus/icons-vue'
+import EntryIcon from '@/components/EntryIcon.vue'
 import { money } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 
@@ -12,7 +12,16 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const avatarError = ref(false)
+watch(() => props.doctor?.avatar, () => { avatarError.value = false })
 const tags = computed(() => (props.doctor.specialty || '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 3))
+
+function starFill(index) {
+  const val = Number(props.doctor.rating) || 0
+  if (val >= index) return 100
+  if (val <= index - 1) return 0
+  return Math.round((val - (index - 1)) * 100)
+}
 
 function open() {
   router.push(props.to || `/doctor/${props.doctor.id}`)
@@ -22,7 +31,10 @@ function open() {
 <template>
   <article class="doctor pc-card" @click="open">
     <div class="head">
-      <el-avatar :size="52" :src="doctor.avatar" class="ava" alt="">{{ doctor.name?.[0] }}</el-avatar>
+      <span class="el-avatar el-avatar--circle ava" style="--el-avatar-size: 52px">
+        <img v-if="doctor.avatar && !avatarError" :src="doctor.avatar" alt="" @error="avatarError = true" />
+        <template v-else>{{ doctor.name?.[0] }}</template>
+      </span>
       <div class="id">
         <div class="line1">
           <router-link class="name" :to="to || `/doctor/${doctor.id}`" @click.stop><b>{{ doctor.name }}</b></router-link>
@@ -43,13 +55,27 @@ function open() {
 
     <footer>
       <span class="rate">
-        <el-rate :model-value="Number(doctor.rating) || 0" disabled size="small" allow-half />
+        <span class="el-rate el-rate--small is-disabled" role="img" :aria-label="`评分 ${Number(doctor.rating || 0).toFixed(1)}`">
+          <span v-for="i in 5" :key="i" class="el-rate__item">
+            <span class="el-rate__icon" :class="{ 'is-active': starFill(i) >= 100 }">
+              <EntryIcon name="StarFilled" />
+              <span v-if="starFill(i) > 0 && starFill(i) < 100" class="el-rate__decimal" :style="{ width: `${starFill(i)}%` }">
+                <EntryIcon name="StarFilled" />
+              </span>
+            </span>
+          </span>
+        </span>
         <b>{{ Number(doctor.rating).toFixed(1) }}</b>
         <span class="pc-muted">({{ doctor.reviewCount || 0 }} 条评价)</span>
       </span>
       <span class="pc-muted">已接诊 {{ doctor.appointmentCount || 0 }} 次</span>
     </footer>
-    <div class="action"><el-button plain @click.stop="open">查看医生<el-icon><ArrowRight /></el-icon></el-button></div>
+    <div class="action">
+      <button type="button" class="el-button is-plain" @click.stop="open">
+        <span>查看医生</span>
+        <EntryIcon name="ArrowRight" />
+      </button>
+    </div>
   </article>
 </template>
 

@@ -65,6 +65,55 @@ export default [
     }
   },
   {
+    // 首屏关键路径（/、/login、/admin/login 及其直连依赖）严禁静态导入 element-plus、图标桶或 axios，
+    // 防止 100+ KB 组件库运行时或第三方 HTTP 库重新混入首屏入口 chunk。
+    files: [
+      'src/main.js',
+      'src/App.vue',
+      'src/router/index.js',
+      'src/api/http.js',
+      'src/layouts/ClientLayout.vue',
+      'src/views/client/Home.vue',
+      'src/views/client/Login.vue',
+      'src/views/admin/Login.vue',
+      'src/components/LoginForm.vue',
+      'src/components/LoginScene.vue',
+      'src/components/DoctorCard.vue',
+      'src/components/LoadFailure.vue',
+      'src/components/DeptIcon.vue',
+      'src/components/StatusChip.vue',
+      'src/components/EntryIcon.vue',
+      'src/utils/toast.js'
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'element-plus',
+              message: '首屏关键路径禁止导入 element-plus（提示请用 @/utils/toast，控件请用原生 HTML + entry-el.css）'
+            },
+            {
+              name: '@element-plus/icons-vue',
+              message: '首屏关键路径禁止导入 @element-plus/icons-vue（请用 @/components/EntryIcon.vue）'
+            },
+            {
+              name: 'axios',
+              message: 'src/api/http.js 已改为原生 fetch，禁止重新引入 axios'
+            }
+          ],
+          patterns: [
+            {
+              group: ['element-plus/*'],
+              message: '首屏关键路径禁止导入 element-plus 子模块'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
     // 工具脚本与测试跑在 Node 里，不是浏览器
     files: ['tools/**/*.mjs', 'tests/**/*.mjs', 'eslint.config.js'],
     languageOptions: { globals: { ...globals.node } }

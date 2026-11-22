@@ -24,8 +24,9 @@
 
 - **模板按需编译**：`devDependencies` 引入 `unplugin-vue-components`，在 `frontend/vite.config.js` 注册 `ElementPlusResolver({ importStyle: 'css', directives: true })`。明确**不引入** `unplugin-auto-import`，避免与 `frontend/eslint.config.js` 的 `no-undef` 校验以及 CI 中 `lint` 先于 `build` 的顺序冲突。全仓 51 个 `.vue` 保持 kebab-case 标签写法以满足 `style-guard` 静态解析，`views/admin/ConsultRoom.vue` 的 `<ElDrawer>` 统一改为 `<el-drawer>` 交由 resolver 按需打包。
 - **CSS `@layer` 锁定样式优先级**：`vite.config.js` 新增插件 `elementPlusLayer()`，将 `node_modules/element-plus/theme-chalk/*.css`（跳过 `?raw`/`?url`）外包一层 `@layer element-plus { ... }`。全量静态核查 121 个 `theme-chalk` CSS 文件均不含 `@charset`、`@import`、`@layer`，且与 `main.css` 的 5 处覆写目标无 `!important` 冲突；`main.css`、`admin.css`（78 行约 `1.5 KB` gzip，保留在入口以维持 `/admin/login` 按钮对比度）与 `<style scoped>` 保持未分层（unlayered），按 CSS Cascade Layers 规则优先级高于 `@layer element-plus`，不受异步路由 chunk 注入顺序影响。
-- **入口清理、32 图标显式导入与 `ElMessageBox` 收口**：`main.js` 移除全量 `ElementPlus`、全量 CSS 与全局图标循环，显式导入 `element-plus/es/components/message/style/css` 保障 `ElMessage`；`App.vue` 根模板包裹 `<el-config-provider :locale="zhCn">` 保持全站中文本地化。全仓实际使用的 32 个 `@element-plus/icons-vue` 图标在对应 `.vue` 中具名导入（3 处动态 `<component :is>` 配合 `markRaw`，8 处字符串 `icon`/`prefix-icon` 改为组件绑定），删去其余未用图标。非首屏 15 处 `ElMessageBox` 统一改为经 `frontend/src/utils/messageBox.js` 导入（内含 `message-box/style/css` 及 `confirm`/`prompt`/`alert` 中文默认按钮文案 `确定`/`取消`），将其 JS 与 CSS 隔离出首屏包。
-- **剥离非首屏重模块**：`App.vue` 改用 `defineAsyncComponent` + `v-if="imageViewer.open"` 按需挂载 `ImageViewerHost`（`ImageViewerHost.vue` 的 `watch` 补 `{ immediate: true }` 保留语义 `alt`）；`router/index.js` 在 `beforeEach` 的 `if (to.meta.admin)` 分支内动态导入 `useAdminStore`，切断用户端首包对 `src/api/admin.js` 的依赖；`views/admin/Dashboard.vue` 按需动态加载 `echarts/core`。
+- **首屏关键路径去 Element Plus / Axios 化与登录路由直入首包**：首阶段按需拆包后入口仍含 `108 KB` gzip 的 Element Plus 运行时/图标桶及 `17 KB` gzip 的 `axios`，且 `/login`、`/admin/login` 存在二次异步 chunk 瀑布，晚高峰跨海弱网（`8–10 KB/s`）下冷启动仍需 16–20 秒。二阶段将首屏直达路由（`/`、`/login`、`/admin/login` 及其直连组件 `ClientLayout.vue`、`Home.vue`、`DoctorCard.vue`、`LoadFailure.vue`、`LoginForm.vue`）全部替换为原生 HTML 控件 + `src/styles/entry-el.css`（置于 `@layer element-plus` 的同名基础类）+ `src/components/EntryIcon.vue`（11 个首屏内联 SVG 路径）+ `src/utils/toast.js`（原生 `.el-message` 提示条）；`src/api/http.js` 改用原生 `fetch` + `AbortController` 替代 `axios`；`vite.config.js` 在构建与 dev 预构建阶段将 `element-plus/es/locale/lang/en.mjs` 直接映射为 `zh-cn.mjs`，使 `App.vue` 无需挂载 `<el-config-provider>` 即可维持全站懒加载组件中文本地化；`router/index.js` 将 `/login` 与 `/admin/login` 静态并入首包，消除从 `/demo` 或直达登录页时的二次 JS/CSS 瀑布。首屏入口关键路径总体积由 `160.84 KB` gzip 进一步压降至 `75.50 KB` gzip（JS `66.52 KB` + CSS `8.98 KB`）。
+- **其余懒加载路由图标显式导入与 `ElMessageBox` 收口**：非首屏 `.vue` 实际使用的 `@element-plus/icons-vue` 图标在各自组件中具名导入；非首屏 15 处 `ElMessageBox` 统一经 `frontend/src/utils/messageBox.js` 导入（内含 `message-box/style/css` 及 `confirm`/`prompt`/`alert` 中文默认按钮文案 `确定`/`取消`），将其 JS 与 CSS 隔离出首屏包。
+- **剥离非首屏重模块**：`App.vue` 改用 `defineAsyncComponent` + `v-if="imageViewer.open"` 按需挂载 `ImageViewerHost`（`ImageViewerHost.vue` 的 `watch` 补 `{ immediate: true }` 保留语义 `alt`）；`views/admin/Dashboard.vue` 按需动态加载 `echarts/core`。
 
 ### 2. 首屏非交互加载壳、`/` 并发抢跑与登录页主图替换
 
@@ -46,14 +47,13 @@
   - 后端 `WebMvcConfig`：按路径特异度先注册 `/uploads/seed/**`（`public, max-age=86400`，不加 `immutable`，避免种子图更新被缓存一年），再注册 `/uploads/**`（`FileStorageService` 生成的不可变 UUID 文件名，`public, max-age=31536000, immutable`）。
 - **发版 chunk 404 单次自愈**：`frontend/src/main.js` 监听 `vite:preloadError`，用 `sessionStorage` 键 `yuzhua_preload_reload_at` 做 30 秒冷却窗口保护（读写包 `try/catch` 兼容隐私模式），首次触发阻止默认报错并执行单次 `location.reload()`，冷却期内复现则放行错误以防无限刷新。
 - **四重防回退门禁**：
-  1. `frontend/eslint.config.js` 的 `no-restricted-imports` 阻断全量导入 `element-plus` / `@element-plus/icons-vue`、导入 `element-plus/dist/index.css` 与业务文件直接从 `element-plus` 导入 `ElMessageBox`。
-  2. `frontend/tools/bundle-budget.mjs` 接入 `npm run verify` 与 `.github/workflows/ci.yml`，卡住四项预算阈值：`dist/index.html` ≤ `14 KB` gz、入口关键路径 JS+CSS ≤ `165 KB` gz（预期实测 `110–160 KB`，且不得包含 `echarts`）、`dist/assets/` 单图 ≤ `50 KB`、`dist/demo-preload.json` 有效且关键文本资产存在 `.gz`。
+  1. `frontend/eslint.config.js` 的 `no-restricted-imports` 阻断全量导入 `element-plus` / `@element-plus/icons-vue`、导入 `element-plus/dist/index.css`、业务文件直接从 `element-plus` 导入 `ElMessageBox`，并严禁首屏关键路径 16 个文件导入 `element-plus`、`@element-plus/icons-vue` 或 `axios`。
+  2. `frontend/tools/bundle-budget.mjs` 接入 `npm run verify` 与 `.github/workflows/ci.yml`，卡住四项预算阈值：`dist/index.html` ≤ `14 KB` gz、入口关键路径 JS+CSS ≤ `85 KB` gz（实测 `75.50 KB`，且不得包含 `echarts`）、`dist/assets/` 单图 ≤ `50 KB`、`dist/demo-preload.json` 有效且关键文本资产存在 `.gz`。
   3. 合并前对着生产构建容器执行 `tools/screenshots.mjs` 与 `tools/main_flow_browser.mjs` 回归，校验样式、中文弹窗与核心主流程。
   4. `.github/workflows/deploy.yml` 冒烟循环补充校验线上 `/`（`200`、`gzip`、`no-cache`）、`/demo-preload.json`（`200`）与提取出的入口 `/assets/index-*.js`（`200`、`gzip`、`immutable`）。
 
 ## 否决的替代方案
 
-- **原生 HTML 重写登录页或首页控件**：虽可把入口压至约 `45–65 KB` gzip，但引入「原生控件 + Element Plus」双轨 UI 维护债（焦点态、密码显隐、清除按钮、校验反馈需手工对齐），易破坏 `style-guard`、截图像素基线与主流程选择器锚点。
 - **容器加装 `nginx-mod-http-brotli` 或宿主机手工编译 Brotli**：文本资产较 gzip 约再省 15%–20%（约 `15–25 KB`），但增加非原生 Alpine 动态模块维护风险，宿主机手工编译又脱离 Git 与 CI/CD 原子回滚，且仍依赖外层透传 `Accept-Encoding: br`。选用原生 `nginx:1.28-alpine` 的 `gzip_static`。
 - **默认接入 Cloudflare Free 等免费海外 CDN 或公共 JS CDN**：国内移动 5G 易绕行美西导致晚高峰丢包高于直连；边缘 100 秒空闲断连会与 `consultSocket.js` 重连上限冲突，且 `/api/ws/consult?token=` 经第三方边缘转发引入额外风险；公共 JS CDN 破坏按需 tree-shaking 与自包含容器镜像。仅保留为后续独立评估的条件选项。
 - **Service Worker / PWA 离线缓存**：对首次冷启动白屏没有帮助，首访注册预缓存反而可能争抢首屏带宽；滚动发版容易因旧清单触发 chunk 404，且在 iOS 微信内置浏览器兼容性不稳定。
