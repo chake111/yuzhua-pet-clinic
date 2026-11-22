@@ -3,6 +3,16 @@ name: Deploy
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'tools/**'
+      - 'deploy/demo/agent-notes.md'
+      - 'deploy/demo/agent-shots/**'
+      - '.pr_agent.toml'
+      - 'commitlint.config.cjs'
+      - 'LICENSE'
+      - '.gitignore'
   workflow_dispatch:
     inputs:
       image_tag:
