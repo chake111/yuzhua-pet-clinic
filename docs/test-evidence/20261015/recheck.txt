@@ -1,3 +1,0 @@
-PASS duplicate booking: 10 rounds x 8 requests; cancel and rebook passed
-PASS disabled account: error returned, socket closed, no message persisted
-PASS normal appointment: booking, payment, acceptance, record, finish, review and database consistency

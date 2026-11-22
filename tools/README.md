@@ -1,6 +1,6 @@
 # tools
 
-隔离测试环境与业务回归脚本。它们不是生产入口，也不会在 CI 中执行；CI 只跑 `backend` 的单元测试与 `frontend` 的 lint / test / build。
+隔离测试环境与业务回归脚本。它们不是生产入口，也不会在 CI 中执行；CI 跑 `backend` 的 `mvn verify`（单元 + 集成测试）与 `frontend` 的 lint / test:coverage / build。
 
 ## 前置条件
 
@@ -66,8 +66,6 @@ cd frontend && npm run dev -- --port 5197
 PLAYWRIGHT_PACKAGE='<全局 playwright 包路径>' node tools/screenshots.mjs
 ```
 
-完整环境变量示例见 [`docs/愈爪改名计划-20261118.md`](../docs/愈爪改名计划-20261118.md) 的 P5。
-
 ```bash
 # 只列出 32 项并校验 manifest 基线宽度/高度/DPR，不启动浏览器
 node tools/screenshots.mjs --dry-run
@@ -89,7 +87,7 @@ node tools/screenshots.mjs --base http://127.0.0.1:5197
 | `load/run-load.sh` | 100 VU race/oversell 并发正确性压测，独立 compose 项目 `yuzhuaload`；`EVIDENCE_DIR` 可覆盖 |
 | `load/run-steady.sh` | 默认 30 req/s × 3 分钟稳态读混合压测，带 Prometheus/Grafana（`observability` profile），独立项目 `yuzhuaperf` |
 
-两个脚本都会为隔离栈提供测试专用 MySQL/JWT 默认值，并处理 Windows Git Bash 的路径转换；`KEEP=1` 保留栈供检查或截图。说明见 [`docs/test-evidence/20261116-observability/README.md`](../docs/test-evidence/20261116-observability/README.md)。
+两个脚本都会为隔离栈提供测试专用 MySQL/JWT 默认值，并处理 Windows Git Bash 的路径转换；`KEEP=1` 保留栈供检查或截图。
 
 ## 注意
 

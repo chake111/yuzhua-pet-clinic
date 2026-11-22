@@ -1,9 +1,0 @@
-PREFLIGHT OK pid=15620 db=pet_clinic_test_1021abcd connections=6
-PASS T1a 登录→改密→旧令牌四路失效→重新登录
-PASS T1a 出站帧：医生改密后旧连接不再收到业务消息
-PASS T4 接收方在线但不发 READ，断连后计数仍等于未读消息数
-PASS T6 新增医生：删除方先持锁，接口等待后按"科室不存在"拒绝
-PASS T6 转科：删除方先持锁，接口拒绝并保留原科室
-PASS T6 删除科室：新增方先持锁，接口等待后看到医生并拒绝
-
-ACCEPTANCE PASSED

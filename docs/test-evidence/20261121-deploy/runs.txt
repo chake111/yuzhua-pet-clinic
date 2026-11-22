@@ -1,8 +1,0 @@
-completed	success	feat(demo): 新增演示视频录制与合成工具链及封面	Deploy	main	push	44887324946	54s	2026-11-21T08:58:12Z
-completed	success	feat(demo): 演示页接入哔哩哔哩演示视频链接	Deploy	main	push	44886177636	1m0s	2026-11-21T08:43:08Z
-completed	success	feat(deploy): 由 web 镜像提供品牌演示落地页 (#20)	Deploy	main	push	44880016766	1m11s	2026-11-21T07:23:16Z
-completed	success	Deploy	Deploy	main	workflow_dispatch	44876361951	1m23s	2026-11-21T06:50:55Z
-completed	failure	Deploy	Deploy	main	workflow_dispatch	44875227449	50s	2026-11-21T06:22:19Z
-completed	failure	Deploy	Deploy	main	workflow_dispatch	44873481195	57s	2026-11-21T06:00:32Z
-completed	failure	Deploy	Deploy	main	workflow_dispatch	44873053843	38s	2026-11-21T05:54:45Z
-completed	failure	Merge pull request #19 from chake111/cursor/add-deploy-workflow-b6b1	Deploy	main	push	44871613018	3m40s	2026-11-21T05:35:45Z

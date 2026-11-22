@@ -1,1 +1,0 @@
-SchedulePeriodCheck passed: boundaries, legacy edits, duplicate periods, stopped-doctor maintenance and restore

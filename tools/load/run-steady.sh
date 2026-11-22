@@ -17,7 +17,7 @@
 #    DURATION      默认 3m
 #    PRE_VUS       默认 30, preAllocatedVUs
 #    KEEP          默认 1, 保留栈供截图; KEEP=0 结束时自动 down -v
-#    EVIDENCE_DIR  默认 docs/test-evidence/20261116-observability, 可覆盖
+#    EVIDENCE_DIR  默认 docs/test-evidence/<运行日期>-observability, 可覆盖
 #    YUZHUA_PROM_PORT / YUZHUA_GRAFANA_PORT
 #                  宿主机端口, 只绑 127.0.0.1; 同一变量既控制 compose
 #                  端口映射, 也用于脚本抓取 targets 和打印地址
@@ -34,7 +34,8 @@ BASE_URL=http://backend:8081/api
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 LOAD_DIR="${ROOT_DIR}/tools/load"
-EVIDENCE_DIR="${EVIDENCE_DIR:-${ROOT_DIR}/docs/test-evidence/20261116-observability}"
+# 证据按运行日期归档 (AGENTS.md 规矩二), 复跑不写回旧轮次目录
+EVIDENCE_DIR="${EVIDENCE_DIR:-${ROOT_DIR}/docs/test-evidence/$(date +%Y%m%d)-observability}"
 
 # k6 的 --summary-export 会把 setup() 返回的登录 token 写进 setup_data；
 # 证据要能公开提交，复制到证据目录后立刻删掉该字段

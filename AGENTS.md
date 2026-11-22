@@ -16,8 +16,9 @@
 
 - `docs/screenshots/` 由 `node tools/screenshots.mjs` 按 `tools/screenshots.manifest.json` 重拍；改 UI 后重跑，不手工换图。
 - README 里的用例数、覆盖率、QPS、p95 必须来自 `docs/test-evidence/**` 的原始输出（`mvn verify`、`summary-*.json`），不写估算值。
+- 配置性数值（门禁阈值、端口、超时、压测场景参数、种子数据量等）以代码与脚本为准，不需要证据链接；上一条只约束实测数字。
 - `docs/test-evidence/**` 是历史证据，按日期归档，不改写旧文件；复跑写入新日期目录。
-- 验收：README 中每个数字都能链到对应证据文件；截图 manifest 中的页面与断言和当前 UI 一致（可先跑 `--dry-run`）。
+- 验收：README 中每个实测数字都能链到对应证据文件；截图 manifest 中的页面与断言和当前 UI 一致（可先跑 `--dry-run`）。
 
 为什么：32 张截图在改名后整体重拍两次；证据文件从 123 涨到 152。手工维护派生文件，源改一次就全量返工一次。
 

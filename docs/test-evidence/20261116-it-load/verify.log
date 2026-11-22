@@ -1,3 +1,0 @@
-schedule_id	total_num	remain_num	last_queue_no	booked	distinct_queue	min_queue	max_queue	verdict
-9001	100	0	100	100	100	1	100	PASS
-9002	20	0	20	20	20	1	20	PASS

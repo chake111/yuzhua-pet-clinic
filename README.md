@@ -74,13 +74,13 @@
 
 每次 push 到 `main` 或向 `main` 提交 PR，GitHub Actions 会执行：
 
-- 后端：JDK 17 + `mvn --batch-mode --no-transfer-progress verify`（单元测试 + 集成测试 + 打包，见[测试与并发证据](#测试与并发证据)）
-- 前端：Node.js 22 + `npm ci`、`npm run lint`、`npm test`、`npm run build`
+- 后端：JDK 17 + `mvn --batch-mode --no-transfer-progress verify`（单元测试 + 集成测试 + 打包，见[测试与压测](#测试与压测)）
+- 前端：Node.js 22 + `npm ci`、`npm run lint`、`npm run test:coverage`、`npm run build`
 - 部署：Docker Compose 构建并启动 MySQL、后端、nginx，校验健康接口与种子数据（仅 PR）
 
 工作流见 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 与 [`.github/workflows/docker.yml`](.github/workflows/docker.yml)，action 版本由 Dependabot 每周检查。Dependabot 的英文 PR 标题由 `Localize Dependabot PR` 工作流自动改成中文。
 
-## 测试与并发证据
+## 测试与压测
 
 ### 单元测试
 
@@ -88,7 +88,7 @@
 cd backend && mvn --batch-mode --no-transfer-progress test
 ```
 
-现有 154 个用例，覆盖 JWT 密钥与令牌版本、账号状态校验、状态取值、排班周期校验、批量查询、WebSocket 会话注册表，以及预约与排班两个核心服务的状态机分支；下单幂等键的预查、唯一键回读、非法键，清扫任务的租约跳过/释放与租约有效期校验，慢 SQL 拦截器的阈值语义、异常透传、4/6 参 query 签名与 MyBatis-Plus 改写只记一次也在其中。只跑 surefire，不需要 Docker。
+覆盖 JWT 密钥与令牌版本、账号状态校验、状态取值、排班周期校验、批量查询、WebSocket 会话注册表，以及预约与排班两个核心服务的状态机分支；下单幂等键的预查、唯一键回读、非法键，清扫任务的租约跳过/释放与租约有效期校验，慢 SQL 拦截器的阈值语义、异常透传、4/6 参 query 签名与 MyBatis-Plus 改写只记一次也在其中。只跑 surefire，不需要 Docker。
 
 ### 集成测试
 
@@ -123,46 +123,15 @@ bash tools/load/run-steady.sh
 
 默认保留 `yuzhuaperf` 栈供截图，结束时打印 Grafana 地址与清理命令；`KEEP=0` 会自动 `down -v`。`RATE` / `DURATION` / `PRE_VUS` 可覆盖默认值。
 
-### 实跑结果
+### 覆盖率门禁
 
-- `mvn verify`（2026-11-16 轮次，本机）：154 个单元测试 + 21 个集成测试（8 个 IT 类）全部通过，`BUILD SUCCESS`，约 2 分钟；完整输出见 [`docs/test-evidence/20261116-observability/mvn-verify.txt`](docs/test-evidence/20261116-observability/mvn-verify.txt)。
-- 覆盖率门禁：后端 `mvn verify` 中 JaCoCo 对 `AppointmentService` / `DoctorScheduleService` / `SlowSqlInterceptor` 行覆盖 ≥95%（当前 99.1% / 100% / 100%）；前端 `npm run test:coverage` 对 `tools/style-guard/index.mjs` 与 `src/utils/tableDensity.js` 行/分支/函数 ≥95%。
-- k6 race / oversell 已实跑（2026-11-16，Docker Desktop 本机）：race 100 个号全部成功，oversell 20 个号成功、80 个请求被正常拒绝，`verify.sql` 两条排班均 PASS。证据：[`race.log`](docs/test-evidence/20261116-it-load/race.log)、[`summary-race.json`](docs/test-evidence/20261116-it-load/summary-race.json)、[`oversell.log`](docs/test-evidence/20261116-it-load/oversell.log)、[`summary-oversell.json`](docs/test-evidence/20261116-it-load/summary-oversell.json)、[`verify.log`](docs/test-evidence/20261116-it-load/verify.log)、[`fixture.log`](docs/test-evidence/20261116-it-load/fixture.log)。
+后端 `mvn verify` 中 JaCoCo 对 `AppointmentService` / `DoctorScheduleService` / `SlowSqlInterceptor` 行覆盖 ≥95%；前端 `npm run test:coverage` 对 `tools/style-guard/index.mjs` 与 `src/utils/tableDensity.js` 行/分支/函数 ≥95%。门禁与代码同一次提交；用例数与压测数值以复跑的原始输出为准。
 
-<!-- LOAD_RESULTS_START -->
-| 场景 | 号源 | VU | 成功 | 拒绝 | 异常 | p95 | verify 终态 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| race | 100 | 100 | 100 | 0 | 0 | 4.17 s | `remain=0` / `booked=100` / `last_queue_no=100`，PASS |
-| oversell | 20 | 100 | 20 | 80 | 0 | 1.17 s | `remain=0` / `booked=20` / `last_queue_no=20`，PASS |
+### 可观测性
 
-数据取自本次 `summary-race.json`、`summary-oversell.json` 与 `verify.log`。race 的 p95 阈值由初版 1 s 调整为 5 s：100 VU 抢同一排班行时 MySQL 行锁会把 100 个写事务串行化，p95 近似整批请求的完成时间；本机冷启动实测 2.09–4.17 s，热态复跑 1.32–1.39 s。该阈值只作数量级退化护栏，成功/拒绝/异常三个功能断言没有放宽。
-<!-- LOAD_RESULTS_END -->
+慢 SQL 阈值 200ms，日志只带 statement、type、elapsed、failed，参数不进日志；traceId 由日志 pattern 带出。可选观测栈（Prometheus/Grafana）的启动方式见[部署步骤](docs/部署步骤.md) 7.1 节。解读压测结果时注意：k6 的 p95 是客户端观测的端到端耗时，Grafana 的 p95 来自服务端 histogram，两者不会完全相等；稳态读压测与 race/oversell 写并发场景的 p95 不可直接比较。
 
-### 稳态压测与可观测性（2026-11-16 轮次）
-
-![Grafana 面板](docs/test-evidence/20261116-observability/grafana-steady.png)
-
-3 分钟稳态读混合压测，目标 30 req/s；数值取自 `summary-steady.json`，截图只用于展示趋势，不作为数值来源。
-
-| 指标 | 实测 |
-| --- | --- |
-| QPS | 29.97 req/s |
-| p95 | 5.55 ms |
-| HTTP 错误率 | 0%（无失败样本） |
-| 业务错误率 | 0 / 5401 |
-| dropped iterations | 0 |
-
-30 req/s 是可重复负载，不是系统上限。p95 是 k6 客户端观测到的端到端耗时；Grafana 的 p95 来自服务端 histogram，两者不会完全相等。Prometheus 同一窗口平均 QPS 28.51，与 k6 相差 -4.86%。
-
-慢 SQL 阈值 200ms，日志只带 statement、type、elapsed、failed，参数不进日志；traceId 由日志 pattern 带出。race 的 100 VU 下单受 Hikari 连接池（20）排队影响，端到端 p95 1.74s，但单条语句未达 200ms；下面的日志来自行锁注入验证（MySQL 事务持有 schedule 9001 行锁 2 秒后发真实下单）：
-
-```text
-WARN [cdf9b8594a96490dbb4329ffa549b06a] 慢 SQL statement=com.yuzhua.mapper.DoctorScheduleMapper.selectByIdForUpdate type=SELECT elapsed=1470ms failed=false
-```
-
-测试环境、接口组合、慢 SQL 注入方式与引用规则见[证据说明](docs/test-evidence/20261116-observability/README.md)。本轮只测读接口；写路径的并发正确性见上面的 race/oversell，两者的 p95 不可直接比较。
-
-隔离环境下的接口与浏览器验收脚本见 [tools/README.md](tools/README.md)，过程证据在 [docs/test-evidence/](docs/test-evidence/)。提交信息另由 commitlint 校验 Conventional Commits（仅 PR），冒号后的描述必须包含中文，规则见 [commitlint.config.cjs](commitlint.config.cjs)。
+历史测试证据归档（`docs/test-evidence/`）已于 2026-11-22 清理，git 历史可查；复跑按 AGENTS.md 规矩二写入新日期目录。隔离环境下的接口与浏览器验收脚本见 [tools/README.md](tools/README.md)。提交信息另由 commitlint 校验 Conventional Commits（仅 PR），冒号后的描述必须包含中文，规则见 [commitlint.config.cjs](commitlint.config.cjs)。
 
 ## Docker 一键启动（演示环境）
 
@@ -245,7 +214,7 @@ cd frontend && npm install && npm run dev
 │       ├── stores/   登录态与账号信息
 │       ├── styles/   全局样式与变量
 │       └── utils/    枚举文案、时间金额格式化、token、WebSocket 客户端、图片查看器状态、列表滚动、病历与排班展示、科室图标素材
-├── docs/           设计约定 / 接口文档 / 数据模型 / 部署步骤 / ADR / 架构图 / 界面截图 / 测试证据
+├── docs/           设计约定 / 接口文档 / 数据模型 / 部署步骤 / ADR / 界面截图
 ├── tools/          隔离测试环境与验收脚本（qa_env / acceptance / business_rules_check / main_flow_* / read_receipt / schedule_status / dashboard_query / trace_id）
 └── .github/        CI 工作流与 Dependabot
 ```
@@ -258,7 +227,6 @@ cd frontend && npm install && npm run dev
 - [部署步骤](docs/部署步骤.md)：环境要求、建库、启动、生产构建、常见问题
 - [架构决策记录](docs/adr/)：关键取舍的裁定与理由（问诊与预约解耦、"未到诊"终态、陈氏 ER 等）
 - [设计约定](docs/design.md)：用户端布局、色彩与组件规则
-- [技术亮点改造记录](docs/技术亮点改造记录-20261114.md)：四个缺陷的根因、动作与验证
 
 ## 已知边界
 

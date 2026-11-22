@@ -1,5 +1,0 @@
-PASS repeated payment: 8 requests, one occupied seat
-PASS stopped schedule existing paid visit, cancellation guard, post-visit record and 8 concurrent record saves
-PASS 8 concurrent reviews: one review and business errors for duplicates
-PASS expired payment rejected; waiting for real scheduled cleanup
-PASS actual scheduler cancelled expired order and returned exactly one seat

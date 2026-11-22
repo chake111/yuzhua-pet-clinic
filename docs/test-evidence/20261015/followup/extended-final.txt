@@ -1,4 +1,0 @@
-PASS last seat: 5 rounds x 8 different pets, one success and zero remaining
-PASS ownership, clinical role, invalid login and pending record/review guards
-PASS discarded payment response retry and record ownership/deletion guards
-PASS independent consult, 25 offline messages, recent/history pagination, unread reset, closure and moderation
