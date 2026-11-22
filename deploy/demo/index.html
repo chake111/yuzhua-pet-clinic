@@ -480,38 +480,107 @@
       var btn = document.getElementById('copy-pw');
       var live = document.getElementById('copy-live');
       var pw = document.getElementById('pw');
-      if (!btn || !pw) return;
-      var label = btn.textContent;
-      btn.addEventListener('click', function () {
-        var text = pw.textContent;
-        function restore() {
-          window.setTimeout(function () { btn.textContent = label; }, 2000);
-        }
-        function ok() {
-          btn.textContent = '已复制';
-          if (live) live.textContent = '密码已复制';
-          restore();
-        }
-        function fallback() {
+      if (btn && pw) {
+        var label = btn.textContent;
+        btn.addEventListener('click', function () {
+          var text = pw.textContent;
+          function restore() {
+            window.setTimeout(function () { btn.textContent = label; }, 2000);
+          }
+          function ok() {
+            btn.textContent = '已复制';
+            if (live) live.textContent = '密码已复制';
+            restore();
+          }
+          function fallback() {
+            try {
+              var range = document.createRange();
+              range.selectNodeContents(pw);
+              var sel = window.getSelection();
+              if (sel) {
+                sel.removeAllRanges();
+                sel.addRange(range);
+              }
+            } catch (err) {}
+            btn.textContent = '请手动复制';
+            if (live) live.textContent = '已选中密码，可以手动复制';
+            restore();
+          }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(ok, fallback);
+          } else {
+            fallback();
+          }
+        });
+      }
+
+      if (typeof window.fetch === 'function') {
+        var shouldSkipPreload = function () {
           try {
-            var range = document.createRange();
-            range.selectNodeContents(pw);
-            var sel = window.getSelection();
-            if (sel) {
-              sel.removeAllRanges();
-              sel.addRange(range);
-            }
+            var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            return !!(conn && (conn.saveData === true || conn.effectiveType === 'slow-2g'));
+          } catch (err) {
+            return false;
+          }
+        };
+
+        var preloadAsset = function (url) {
+          if (typeof url !== 'string' || url.charAt(0) !== '/' || url.indexOf('//') === 0 || /echarts/i.test(url)) {
+            return Promise.resolve();
+          }
+          return window.fetch(url, {
+            method: 'GET',
+            mode: 'cors',
+            credentials: 'same-origin',
+            cache: 'default'
+          }).then(function (res) {
+            if (!res || !res.ok) return;
+            return res.arrayBuffer();
+          }).catch(function () {});
+        };
+
+        var runPreload = function () {
+          if (shouldSkipPreload()) return;
+          try {
+            window.fetch('/demo-preload.json', {
+              method: 'GET',
+              credentials: 'same-origin',
+              cache: 'no-cache'
+            }).then(function (res) {
+              if (!res || !res.ok) return null;
+              return res.json();
+            }).then(function (manifest) {
+              if (!manifest || !Array.isArray(manifest.assets) || !manifest.assets.length) return;
+              var queue = manifest.assets.slice();
+              var concurrency = Math.min(2, queue.length);
+              var workers = [];
+              function next() {
+                if (!queue.length || shouldSkipPreload()) return Promise.resolve();
+                return preloadAsset(queue.shift()).then(next);
+              }
+              for (var i = 0; i < concurrency; i++) {
+                workers.push(next());
+              }
+              return Promise.all(workers);
+            }).catch(function () {});
           } catch (err) {}
-          btn.textContent = '请手动复制';
-          if (live) live.textContent = '已选中密码，可以手动复制';
-          restore();
-        }
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(ok, fallback);
+        };
+
+        var schedulePreload = function () {
+          if (shouldSkipPreload()) return;
+          if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(runPreload, { timeout: 2500 });
+          } else {
+            window.setTimeout(runPreload, 800);
+          }
+        };
+
+        if (document.readyState === 'complete') {
+          schedulePreload();
         } else {
-          fallback();
+          window.addEventListener('load', schedulePreload, { once: true });
         }
-      });
+      }
     })();
   </script>
 </body>

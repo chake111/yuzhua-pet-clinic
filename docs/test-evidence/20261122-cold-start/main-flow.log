@@ -1,0 +1,9 @@
+PASS UI-login
+PASS CSS-overrides-client {"colorPrimary":"#ff385c","elColorPrimary":"#ff385c","inputFontSize":"16px","avatarBg":"rgb(242, 242, 242)"}
+PASS ElMessageBox-chinese-and-css ["取消","退出登录"]
+INFO admin-primary-btn-bg rgb(217, 37, 73)
+PASS UI-book-pay 640
+PASS UI-record-finish-review
+PASS Admin-ConsultRoom-el-drawer {"x":1365,"y":0,"width":400,"height":900}
+PASS UI-consult-send-reload-close 10
+{"ok":true,"results":["appointment","consultation"],"pageErrors":[]}

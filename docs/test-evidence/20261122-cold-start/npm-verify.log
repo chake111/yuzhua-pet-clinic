@@ -1,0 +1,579 @@
+
+> yuzhua-frontend@1.0.0 verify
+> npm run lint && npm run style-guard && npm run test:coverage && npm run build && npm run bundle-budget
+
+
+> yuzhua-frontend@1.0.0 lint
+> eslint src tests tools eslint.config.js
+
+
+> yuzhua-frontend@1.0.0 style-guard
+> node tools/style-guard/check.mjs
+
+样式护栏通过
+
+> yuzhua-frontend@1.0.0 test:coverage
+> node --test --experimental-test-coverage --test-coverage-lines=95 --test-coverage-branches=95 --test-coverage-functions=95 "--test-coverage-include=tools/style-guard/index.mjs" "--test-coverage-include=src/utils/tableDensity.js" "tests/*.test.mjs"
+
+TAP version 13
+# Subtest: 品牌常量不含旧名
+ok 1 - 品牌常量不含旧名
+  ---
+  duration_ms: 1.0025
+  type: 'test'
+  ...
+# Subtest: parseEntryAssetsFromHtml 提取入口脚本/样式/modulepreload 并忽略外链与普通资源
+ok 2 - parseEntryAssetsFromHtml 提取入口脚本/样式/modulepreload 并忽略外链与普通资源
+  ---
+  duration_ms: 3.3967
+  type: 'test'
+  ...
+# Subtest: 合规 dist 产物通过全部门禁，且 demo-preload.json 严格排除 dynamicImports
+ok 3 - 合规 dist 产物通过全部门禁，且 demo-preload.json 严格排除 dynamicImports
+  ---
+  duration_ms: 71.3217
+  type: 'test'
+  ...
+# Subtest: gzipDirectory（--gzip-only 模式）为 >=256B 可压缩文本生成 .gz 并跳过过小文件
+ok 4 - gzipDirectory（--gzip-only 模式）为 >=256B 可压缩文本生成 .gz 并跳过过小文件
+  ---
+  duration_ms: 16.1274
+  type: 'test'
+  ...
+# Subtest: index.html gzip 超过 14 KB 时拦截失败
+ok 5 - index.html gzip 超过 14 KB 时拦截失败
+  ---
+  duration_ms: 40.9355
+  type: 'test'
+  ...
+# Subtest: 首屏入口关键路径总 gzip 超过 165 KB 时拦截失败
+ok 6 - 首屏入口关键路径总 gzip 超过 165 KB 时拦截失败
+  ---
+  duration_ms: 62.9118
+  type: 'test'
+  ...
+# Subtest: 入口关键路径 chunk 文件名或内容包含 echarts 时拦截失败
+ok 7 - 入口关键路径 chunk 文件名或内容包含 echarts 时拦截失败
+  ---
+  duration_ms: 70.2037
+  type: 'test'
+  ...
+# Subtest: dist/assets/ 单张图片超过 50 KB 时拦截失败
+ok 8 - dist/assets/ 单张图片超过 50 KB 时拦截失败
+  ---
+  duration_ms: 44.7467
+  type: 'test'
+  ...
+# Subtest: 关键文本资产缺失同名 .gz 时拦截失败
+ok 9 - 关键文本资产缺失同名 .gz 时拦截失败
+  ---
+  duration_ms: 31.8451
+  type: 'test'
+  ...
+# Subtest: demo-preload.json 缺失或指向不存在资产时拦截失败
+ok 10 - demo-preload.json 缺失或指向不存在资产时拦截失败
+  ---
+  duration_ms: 59.6169
+  type: 'test'
+  ...
+# business-rules passed: payment deadline, governance, suggestion draft, admin history, schedule availability, notice draft
+# Subtest: tests\\business-rules.test.mjs
+ok 3 - tests\\business-rules.test.mjs
+  ---
+  duration_ms: 304.5911
+  type: 'test'
+  ...
+# PASS 屏蔽当前图片关闭预览并清理切换列表
+# PASS 屏蔽整场会话清理该面板预览
+# PASS client：会话处置和离开页面清理症状照片，保留其他会话预览
+# PASS admin：会话处置和离开页面清理症状照片，保留其他会话预览
+# PASS 屏蔽非当前图片后切换列表清除该图片
+# PASS 治理当前面板时保留其他来源的预览
+# PASS 断线期间恢复的消息随新连接历史显示
+# PASS 新连接同步期间屏蔽事件继续过滤随后到达的旧快照
+# PASS 双方在线恢复对方消息发送READ，恢复本人消息不发送
+# PASS 同步期间恢复的消息在历史就绪后确认已读
+# PASS 页面不可见时收到对侧消息不标已读，切回可见才补标
+# PASS onState(error) 不清 historyReady，已读不会被永久卡住
+# PASS historyReady 是 read 的前置门：断线期间根本不尝试发，重连后由 HISTORY 补上
+# PASS visibilitychange 真的接线：挂 1 次、卸载解 1 次、切回前台补发 READ
+# PASS 标题栏在线状态随同步、断线和结束更新
+# Subtest: tests\\consult-governance.test.mjs
+ok 4 - tests\\consult-governance.test.mjs
+  ---
+  duration_ms: 306.7508
+  type: 'test'
+  ...
+# PASS 保存回执到达后才清空草稿
+# PASS 业务拒绝保留草稿并提示原因
+# PASS 非预期异常与断连同样保留草稿
+# PASS 发送期间新输入的文字不被回执清掉
+# PASS 草稿被改写时整段保留，不吞用户新内容
+# PASS 空白草稿不触发发送
+# PASS 图片与文字共用保存回执
+# PASS 图片已上传但保存失败时明确提示
+# PASS ACK 按 requestId 对应到具体一次发送
+# PASS ERROR 帧按 requestId 拒绝并带上服务端原因
+# PASS 连接断开时待确认的发送全部拒绝
+# Subtest: tests\\consult-send.test.mjs
+ok 5 - tests\\consult-send.test.mjs
+  ---
+  duration_ms: 289.0614
+  type: 'test'
+  ...
+# Subtest: 合法角色按登录侧返回对应演示账号与传入口令
+ok 14 - 合法角色按登录侧返回对应演示账号与传入口令
+  ---
+  duration_ms: 6.4707
+  type: 'test'
+  ...
+# Subtest: 跨端角色严格隔离，禁止用户端预填后台账号或反向越界
+ok 15 - 跨端角色严格隔离，禁止用户端预填后台账号或反向越界
+  ---
+  duration_ms: 0.3284
+  type: 'test'
+  ...
+# Subtest: 演示口令缺失或为空时安全降级为空串，不回退任何硬编码密码
+ok 16 - 演示口令缺失或为空时安全降级为空串，不回退任何硬编码密码
+  ---
+  duration_ms: 1.0972
+  type: 'test'
+  ...
+# Subtest: 非字符串、数组、空值、未知角色与原型属性名一律返回 null
+ok 17 - 非字符串、数组、空值、未知角色与原型属性名一律返回 null
+  ---
+  duration_ms: 0.196
+  type: 'test'
+  ...
+# http-error passed: business/network/timeout, silent and 401
+# Subtest: tests\\http-error.test.mjs
+ok 7 - tests\\http-error.test.mjs
+  ---
+  duration_ms: 116.4025
+  type: 'test'
+  ...
+# Subtest: 优先使用 crypto.randomUUID
+ok 19 - 优先使用 crypto.randomUUID
+  ---
+  duration_ms: 1.1408
+  type: 'test'
+  ...
+# Subtest: 没有 randomUUID 时走兜底，字符集与长度符合服务端校验
+ok 20 - 没有 randomUUID 时走兜底，字符集与长度符合服务端校验
+  ---
+  duration_ms: 2.1287
+  type: 'test'
+  ...
+# Subtest: 连续两次兜底结果不同，且不超过 64 字符
+ok 21 - 连续两次兜底结果不同，且不超过 64 字符
+  ---
+  duration_ms: 0.3974
+  type: 'test'
+  ...
+# schedule-period passed: boundaries, switching, legacy edits, batch uniqueness, capacity minimum
+# Subtest: tests\\schedule-period.test.mjs
+ok 9 - tests\\schedule-period.test.mjs
+  ---
+  duration_ms: 280.7248
+  type: 'test'
+  ...
+# Subtest: stripComments：注释被抹成空格，行号不位移
+ok 23 - stripComments：注释被抹成空格，行号不位移
+  ---
+  duration_ms: 1.3394
+  type: 'test'
+  ...
+# Subtest: extractStyleBlocks：单块、多块与没有 style 的情况
+ok 24 - extractStyleBlocks：单块、多块与没有 style 的情况
+  ---
+  duration_ms: 1.5002
+  type: 'test'
+  ...
+# Subtest: parseRules：普通规则、多选择器与 @media 里的规则
+ok 25 - parseRules：普通规则、多选择器与 @media 里的规则
+  ---
+  duration_ms: 1.2275
+  type: 'test'
+  ...
+# Subtest: parseRules：忽略注释与只有容器的空块
+ok 26 - parseRules：忽略注释与只有容器的空块
+  ---
+  duration_ms: 0.1493
+  type: 'test'
+  ...
+# Subtest: parseRules：行号随 lineOffset 偏移
+ok 27 - parseRules：行号随 lineOffset 偏移
+  ---
+  duration_ms: 0.0909
+  type: 'test'
+  ...
+# Subtest: declaredProps：去重、忽略空段与没有冒号的片段
+ok 28 - declaredProps：去重、忽略空段与没有冒号的片段
+  ---
+  duration_ms: 0.2234
+  type: 'test'
+  ...
+# Subtest: parseTableColumns：width、min-width、两者并存与都没有
+ok 29 - parseTableColumns：width、min-width、两者并存与都没有
+  ---
+  duration_ms: 0.3378
+  type: 'test'
+  ...
+# Subtest: columnBudget：缺宽度的列按 0 计
+ok 30 - columnBudget：缺宽度的列按 0 计
+  ---
+  duration_ms: 0.1404
+  type: 'test'
+  ...
+# Subtest: extractTables：弹窗里的表格被标记出来
+ok 31 - extractTables：弹窗里的表格被标记出来
+  ---
+  duration_ms: 0.3358
+  type: 'test'
+  ...
+# Subtest: auditSources：.pc-page-heading 复活时报错
+ok 32 - auditSources：.pc-page-heading 复活时报错
+  ---
+  duration_ms: 0.4581
+  type: 'test'
+  ...
+# Subtest: auditSources：页标题字号只允许在 main.css 声明
+ok 33 - auditSources：页标题字号只允许在 main.css 声明
+  ---
+  duration_ms: 0.2699
+  type: 'test'
+  ...
+# Subtest: auditSources：页面骨架只允许保留间距类覆盖
+ok 34 - auditSources：页面骨架只允许保留间距类覆盖
+  ---
+  duration_ms: 0.335
+  type: 'test'
+  ...
+# Subtest: auditSources：骨架规则不误伤后代选择器与用户端
+ok 35 - auditSources：骨架规则不误伤后代选择器与用户端
+  ---
+  duration_ms: 0.1709
+  type: 'test'
+  ...
+# Subtest: auditSources：表格列宽超出预算时报错，弹窗表格不计入
+ok 36 - auditSources：表格列宽超出预算时报错，弹窗表格不计入
+  ---
+  duration_ms: 0.2798
+  type: 'test'
+  ...
+# Subtest: auditSources：外壳宽度写死时报错，用令牌则通过
+ok 37 - auditSources：外壳宽度写死时报错，用令牌则通过
+  ---
+  duration_ms: 0.2886
+  type: 'test'
+  ...
+# Subtest: auditSources：一次返回多处违规，且按文件顺序排列
+ok 38 - auditSources：一次返回多处违规，且按文件顺序排列
+  ---
+  duration_ms: 0.1789
+  type: 'test'
+  ...
+# Subtest: collectSources：递归收集 css/vue，路径用 / 分隔
+ok 39 - collectSources：递归收集 css/vue，路径用 / 分隔
+  ---
+  duration_ms: 11.4159
+  type: 'test'
+  ...
+# Subtest: auditSources：模板里写回 .pc-page-heading 也算复活
+ok 40 - auditSources：模板里写回 .pc-page-heading 也算复活
+  ---
+  duration_ms: 0.1915
+  type: 'test'
+  ...
+# Subtest: auditSources：.pc-title 不带 h1 前缀同样不许声明字号
+ok 41 - auditSources：.pc-title 不带 h1 前缀同样不许声明字号
+  ---
+  duration_ms: 0.1583
+  type: 'test'
+  ...
+# Subtest: parseRules：字符串里的花括号不参与深度计算
+ok 42 - parseRules：字符串里的花括号不参与深度计算
+  ---
+  duration_ms: 0.144
+  type: 'test'
+  ...
+# Subtest: parseRules：转义引号不会提前结束字符串
+ok 43 - parseRules：转义引号不会提前结束字符串
+  ---
+  duration_ms: 0.1276
+  type: 'test'
+  ...
+# Subtest: lineOf：返回字面量首次出现的行号
+ok 44 - lineOf：返回字面量首次出现的行号
+  ---
+  duration_ms: 0.1078
+  type: 'test'
+  ...
+# Subtest: auditSources：pageTitleFile 可换，便于检查别的入口文件
+ok 45 - auditSources：pageTitleFile 可换，便于检查别的入口文件
+  ---
+  duration_ms: 0.1319
+  type: 'test'
+  ...
+# Subtest: parseRules：多余的右括号不会让解析器崩掉
+ok 46 - parseRules：多余的右括号不会让解析器崩掉
+  ---
+  duration_ms: 0.0955
+  type: 'test'
+  ...
+# Subtest: 集成：真实 src 通过全部规则
+ok 47 - 集成：真实 src 通过全部规则
+  ---
+  duration_ms: 47.0732
+  type: 'test'
+  ...
+# Subtest: 集成：医生表与病历表都在预算内，且状态列留有余量
+ok 48 - 集成：医生表与病历表都在预算内，且状态列留有余量
+  ---
+  duration_ms: 32.3486
+  type: 'test'
+  ...
+# Subtest: 集成：医生表的密度阶梯在任意宽度下都放得下
+ok 49 - 集成：医生表的密度阶梯在任意宽度下都放得下
+  ---
+  duration_ms: 4.0227
+  type: 'test'
+  ...
+# Subtest: 集成：密度阶梯里的列宽与 Doctors.vue 模板一致
+ok 50 - 集成：密度阶梯里的列宽与 Doctors.vue 模板一致
+  ---
+  duration_ms: 29.4041
+  type: 'test'
+  ...
+# Subtest: tableDensity：五档分别收起哪些列
+ok 51 - tableDensity：五档分别收起哪些列
+  ---
+  duration_ms: 0.2456
+  type: 'test'
+  ...
+# Subtest: tableDensity：阶梯里写了也不许收掉医生、状态与操作
+ok 52 - tableDensity：阶梯里写了也不许收掉医生、状态与操作
+  ---
+  duration_ms: 0.2101
+  type: 'test'
+  ...
+# Subtest: tableDensity：阶梯没有兜底档时回落到最后一档
+ok 53 - tableDensity：阶梯没有兜底档时回落到最后一档
+  ---
+  duration_ms: 0.1457
+  type: 'test'
+  ...
+# Subtest: tableDensity：visibleWidth 只累加可见列
+ok 54 - tableDensity：visibleWidth 只累加可见列
+  ---
+  duration_ms: 0.2236
+  type: 'test'
+  ...
+1..54
+# tests 54
+# suites 0
+# pass 54
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 530.6672
+# start of coverage report
+# ------------------------------------------------------------------
+# file              | line % | branch % | funcs % | uncovered lines
+# ------------------------------------------------------------------
+# src               |        |          |         | 
+#  utils            |        |          |         | 
+#   tableDensity.js | 100.00 |   100.00 |  100.00 | 
+# tools             |        |          |         | 
+#  style-guard      |        |          |         | 
+#   index.mjs       | 100.00 |    96.51 |  100.00 | 
+# ------------------------------------------------------------------
+# all files         | 100.00 |    96.84 |  100.00 | 
+# ------------------------------------------------------------------
+# end of coverage report
+
+> yuzhua-frontend@1.0.0 build
+> node -r ./esbuild-tmp-shim.cjs node_modules/vite/bin/vite.js build && node tools/postbuild-assets.mjs
+
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 2460 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32massets/logo-DcgZEwI_.svg                           [39m[1m[2m  0.74 kB[22m[1m[22m[2m │ gzip:   0.40 kB[22m
+[2mdist/[22m[32mindex.html                                         [39m[1m[2m  3.17 kB[22m[1m[22m[2m │ gzip:   1.69 kB[22m
+[2mdist/[22m[32massets/tuantuan-8wo1R5K3.webp                      [39m[1m[2m 30.58 kB[22m[1m[22m
+[2mdist/[22m[32m.vite/manifest.json                                [39m[1m[2m 44.55 kB[22m[1m[22m[2m │ gzip:   4.97 kB[22m
+[2mdist/[22m[35massets/el-tooltip-D7jGJQuE.css                     [39m[1m[2m  0.02 kB[22m[1m[22m[2m │ gzip:   0.04 kB[22m
+[2mdist/[22m[35massets/ChangePasswordForm-LOkLG24I.css             [39m[1m[2m  0.05 kB[22m[1m[22m[2m │ gzip:   0.07 kB[22m
+[2mdist/[22m[35massets/PetForm-CWl-uoKF.css                        [39m[1m[2m  0.13 kB[22m[1m[22m[2m │ gzip:   0.11 kB[22m
+[2mdist/[22m[35massets/RecordDetail-4wX8MYQN.css                   [39m[1m[2m  0.18 kB[22m[1m[22m[2m │ gzip:   0.14 kB[22m
+[2mdist/[22m[35massets/el-overlay-Boq-0vby.css                     [39m[1m[2m  0.21 kB[22m[1m[22m[2m │ gzip:   0.16 kB[22m
+[2mdist/[22m[35massets/Records-C8GvTbV5.css                        [39m[1m[2m  0.26 kB[22m[1m[22m[2m │ gzip:   0.17 kB[22m
+[2mdist/[22m[35massets/Pets-Cjg37YKK.css                           [39m[1m[2m  0.29 kB[22m[1m[22m[2m │ gzip:   0.16 kB[22m
+[2mdist/[22m[35massets/NotFound-DhDSEEKO.css                       [39m[1m[2m  0.29 kB[22m[1m[22m[2m │ gzip:   0.20 kB[22m
+[2mdist/[22m[35massets/ConsultList-BH_BNv0x.css                    [39m[1m[2m  0.31 kB[22m[1m[22m[2m │ gzip:   0.17 kB[22m
+[2mdist/[22m[35massets/Notices-E5TMEArd.css                        [39m[1m[2m  0.33 kB[22m[1m[22m[2m │ gzip:   0.21 kB[22m
+[2mdist/[22m[35massets/Users-PhxUxT9A.css                          [39m[1m[2m  0.34 kB[22m[1m[22m[2m │ gzip:   0.17 kB[22m
+[2mdist/[22m[35massets/Profile-BT-jM4gX.css                        [39m[1m[2m  0.43 kB[22m[1m[22m[2m │ gzip:   0.23 kB[22m
+[2mdist/[22m[35massets/Doctors-Ca-sbidS.css                        [39m[1m[2m  0.44 kB[22m[1m[22m[2m │ gzip:   0.21 kB[22m
+[2mdist/[22m[35massets/MyProfile-BDVToQuZ.css                      [39m[1m[2m  0.45 kB[22m[1m[22m[2m │ gzip:   0.24 kB[22m
+[2mdist/[22m[35massets/Register-clGYaOia.css                       [39m[1m[2m  0.55 kB[22m[1m[22m[2m │ gzip:   0.29 kB[22m
+[2mdist/[22m[35massets/el-image-BayqNUqQ.css                       [39m[1m[2m  0.60 kB[22m[1m[22m[2m │ gzip:   0.31 kB[22m
+[2mdist/[22m[35massets/RecordDetail-DSed4T9O.css                   [39m[1m[2m  0.79 kB[22m[1m[22m[2m │ gzip:   0.30 kB[22m
+[2mdist/[22m[35massets/Departments-B4UMLzXi.css                    [39m[1m[2m  0.80 kB[22m[1m[22m[2m │ gzip:   0.39 kB[22m
+[2mdist/[22m[35massets/ImageViewerHost-CHUUyFOm.css                [39m[1m[2m  0.84 kB[22m[1m[22m[2m │ gzip:   0.41 kB[22m
+[2mdist/[22m[35massets/ImageGallery-CB6aRH3C.css                   [39m[1m[2m  0.91 kB[22m[1m[22m[2m │ gzip:   0.39 kB[22m
+[2mdist/[22m[35massets/NewConsult-Bujhz1XD.css                     [39m[1m[2m  0.91 kB[22m[1m[22m[2m │ gzip:   0.35 kB[22m
+[2mdist/[22m[35massets/Mine-DoMj8p3q.css                           [39m[1m[2m  1.04 kB[22m[1m[22m[2m │ gzip:   0.45 kB[22m
+[2mdist/[22m[35massets/ReviewForm-BkZyiO9Y.css                     [39m[1m[2m  1.08 kB[22m[1m[22m[2m │ gzip:   0.41 kB[22m
+[2mdist/[22m[35massets/ImageUpload-BMkZ-Wxq.css                    [39m[1m[2m  1.09 kB[22m[1m[22m[2m │ gzip:   0.44 kB[22m
+[2mdist/[22m[35massets/ConsultRecords-BUartp_P.css                 [39m[1m[2m  1.14 kB[22m[1m[22m[2m │ gzip:   0.46 kB[22m
+[2mdist/[22m[35massets/MyRecords-d8dqu666.css                      [39m[1m[2m  1.31 kB[22m[1m[22m[2m │ gzip:   0.51 kB[22m
+[2mdist/[22m[35massets/NoticeList-DelPP17G.css                     [39m[1m[2m  1.33 kB[22m[1m[22m[2m │ gzip:   0.54 kB[22m
+[2mdist/[22m[35massets/NoticeDetail-CnZPh2q2.css                   [39m[1m[2m  1.34 kB[22m[1m[22m[2m │ gzip:   0.50 kB[22m
+[2mdist/[22m[35massets/ConsultRoom-DLdxxEWC.css                    [39m[1m[2m  1.42 kB[22m[1m[22m[2m │ gzip:   0.54 kB[22m
+[2mdist/[22m[35massets/ConsultList-Dma9x8bY.css                    [39m[1m[2m  1.47 kB[22m[1m[22m[2m │ gzip:   0.54 kB[22m
+[2mdist/[22m[35massets/el-page-header-DpeVLac0.css                 [39m[1m[2m  1.50 kB[22m[1m[22m[2m │ gzip:   0.52 kB[22m
+[2mdist/[22m[35massets/el-loading-8df25rMS.css                     [39m[1m[2m  1.66 kB[22m[1m[22m[2m │ gzip:   0.57 kB[22m
+[2mdist/[22m[35massets/PetPicker-B-yszkJJ.css                      [39m[1m[2m  1.96 kB[22m[1m[22m[2m │ gzip:   0.72 kB[22m
+[2mdist/[22m[35massets/DoctorList-BlturPW5.css                     [39m[1m[2m  1.96 kB[22m[1m[22m[2m │ gzip:   0.67 kB[22m
+[2mdist/[22m[35massets/ConsultRoom-BEhMOMSf.css                    [39m[1m[2m  2.07 kB[22m[1m[22m[2m │ gzip:   0.70 kB[22m
+[2mdist/[22m[35massets/Dashboard-CmV94_Fa.css                      [39m[1m[2m  2.09 kB[22m[1m[22m[2m │ gzip:   0.67 kB[22m
+[2mdist/[22m[35massets/el-image-viewer-gMO4unAN.css                [39m[1m[2m  2.20 kB[22m[1m[22m[2m │ gzip:   0.68 kB[22m
+[2mdist/[22m[35massets/MyPets-Bgd2nvhc.css                         [39m[1m[2m  2.31 kB[22m[1m[22m[2m │ gzip:   0.72 kB[22m
+[2mdist/[22m[35massets/el-radio-button-CP7zFYBB.css                [39m[1m[2m  3.20 kB[22m[1m[22m[2m │ gzip:   0.79 kB[22m
+[2mdist/[22m[35massets/el-segmented-BrBfuYty.css                   [39m[1m[2m  3.39 kB[22m[1m[22m[2m │ gzip:   0.83 kB[22m
+[2mdist/[22m[35massets/el-descriptions-JWA4q49d.css                [39m[1m[2m  3.46 kB[22m[1m[22m[2m │ gzip:   0.62 kB[22m
+[2mdist/[22m[35massets/Reviews-CeuC7fJn.css                        [39m[1m[2m  3.58 kB[22m[1m[22m[2m │ gzip:   1.05 kB[22m
+[2mdist/[22m[35massets/el-dialog-xSqOu1ov.css                      [39m[1m[2m  3.61 kB[22m[1m[22m[2m │ gzip:   0.99 kB[22m
+[2mdist/[22m[35massets/MySchedule-BEC5k3O2.css                     [39m[1m[2m  3.76 kB[22m[1m[22m[2m │ gzip:   0.88 kB[22m
+[2mdist/[22m[35massets/AppointmentDetail-pRDbH8ZO.css              [39m[1m[2m  3.87 kB[22m[1m[22m[2m │ gzip:   1.04 kB[22m
+[2mdist/[22m[35massets/MedicalRecordSheet-CyefcJ0Y.css             [39m[1m[2m  3.91 kB[22m[1m[22m[2m │ gzip:   0.98 kB[22m
+[2mdist/[22m[35massets/el-switch-D4DpnEEB.css                      [39m[1m[2m  3.93 kB[22m[1m[22m[2m │ gzip:   0.96 kB[22m
+[2mdist/[22m[35massets/Appointments-BitsqtEQ.css                   [39m[1m[2m  3.96 kB[22m[1m[22m[2m │ gzip:   1.03 kB[22m
+[2mdist/[22m[35massets/el-drawer-DTZA-gSw.css                      [39m[1m[2m  4.10 kB[22m[1m[22m[2m │ gzip:   1.07 kB[22m
+[2mdist/[22m[35massets/LoginForm-keFppiEK.css                      [39m[1m[2m  4.14 kB[22m[1m[22m[2m │ gzip:   1.33 kB[22m
+[2mdist/[22m[35massets/el-input-number-Cp42U08B.css                [39m[1m[2m  4.37 kB[22m[1m[22m[2m │ gzip:   0.91 kB[22m
+[2mdist/[22m[35massets/el-radio-group-D4zDdkaV.css                 [39m[1m[2m  4.47 kB[22m[1m[22m[2m │ gzip:   0.98 kB[22m
+[2mdist/[22m[35massets/messageBox-BfgoYLdd.css                     [39m[1m[2m  4.80 kB[22m[1m[22m[2m │ gzip:   1.17 kB[22m
+[2mdist/[22m[35massets/el-form-item-FJlhuP5i.css                   [39m[1m[2m  5.84 kB[22m[1m[22m[2m │ gzip:   1.01 kB[22m
+[2mdist/[22m[35massets/el-pagination-paQ4fmUo.css                  [39m[1m[2m  7.05 kB[22m[1m[22m[2m │ gzip:   1.20 kB[22m
+[2mdist/[22m[35massets/ConsultPanel-ajEsL43U.css                   [39m[1m[2m  7.09 kB[22m[1m[22m[2m │ gzip:   1.72 kB[22m
+[2mdist/[22m[35massets/Workbench-H9WuDbcy.css                      [39m[1m[2m  8.46 kB[22m[1m[22m[2m │ gzip:   1.89 kB[22m
+[2mdist/[22m[35massets/DoctorDetail-BmoRigBF.css                   [39m[1m[2m  8.51 kB[22m[1m[22m[2m │ gzip:   1.91 kB[22m
+[2mdist/[22m[35massets/OrderDetail-B-lDvqDJ.css                    [39m[1m[2m 10.18 kB[22m[1m[22m[2m │ gzip:   2.16 kB[22m
+[2mdist/[22m[35massets/Booking-CSCJ25PW.css                        [39m[1m[2m 11.13 kB[22m[1m[22m[2m │ gzip:   2.83 kB[22m
+[2mdist/[22m[35massets/AdminLayout-ChUOoGZ-.css                    [39m[1m[2m 13.52 kB[22m[1m[22m[2m │ gzip:   2.55 kB[22m
+[2mdist/[22m[35massets/Schedules-DDqp28uO.css                      [39m[1m[2m 15.40 kB[22m[1m[22m[2m │ gzip:   2.77 kB[22m
+[2mdist/[22m[35massets/el-select-De5g2loW.css                      [39m[1m[2m 16.95 kB[22m[1m[22m[2m │ gzip:   2.71 kB[22m
+[2mdist/[22m[35massets/MyOrders-BhgnBcL-.css                       [39m[1m[2m 18.74 kB[22m[1m[22m[2m │ gzip:   2.96 kB[22m
+[2mdist/[22m[35massets/el-table-column-CGtjekpn.css                [39m[1m[2m 26.12 kB[22m[1m[22m[2m │ gzip:   3.81 kB[22m
+[2mdist/[22m[35massets/el-date-picker-CnrcpGza.css                 [39m[1m[2m 31.32 kB[22m[1m[22m[2m │ gzip:   4.35 kB[22m
+[2mdist/[22m[35massets/el-col-JJvwCnWd.css                         [39m[1m[2m 36.53 kB[22m[1m[22m[2m │ gzip:   3.53 kB[22m
+[2mdist/[22m[35massets/index-54opOs1E.css                          [39m[1m[2m 92.14 kB[22m[1m[22m[2m │ gzip:  14.79 kB[22m
+[2mdist/[22m[36massets/validator-rQbgodZ5.js                       [39m[1m[2m  0.09 kB[22m[1m[22m[2m │ gzip:   0.10 kB[22m
+[2mdist/[22m[36massets/schedule-JYI2ou9i.js                        [39m[1m[2m  0.42 kB[22m[1m[22m[2m │ gzip:   0.26 kB[22m
+[2mdist/[22m[36massets/index-DGKF88Vu.js                           [39m[1m[2m  0.63 kB[22m[1m[22m[2m │ gzip:   0.39 kB[22m
+[2mdist/[22m[36massets/NotFound-BICLanHy.js                        [39m[1m[2m  0.66 kB[22m[1m[22m[2m │ gzip:   0.51 kB[22m
+[2mdist/[22m[36massets/index-BN3_l_z8.js                           [39m[1m[2m  0.81 kB[22m[1m[22m[2m │ gzip:   0.49 kB[22m
+[2mdist/[22m[36massets/admin-BougQEi5.js                           [39m[1m[2m  0.81 kB[22m[1m[22m[2m │ gzip:   0.41 kB[22m
+[2mdist/[22m[36massets/omit-DKfkTeul.js                            [39m[1m[2m  0.92 kB[22m[1m[22m[2m │ gzip:   0.56 kB[22m
+[2mdist/[22m[36massets/index-BH9ncWmF.js                           [39m[1m[2m  0.94 kB[22m[1m[22m[2m │ gzip:   0.52 kB[22m
+[2mdist/[22m[36massets/Login-B5FR1zTM.js                           [39m[1m[2m  1.00 kB[22m[1m[22m[2m │ gzip:   0.65 kB[22m
+[2mdist/[22m[36massets/debounce-bNzMRc7Z.js                        [39m[1m[2m  1.03 kB[22m[1m[22m[2m │ gzip:   0.55 kB[22m
+[2mdist/[22m[36massets/Login-DRZEPma8.js                           [39m[1m[2m  1.14 kB[22m[1m[22m[2m │ gzip:   0.72 kB[22m
+[2mdist/[22m[36massets/scroll-DEOeFJJP.js                          [39m[1m[2m  1.24 kB[22m[1m[22m[2m │ gzip:   0.66 kB[22m
+[2mdist/[22m[36massets/Mine-DqfHeO6b.js                            [39m[1m[2m  1.44 kB[22m[1m[22m[2m │ gzip:   0.91 kB[22m
+[2mdist/[22m[36massets/ImageGallery-DVI0S5MB.js                    [39m[1m[2m  1.44 kB[22m[1m[22m[2m │ gzip:   0.86 kB[22m
+[2mdist/[22m[36massets/RecordDetail-DirOvWQL.js                    [39m[1m[2m  1.48 kB[22m[1m[22m[2m │ gzip:   0.93 kB[22m
+[2mdist/[22m[36massets/RecordDetail-DfBHZks9.js                    [39m[1m[2m  1.54 kB[22m[1m[22m[2m │ gzip:   0.95 kB[22m
+[2mdist/[22m[36massets/index-CxqmMpgY.js                           [39m[1m[2m  1.61 kB[22m[1m[22m[2m │ gzip:   0.55 kB[22m
+[2mdist/[22m[36massets/ImageViewerHost-Cqox75AA.js                 [39m[1m[2m  1.64 kB[22m[1m[22m[2m │ gzip:   1.05 kB[22m
+[2mdist/[22m[36massets/el-col-JkAY-TjE.js                          [39m[1m[2m  2.06 kB[22m[1m[22m[2m │ gzip:   0.89 kB[22m
+[2mdist/[22m[36massets/ImageUpload-BJiWMVqy.js                     [39m[1m[2m  2.06 kB[22m[1m[22m[2m │ gzip:   1.19 kB[22m
+[2mdist/[22m[36massets/NoticeDetail-Qhb6FYgl.js                    [39m[1m[2m  2.09 kB[22m[1m[22m[2m │ gzip:   1.29 kB[22m
+[2mdist/[22m[36massets/ChangePasswordForm-Djj4WRgV.js              [39m[1m[2m  2.19 kB[22m[1m[22m[2m │ gzip:   1.06 kB[22m
+[2mdist/[22m[36massets/Profile-DFLmckrq.js                         [39m[1m[2m  2.23 kB[22m[1m[22m[2m │ gzip:   1.12 kB[22m
+[2mdist/[22m[36massets/el-overlay-CM3ReANM.js                      [39m[1m[2m  2.26 kB[22m[1m[22m[2m │ gzip:   1.06 kB[22m
+[2mdist/[22m[36massets/MyRecords-M1JB7_lL.js                       [39m[1m[2m  2.26 kB[22m[1m[22m[2m │ gzip:   1.32 kB[22m
+[2mdist/[22m[36massets/el-page-header-CBKCZBmp.js                  [39m[1m[2m  2.29 kB[22m[1m[22m[2m │ gzip:   0.94 kB[22m
+[2mdist/[22m[36massets/PetPicker-Pxe3T9KK.js                       [39m[1m[2m  2.37 kB[22m[1m[22m[2m │ gzip:   1.26 kB[22m
+[2mdist/[22m[36massets/MedicalRecordSheet-BP1LGk7i.js              [39m[1m[2m  2.52 kB[22m[1m[22m[2m │ gzip:   1.37 kB[22m
+[2mdist/[22m[36massets/admin-n_igo_fA.js                           [39m[1m[2m  2.73 kB[22m[1m[22m[2m │ gzip:   0.90 kB[22m
+[2mdist/[22m[36massets/ConsultList-CmmN_QqH.js                     [39m[1m[2m  2.76 kB[22m[1m[22m[2m │ gzip:   1.60 kB[22m
+[2mdist/[22m[36massets/el-segmented-DQLDlUoI.js                    [39m[1m[2m  3.22 kB[22m[1m[22m[2m │ gzip:   1.55 kB[22m
+[2mdist/[22m[36massets/DoctorList-DIP4_8io.js                      [39m[1m[2m  3.24 kB[22m[1m[22m[2m │ gzip:   1.76 kB[22m
+[2mdist/[22m[36massets/NoticeList-Cr_rpMv7.js                      [39m[1m[2m  3.34 kB[22m[1m[22m[2m │ gzip:   1.78 kB[22m
+[2mdist/[22m[36massets/ReviewForm--ZIDCJea.js                      [39m[1m[2m  3.49 kB[22m[1m[22m[2m │ gzip:   1.94 kB[22m
+[2mdist/[22m[36massets/Register-iMvWsZp2.js                        [39m[1m[2m  3.51 kB[22m[1m[22m[2m │ gzip:   1.70 kB[22m
+[2mdist/[22m[36massets/ConsultList-D1_Fmx_0.js                     [39m[1m[2m  3.75 kB[22m[1m[22m[2m │ gzip:   1.95 kB[22m
+[2mdist/[22m[36massets/NewConsult-JH7YK0pH.js                      [39m[1m[2m  3.80 kB[22m[1m[22m[2m │ gzip:   2.07 kB[22m
+[2mdist/[22m[36massets/Records-FMKLg-fw.js                         [39m[1m[2m  3.82 kB[22m[1m[22m[2m │ gzip:   1.89 kB[22m
+[2mdist/[22m[36massets/MyProfile-XiIncc6X.js                       [39m[1m[2m  4.05 kB[22m[1m[22m[2m │ gzip:   1.81 kB[22m
+[2mdist/[22m[36massets/MySchedule-BsD-Bw3D.js                      [39m[1m[2m  4.35 kB[22m[1m[22m[2m │ gzip:   2.27 kB[22m
+[2mdist/[22m[36massets/el-image-C_YQ3fhS.js                        [39m[1m[2m  4.35 kB[22m[1m[22m[2m │ gzip:   1.96 kB[22m
+[2mdist/[22m[36massets/MyPets-A-vJpJ03.js                          [39m[1m[2m  4.42 kB[22m[1m[22m[2m │ gzip:   2.33 kB[22m
+[2mdist/[22m[36massets/ConsultRoom-CqCHWw04.js                     [39m[1m[2m  4.45 kB[22m[1m[22m[2m │ gzip:   2.28 kB[22m
+[2mdist/[22m[36massets/use-dialog-CjrkguWj.js                      [39m[1m[2m  4.49 kB[22m[1m[22m[2m │ gzip:   1.78 kB[22m
+[2mdist/[22m[36massets/_baseClone-DrBepz1m.js                      [39m[1m[2m  4.72 kB[22m[1m[22m[2m │ gzip:   1.92 kB[22m
+[2mdist/[22m[36massets/el-dialog-jyrhnzqh.js                       [39m[1m[2m  4.72 kB[22m[1m[22m[2m │ gzip:   2.07 kB[22m
+[2mdist/[22m[36massets/el-loading-9r9ftIGk.js                      [39m[1m[2m  4.72 kB[22m[1m[22m[2m │ gzip:   2.03 kB[22m
+[2mdist/[22m[36massets/el-descriptions-BQw7VFfv.js                 [39m[1m[2m  4.73 kB[22m[1m[22m[2m │ gzip:   1.86 kB[22m
+[2mdist/[22m[36massets/LoginForm-V00BW3RO.js                       [39m[1m[2m  4.80 kB[22m[1m[22m[2m │ gzip:   2.53 kB[22m
+[2mdist/[22m[36massets/core-BGVzS-G6.js                            [39m[1m[2m  4.82 kB[22m[1m[22m[2m │ gzip:   2.15 kB[22m
+[2mdist/[22m[36massets/el-drawer-BxdjXoPF.js                       [39m[1m[2m  4.99 kB[22m[1m[22m[2m │ gzip:   2.29 kB[22m
+[2mdist/[22m[36massets/el-switch-CZDXt3VK.js                       [39m[1m[2m  5.07 kB[22m[1m[22m[2m │ gzip:   1.77 kB[22m
+[2mdist/[22m[36massets/ConsultRoom-BShfo3AB.js                     [39m[1m[2m  5.11 kB[22m[1m[22m[2m │ gzip:   2.51 kB[22m
+[2mdist/[22m[36massets/el-radio-group-CzzT4OkS.js                  [39m[1m[2m  5.40 kB[22m[1m[22m[2m │ gzip:   2.22 kB[22m
+[2mdist/[22m[36massets/createSeriesData-DrBS9pEq.js                [39m[1m[2m  5.68 kB[22m[1m[22m[2m │ gzip:   2.41 kB[22m
+[2mdist/[22m[36massets/PetForm-DYFuJ6U-.js                         [39m[1m[2m  6.06 kB[22m[1m[22m[2m │ gzip:   2.31 kB[22m
+[2mdist/[22m[36massets/Departments-DhMfVZSc.js                     [39m[1m[2m  6.38 kB[22m[1m[22m[2m │ gzip:   2.81 kB[22m
+[2mdist/[22m[36massets/Users-CdHcSsgA.js                           [39m[1m[2m  6.53 kB[22m[1m[22m[2m │ gzip:   2.85 kB[22m
+[2mdist/[22m[36massets/Reviews-Bs8Sj1mr.js                         [39m[1m[2m  6.59 kB[22m[1m[22m[2m │ gzip:   3.13 kB[22m
+[2mdist/[22m[36massets/AppointmentDetail-vaO-PQCz.js               [39m[1m[2m  6.89 kB[22m[1m[22m[2m │ gzip:   2.97 kB[22m
+[2mdist/[22m[36massets/el-input-number-BEs_9nD2.js                 [39m[1m[2m  7.28 kB[22m[1m[22m[2m │ gzip:   2.92 kB[22m
+[2mdist/[22m[36massets/el-image-viewer-CygbEVee.js                 [39m[1m[2m  7.30 kB[22m[1m[22m[2m │ gzip:   2.97 kB[22m
+[2mdist/[22m[36massets/DoctorDetail-B91-jP02.js                    [39m[1m[2m  7.94 kB[22m[1m[22m[2m │ gzip:   3.64 kB[22m
+[2mdist/[22m[36massets/Notices-BhN60axk.js                         [39m[1m[2m  8.33 kB[22m[1m[22m[2m │ gzip:   3.15 kB[22m
+[2mdist/[22m[36massets/ConsultRecords-W0_By0Tv.js                  [39m[1m[2m  9.10 kB[22m[1m[22m[2m │ gzip:   3.80 kB[22m
+[2mdist/[22m[36massets/Dashboard-D9NXnqyJ.js                       [39m[1m[2m  9.43 kB[22m[1m[22m[2m │ gzip:   3.93 kB[22m
+[2mdist/[22m[36massets/Pets-CSHZgFMO.js                            [39m[1m[2m  9.46 kB[22m[1m[22m[2m │ gzip:   3.51 kB[22m
+[2mdist/[22m[36massets/Workbench-DohR7qDk.js                       [39m[1m[2m 10.27 kB[22m[1m[22m[2m │ gzip:   4.38 kB[22m
+[2mdist/[22m[36massets/OrderDetail-CJxH_PIJ.js                     [39m[1m[2m 11.72 kB[22m[1m[22m[2m │ gzip:   5.13 kB[22m
+[2mdist/[22m[36massets/el-pagination-CVuBeVxO.js                   [39m[1m[2m 11.82 kB[22m[1m[22m[2m │ gzip:   4.06 kB[22m
+[2mdist/[22m[36massets/Doctors-CtGl9iPA.js                         [39m[1m[2m 12.12 kB[22m[1m[22m[2m │ gzip:   4.58 kB[22m
+[2mdist/[22m[36massets/messageBox-Cwy_pSJo.js                      [39m[1m[2m 12.22 kB[22m[1m[22m[2m │ gzip:   4.56 kB[22m
+[2mdist/[22m[36massets/Appointments-C4pglSjT.js                    [39m[1m[2m 12.37 kB[22m[1m[22m[2m │ gzip:   4.86 kB[22m
+[2mdist/[22m[36massets/ConsultPanel-DCrVRqDJ.js                    [39m[1m[2m 13.80 kB[22m[1m[22m[2m │ gzip:   6.02 kB[22m
+[2mdist/[22m[36massets/Booking-mB65CABx.js                         [39m[1m[2m 15.85 kB[22m[1m[22m[2m │ gzip:   6.73 kB[22m
+[2mdist/[22m[36massets/MyOrders-pKk5VLXX.js                        [39m[1m[2m 18.62 kB[22m[1m[22m[2m │ gzip:   7.98 kB[22m
+[2mdist/[22m[36massets/Schedules-PodXpIYD.js                       [39m[1m[2m 19.00 kB[22m[1m[22m[2m │ gzip:   6.86 kB[22m
+[2mdist/[22m[36massets/AdminLayout-BUv2W-ZI.js                     [39m[1m[2m 20.62 kB[22m[1m[22m[2m │ gzip:   7.99 kB[22m
+[2mdist/[22m[36massets/el-form-item-C2tOLrKe.js                    [39m[1m[2m 27.63 kB[22m[1m[22m[2m │ gzip:   9.66 kB[22m
+[2mdist/[22m[36massets/renderers-CdYWd300.js                       [39m[1m[2m 32.93 kB[22m[1m[22m[2m │ gzip:  12.74 kB[22m
+[2mdist/[22m[36massets/el-select-CQSd4nIb.js                       [39m[1m[2m 34.40 kB[22m[1m[22m[2m │ gzip:  11.73 kB[22m
+[2mdist/[22m[36massets/el-table-column-DYNfbScP.js                 [39m[1m[2m 89.87 kB[22m[1m[22m[2m │ gzip:  30.82 kB[22m
+[2mdist/[22m[36massets/el-date-picker-51eL2YqB.js                  [39m[1m[2m103.18 kB[22m[1m[22m[2m │ gzip:  28.76 kB[22m
+[2mdist/[22m[36massets/customGraphicKeyframeAnimation-BwipPccT.js  [39m[1m[2m126.52 kB[22m[1m[22m[2m │ gzip:  42.29 kB[22m
+[2mdist/[22m[36massets/graphic-BXAK6xMP.js                         [39m[1m[2m146.69 kB[22m[1m[22m[2m │ gzip:  49.45 kB[22m
+[2mdist/[22m[36massets/Axis-C25cQT2J.js                            [39m[1m[2m228.50 kB[22m[1m[22m[2m │ gzip:  78.84 kB[22m
+[2mdist/[22m[36massets/components-C5hwjtgx.js                      [39m[1m[2m231.95 kB[22m[1m[22m[2m │ gzip:  74.11 kB[22m
+[2mdist/[22m[36massets/charts-CZ3gWZ01.js                          [39m[1m[2m249.38 kB[22m[1m[22m[2m │ gzip:  82.13 kB[22m
+[2mdist/[22m[36massets/index-BLabDGkg.js                           [39m[1m[2m412.85 kB[22m[1m[22m[2m │ gzip: 150.17 kB[22m
+[32m✓ built in 11.28s[39m
+[postbuild-assets] demo-preload.json 写入 2 个入口资产；生成 153 个 .gz（扫描 160，跳过 7）
+
+> yuzhua-frontend@1.0.0 bundle-budget
+> node tools/bundle-budget.mjs
+
+[bundle-budget] 首屏包体与预压缩门禁汇总：
+  - /index.html: gzip 1.65 KB (1688 B) / 上限 14.00 KB (14336 B)（raw 3315 B，.gz 有）
+  - 首屏入口关键路径 (2 项): gzip 160.84 KB (164700 B) / 上限 165.00 KB (168960 B)
+      * /assets/index-BLabDGkg.js: gzip 146.51 KB (150024 B)（raw 414899 B，.gz 有）
+      * /assets/index-54opOs1E.css: gzip 14.33 KB (14676 B)（raw 92151 B，.gz 有）
+  - dist/assets 图片 (1 张，单图上限 50.00 KB (51200 B)):
+      * /assets/tuantuan-8wo1R5K3.webp: 29.87 KB (30584 B)
+  - /demo-preload.json: 2 个预热资产
+[bundle-budget] 门禁通过

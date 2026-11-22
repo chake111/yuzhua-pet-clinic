@@ -3,6 +3,7 @@ import { loadWithSavedScroll } from '@/utils/listScroll'
 import LoadFailure from '@/components/LoadFailure.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Search } from '@element-plus/icons-vue'
 import { departments, doctors } from '@/api/user'
 import DoctorCard from '@/components/DoctorCard.vue'
 
@@ -65,7 +66,7 @@ onMounted(() => loadWithSavedScroll(load))
     </div>
 
     <div class="filter">
-      <el-input v-model="q.keyword" placeholder="姓名 / 擅长领域 / 职称" aria-label="搜索医生" clearable prefix-icon="Search"
+      <el-input v-model="q.keyword" placeholder="姓名 / 擅长领域 / 职称" aria-label="搜索医生" clearable :prefix-icon="Search"
                 @keyup.enter="reset" @clear="reset">
         <template #append><el-button @click="reset">搜索</el-button></template>
       </el-input>

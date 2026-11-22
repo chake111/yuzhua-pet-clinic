@@ -76,6 +76,9 @@ jobs:
       - name: 构建
         run: npm run build
 
+      - name: 包体预算门禁
+        run: npm run bundle-budget
+
       - name: 校验 Dependabot 标题本地化脚本
         working-directory: .
         run: node --test .github/scripts/localize-dependabot.test.mjs

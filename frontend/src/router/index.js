@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAdminStore } from '@/stores/admin'
+import ClientLayout from '@/layouts/ClientLayout.vue'
+import Home from '@/views/client/Home.vue'
 import { useUserStore } from '@/stores/client'
 
 /**
@@ -14,9 +15,9 @@ const routes = [
   { path: '/register', name: 'register', component: () => import('@/views/client/Register.vue') },
   {
     path: '/',
-    component: () => import('@/layouts/ClientLayout.vue'),
+    component: ClientLayout,
     children: [
-      { path: '', name: 'home', component: () => import('@/views/client/Home.vue') },
+      { path: '', name: 'home', component: Home },
       { path: 'doctors', name: 'doctors', component: () => import('@/views/client/DoctorList.vue') },
       { path: 'doctor/:id', name: 'doctor', component: () => import('@/views/client/DoctorDetail.vue') },
       { path: 'book/:doctorId', name: 'book', component: () => import('@/views/client/Booking.vue'), meta: { auth: true } },
@@ -82,8 +83,9 @@ const router = createRouter({
   scrollBehavior: (to, from, saved) => saved || { top: 0 }
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   if (to.meta.admin) {
+    const { useAdminStore } = await import('@/stores/admin')
     const store = useAdminStore()
     if (!store.logged) return { path: '/admin/login', query: { redirect: to.fullPath } }
     if (to.meta.roles && !to.meta.roles.includes(store.role)) {

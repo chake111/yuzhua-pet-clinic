@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { Lock, User } from '@element-plus/icons-vue'
 import LoginScene from '@/components/LoginScene.vue'
 
 /**
@@ -11,12 +12,25 @@ import LoginScene from '@/components/LoginScene.vue'
 const props = defineProps({
   login: { type: Function, required: true },
   onSuccess: { type: Function, required: true },
-  staff: { type: Boolean, default: false }
+  staff: { type: Boolean, default: false },
+  initialUsername: { type: String, default: '' },
+  initialPassword: { type: String, default: '' }
 })
 
-const form = ref({ username: '', password: '' })
+const form = ref({
+  username: props.initialUsername || '',
+  password: props.initialPassword || ''
+})
+const edited = { username: false, password: false }
 const el = ref(null)
 const busy = ref(false)
+
+watch(() => props.initialUsername, (value) => {
+  if (!edited.username) form.value.username = value || ''
+})
+watch(() => props.initialPassword, (value) => {
+  if (!edited.password) form.value.password = value || ''
+})
 
 const rules = {
   username: [{ required: true, message: '请输入账号', trigger: 'blur' }],
@@ -48,12 +62,12 @@ function onEnter(event) {
   <LoginScene :staff="staff">
     <el-form ref="el" :model="form" :rules="rules" label-position="top" size="large" @submit.prevent="submit" @keydown.enter="onEnter">
       <el-form-item label="账号" prop="username">
-        <el-input v-model.trim="form.username" autocomplete="username" placeholder="请输入登录账号" clearable>
+        <el-input v-model.trim="form.username" autocomplete="username" placeholder="请输入登录账号" clearable @input="edited.username = true" @clear="edited.username = true">
           <template #prefix><el-icon><User /></el-icon></template>
         </el-input>
       </el-form-item>
       <el-form-item label="密码" prop="password">
-        <el-input v-model="form.password" type="password" autocomplete="current-password" placeholder="请输入密码" show-password>
+        <el-input v-model="form.password" type="password" autocomplete="current-password" placeholder="请输入密码" show-password @input="edited.password = true">
           <template #prefix><el-icon><Lock /></el-icon></template>
         </el-input>
       </el-form-item>

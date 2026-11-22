@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Calendar, Picture, Top, ZoomIn } from '@element-plus/icons-vue'
 import { consultMessages } from '@/api/user'
 import { consultMessages as adminMessages } from '@/api/admin'
 import { upload } from '@/api/http'

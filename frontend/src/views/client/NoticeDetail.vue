@@ -2,6 +2,7 @@
 import LoadFailure from '@/components/LoadFailure.vue'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { View } from '@element-plus/icons-vue'
 import { noticeDetail } from '@/api/user'
 import { NOTICE_TYPE, text } from '@/utils/dict'
 import { toDateTime } from '@/utils/format'

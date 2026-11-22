@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElDrawer } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft, Document } from '@element-plus/icons-vue'
 import { acceptConsult, closeConsult, consultDetail } from '@/api/admin'
 import { SESSION_STATUS, text } from '@/utils/dict'
 import { maskPhone } from '@/utils/format'
@@ -106,8 +107,8 @@ onMounted(async () => {
           <ConsultPanel :key="panelKey" :session-id="id" kind="admin" :closed="closed" peer-label="宠物主人" :preview-owner="previewOwner"
                          @status-changed="load" />
         </section>
-        <ElDrawer v-model="detailsOpen" title="病情资料" :direction="phone ? 'btt' : 'rtl'"
-                  :size="phone ? 'auto' : '400px'" :style="phone ? { maxHeight: '80dvh', borderRadius: '16px 16px 0 0' } : {}">
+        <el-drawer v-model="detailsOpen" title="病情资料" :direction="phone ? 'btt' : 'rtl'"
+                   :size="phone ? 'auto' : '400px'" :style="phone ? { maxHeight: '80dvh', borderRadius: '16px 16px 0 0' } : {}">
           <div id="consult-details" class="details-body">
             <section v-if="session.summary" class="detail-section summary">
               <h3>问诊小结</h3>
@@ -126,7 +127,7 @@ onMounted(async () => {
               <p>{{ maskPhone(session.userPhone) || '未填写' }}</p>
             </section>
           </div>
-        </ElDrawer>
+        </el-drawer>
       </div>
 
       <el-dialog v-model="finishOpen" title="结束问诊" width="min(440px, 92vw)">

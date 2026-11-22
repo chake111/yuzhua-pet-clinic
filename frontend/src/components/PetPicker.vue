@@ -1,4 +1,5 @@
 <script setup>
+import { Plus, Select } from '@element-plus/icons-vue'
 import { PET_GENDER, text } from '@/utils/dict'
 
 /**

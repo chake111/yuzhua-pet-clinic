@@ -3,6 +3,7 @@ import { loadWithSavedScroll } from '@/utils/listScroll'
 import LoadFailure from '@/components/LoadFailure.vue'
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Search, View } from '@element-plus/icons-vue'
 import { notices } from '@/api/user'
 import { NOTICE_TYPE, options, text } from '@/utils/dict'
 import { toDate } from '@/utils/format'
@@ -56,7 +57,7 @@ onMounted(() => loadWithSavedScroll(load))
     <div class="filter pc-card">
       <el-segmented v-model="q.type" :options="[{ value: 'all', label: '全部' }, ...options(NOTICE_TYPE)]"
                     @change="reset" />
-      <el-input v-model="q.keyword" placeholder="搜索标题或正文" aria-label="搜索公告" clearable prefix-icon="Search"
+      <el-input v-model="q.keyword" placeholder="搜索标题或正文" aria-label="搜索公告" clearable :prefix-icon="Search"
                 @keyup.enter="reset" @clear="reset">
         <template #append><el-button @click="reset">搜索</el-button></template>
       </el-input>

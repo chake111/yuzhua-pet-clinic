@@ -1,7 +1,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
+import { ElMessageBox } from '@/utils/messageBox'
 import { accept, appointmentDetail, finish, recordOfAppointment, saveRecord } from '@/api/admin'
 import { APPT_STATUS, PERIOD, tagType, text } from '@/utils/dict'
 import { money, toDate, toDateTime } from '@/utils/format'

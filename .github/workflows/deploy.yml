@@ -108,6 +108,7 @@ jobs:
           file: ./deploy/web/Dockerfile
           push: true
           tags: ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.image_tag }}
+          build-args: VITE_DEMO_PASSWORD=${{ vars.DEMO_PASSWORD }}
           cache-from: type=gha,scope=yuzhua-web
           cache-to: type=gha,mode=max,scope=yuzhua-web
 
@@ -164,12 +165,39 @@ jobs:
       - name: Smoke-test the live site
         run: |
           set -euo pipefail
+          smoke_check() {
+            local root_hdr root_gz js_hdr code root_html entry_js
+            root_hdr=$(mktemp)
+            root_gz=$(mktemp)
+            js_hdr=$(mktemp)
+            trap "rm -f '$root_hdr' '$root_gz' '$js_hdr'" RETURN
+
+            grep -q '"status":"UP"' < <(curl -fsS https://yuzhua-petclinic.top/api/actuator/health) || return 1
+            grep -q '"status":"UP"' < <(curl -fsS https://yuzhua-petclinic.top/api/actuator/health/readiness) || return 1
+            curl -fsS -o /dev/null https://yuzhua-petclinic.top/healthz || return 1
+            curl -fsS -o /dev/null https://yuzhua-petclinic.top/demo || return 1
+
+            code=$(curl -sS -H 'Accept-Encoding: gzip' -D "$root_hdr" -o "$root_gz" -w '%{http_code}' https://yuzhua-petclinic.top/) || return 1
+            [ "$code" = "200" ] || return 1
+            tr -d '\r' < "$root_hdr" | grep -qiE '^content-encoding:[[:space:]]*gzip[[:space:]]*$' || return 1
+            tr -d '\r' < "$root_hdr" | grep -qiE '^cache-control:.*no-cache' || return 1
+
+            code=$(curl -sS -o /dev/null -w '%{http_code}' https://yuzhua-petclinic.top/demo-preload.json) || return 1
+            [ "$code" = "200" ] || return 1
+
+            root_html=$(gzip -dc "$root_gz") || return 1
+            entry_js=$(printf '%s' "$root_html" | grep -oE '/assets/index-[^"'"'"'<>[:space:]]+\.js' | head -n 1 || true)
+            [ -n "$entry_js" ] || return 1
+
+            code=$(curl -sS -H 'Accept-Encoding: gzip' -D "$js_hdr" -o /dev/null -w '%{http_code}' "https://yuzhua-petclinic.top${entry_js}") || return 1
+            [ "$code" = "200" ] || return 1
+            tr -d '\r' < "$js_hdr" | grep -qiE '^content-encoding:[[:space:]]*gzip[[:space:]]*$' || return 1
+            tr -d '\r' < "$js_hdr" | grep -qiE '^cache-control:.*immutable' || return 1
+          }
+
           ok=0
           for i in $(seq 1 12); do
-            if grep -q '"status":"UP"' < <(curl -fsS https://yuzhua-petclinic.top/api/actuator/health) \
-              && grep -q '"status":"UP"' < <(curl -fsS https://yuzhua-petclinic.top/api/actuator/health/readiness) \
-              && curl -fsS -o /dev/null https://yuzhua-petclinic.top/healthz \
-              && curl -fsS -o /dev/null https://yuzhua-petclinic.top/demo; then
+            if smoke_check; then
               ok=1
               break
             fi

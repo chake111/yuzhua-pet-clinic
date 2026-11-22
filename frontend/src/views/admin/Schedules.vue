@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { ElMessageBox } from '@/utils/messageBox'
 import {
   batchSchedule, createSchedule, doctorPage, removeSchedule, resumeSchedule,
   schedulePage, stopSchedule, updateSchedule
@@ -195,7 +196,7 @@ async function del(row) {
     + (row.refNum > 0
       ? `该时段已有 ${row.refNum} 条预约记录，无法删除，可改为停诊。`
       : '已有预约记录的时段无法删除，可改为停诊。'),
-    '删除排班', { type: 'warning' }
+    '删除排班', { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
   ).then(() => true).catch(() => false)
   if (!ok) return
   await removeSchedule(row.id)

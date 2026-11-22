@@ -1,9 +1,13 @@
 <script setup>
 import brandLogo from '@/assets/logo.svg'
 import { BRAND } from '@/brand.js'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+import {
+  Avatar, Bell, Calendar, ChatDotRound, Clock, Collection, DataLine, Document,
+  Expand, Fold, Notebook, OfficeBuilding, Star, Tickets, User
+} from '@element-plus/icons-vue'
+import { ElMessageBox } from '@/utils/messageBox'
 import { consultUnread } from '@/api/admin'
 import { useAdminStore } from '@/stores/admin'
 import StatusChip from '@/components/StatusChip.vue'
@@ -22,19 +26,19 @@ const unread = ref(0)
 let timer = null
 
 const all = [
-  { to: '/admin/dashboard', label: '工作台', icon: 'DataLine' },
-  { to: '/admin/appointments', label: '预约管理', icon: 'Tickets' },
-  { to: '/admin/schedule', label: '排班管理', icon: 'Calendar', roles: ['ADMIN'] },
-  { to: '/admin/my-schedule', label: '我的排班', icon: 'Clock', roles: ['DOCTOR'] },
-  { to: '/admin/doctors', label: '医生管理', icon: 'Avatar', roles: ['ADMIN'] },
-  { to: '/admin/users', label: '宠物主人', icon: 'User', roles: ['ADMIN'] },
-  { to: '/admin/pets', label: '宠物档案', icon: 'Collection', roles: ['ADMIN'] },
-  { to: '/admin/departments', label: '科室管理', icon: 'OfficeBuilding', roles: ['ADMIN'] },
-  { to: '/admin/records', label: '病历查询', icon: 'Notebook' },
-  { to: '/admin/reviews', label: '评价管理', icon: 'Star' },
-  { to: '/admin/consult-records', label: '问诊记录', icon: 'Document', roles: ['ADMIN'] },
-  { to: '/admin/consult', label: '问诊会话', icon: 'ChatDotRound', roles: ['DOCTOR'], badge: true },
-  { to: '/admin/notices', label: '公告科普', icon: 'Bell', roles: ['ADMIN'] }
+  { to: '/admin/dashboard', label: '工作台', icon: markRaw(DataLine) },
+  { to: '/admin/appointments', label: '预约管理', icon: markRaw(Tickets) },
+  { to: '/admin/schedule', label: '排班管理', icon: markRaw(Calendar), roles: ['ADMIN'] },
+  { to: '/admin/my-schedule', label: '我的排班', icon: markRaw(Clock), roles: ['DOCTOR'] },
+  { to: '/admin/doctors', label: '医生管理', icon: markRaw(Avatar), roles: ['ADMIN'] },
+  { to: '/admin/users', label: '宠物主人', icon: markRaw(User), roles: ['ADMIN'] },
+  { to: '/admin/pets', label: '宠物档案', icon: markRaw(Collection), roles: ['ADMIN'] },
+  { to: '/admin/departments', label: '科室管理', icon: markRaw(OfficeBuilding), roles: ['ADMIN'] },
+  { to: '/admin/records', label: '病历查询', icon: markRaw(Notebook) },
+  { to: '/admin/reviews', label: '评价管理', icon: markRaw(Star) },
+  { to: '/admin/consult-records', label: '问诊记录', icon: markRaw(Document), roles: ['ADMIN'] },
+  { to: '/admin/consult', label: '问诊会话', icon: markRaw(ChatDotRound), roles: ['DOCTOR'], badge: true },
+  { to: '/admin/notices', label: '公告科普', icon: markRaw(Bell), roles: ['ADMIN'] }
 ]
 
 const menus = computed(() => all.filter((m) => !m.roles || m.roles.includes(store.role)))
@@ -80,7 +84,9 @@ onBeforeUnmount(() => clearInterval(timer))
 onMounted(() => { store.refresh().catch(() => {}) })
 
 async function logout() {
-  await ElMessageBox.confirm('退出后需要重新登录，确定吗？', '退出登录', { type: 'warning' })
+  await ElMessageBox.confirm('退出后需要重新登录，确定吗？', '退出登录', {
+    type: 'warning', confirmButtonText: '退出登录', cancelButtonText: '取消'
+  })
   store.logout()
   router.replace('/admin/login')
 }

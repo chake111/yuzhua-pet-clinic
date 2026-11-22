@@ -1,6 +1,8 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
+import { ElMessageBox } from '@/utils/messageBox'
 import { petPage, removePet, updatePet } from '@/api/admin'
 import { DEWORM, PET_GENDER, SPECIES, VACCINE, options, tagType, text } from '@/utils/dict'
 import { toDate } from '@/utils/format'
@@ -92,7 +94,7 @@ onMounted(load)
   <div class="page">
     <div class="pc-card filter">
       <el-input v-model="q.keyword" placeholder="宠物名 / 主人昵称 / 手机号" clearable class="w240"
-                prefix-icon="Search" @keyup.enter="search" />
+                :prefix-icon="Search" @keyup.enter="search" />
       <el-button :loading="loading" @click="search">查询</el-button>
       <div class="sp" />
     </div>

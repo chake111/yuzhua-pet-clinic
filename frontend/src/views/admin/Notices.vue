@@ -1,6 +1,8 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
+import { ElMessageBox } from '@/utils/messageBox'
 import { createNotice, noticeDetail, noticePage, noticeStatus, removeNotice, updateNotice } from '@/api/admin'
 import { NOTICE_STATUS, NOTICE_TYPE, options, tagType, text } from '@/utils/dict'
 import { toDate } from '@/utils/format'
@@ -110,7 +112,7 @@ onMounted(load)
 <template>
   <div class="page">
     <div class="pc-card filter">
-      <el-input v-model="q.keyword" placeholder="搜标题 / 摘要" clearable class="w200" prefix-icon="Search"
+      <el-input v-model="q.keyword" placeholder="搜标题 / 摘要" clearable class="w200" :prefix-icon="Search"
                 @keyup.enter="search" />
       <el-select v-model="q.type" placeholder="全部类型" clearable class="w130">
         <el-option v-for="o in options(NOTICE_TYPE)" :key="o.value" :label="o.label" :value="o.value" />

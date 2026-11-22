@@ -1,0 +1,112 @@
+=== 1. SPA root /: curl -sSI -H 'Accept-Encoding: gzip' http://127.0.0.1:8088/ ===
+HTTP/1.1 200 OK
+Server: nginx/1.28.3
+Date: Sun, 22 Nov 2026 11:45:20 GMT
+Content-Type: text/html
+Content-Length: 1688
+Last-Modified: Sun, 22 Nov 2026 11:39:34 GMT
+Connection: keep-alive
+Vary: Accept-Encoding
+ETag: "6b02d476-698"
+Content-Encoding: gzip
+Cache-Control: no-cache
+Accept-Ranges: bytes
+
+=== 2. Extracted entry JS: curl -sSI -H 'Accept-Encoding: gzip' http://127.0.0.1:8088/assets/index-nNbCAKX0.js ===
+HTTP/1.1 200 OK
+Server: nginx/1.28.3
+Date: Sun, 22 Nov 2026 11:45:20 GMT
+Content-Type: application/javascript
+Content-Length: 149579
+Last-Modified: Sun, 22 Nov 2026 11:39:34 GMT
+Connection: keep-alive
+Vary: Accept-Encoding
+ETag: "6b02d476-2484b"
+Content-Encoding: gzip
+Cache-Control: public, max-age=31536000, immutable
+Accept-Ranges: bytes
+
+=== 3. Demo page /demo/: curl -sSI -H 'Accept-Encoding: gzip' http://127.0.0.1:8088/demo/ ===
+HTTP/1.1 200 OK
+Server: nginx/1.28.3
+Date: Sun, 22 Nov 2026 11:45:20 GMT
+Content-Type: text/html
+Content-Length: 6494
+Last-Modified: Sun, 22 Nov 2026 11:39:34 GMT
+Connection: keep-alive
+Vary: Accept-Encoding
+ETag: "6b02d476-195e"
+Content-Encoding: gzip
+Cache-Control: no-cache
+Accept-Ranges: bytes
+
+=== 4. Demo static image /demo/agent-assets/tuantuan.webp: curl -sSI -H 'Accept-Encoding: gzip' http://127.0.0.1:8088/demo/agent-assets/tuantuan.webp ===
+HTTP/1.1 200 OK
+Server: nginx/1.28.3
+Date: Sun, 22 Nov 2026 11:45:20 GMT
+Content-Type: image/webp
+Content-Length: 18502
+Last-Modified: Sat, 21 Nov 2026 04:09:27 GMT
+Connection: keep-alive
+ETag: "6b011977-4846"
+Cache-Control: public, max-age=604800
+Accept-Ranges: bytes
+
+=== 5. Demo preload manifest /demo-preload.json: curl -sSI -H 'Accept-Encoding: gzip' http://127.0.0.1:8088/demo-preload.json ===
+HTTP/1.1 200 OK
+Server: nginx/1.28.3
+Date: Sun, 22 Nov 2026 11:45:20 GMT
+Content-Type: application/json
+Content-Length: 104
+Last-Modified: Sun, 22 Nov 2026 11:39:33 GMT
+Connection: keep-alive
+ETag: "6b02d475-68"
+Cache-Control: no-cache
+Accept-Ranges: bytes
+
+=== 6. Hidden Vite manifest /.vite/manifest.json: curl -sSI -H 'Accept-Encoding: gzip' http://127.0.0.1:8088/.vite/manifest.json ===
+HTTP/1.1 404 Not Found
+Server: nginx/1.28.3
+Date: Sun, 22 Nov 2026 11:45:20 GMT
+Content-Type: text/html
+Content-Length: 153
+Connection: keep-alive
+
+=== 7. Seed upload /api/uploads/seed/doctor-01.jpg: curl -sSI -H 'Accept-Encoding: gzip' http://127.0.0.1:8088/api/uploads/seed/doctor-01.jpg ===
+HTTP/1.1 200 
+Server: nginx/1.28.3
+Date: Sun, 22 Nov 2026 11:45:20 GMT
+Content-Type: image/jpeg
+Content-Length: 13605
+Connection: keep-alive
+X-Trace-Id: 0c38d3ea0e154928bf0a9f425dfeaed9
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Cache-Control: max-age=86400, public
+Last-Modified: Mon, 16 Nov 2026 03:55:01 GMT
+Accept-Ranges: bytes
+
+=== 8. Uploaded UUID image: curl -sSI -H 'Accept-Encoding: gzip' http://127.0.0.1:8088/api/uploads/2026/11/22/0ddc8d957c6b439a91924c9ced5810ac.png ===
+HTTP/1.1 200 
+Server: nginx/1.28.3
+Date: Sun, 22 Nov 2026 11:45:20 GMT
+Content-Type: image/png
+Content-Length: 68
+Connection: keep-alive
+X-Trace-Id: 270eaeb9267e42869641504ecd513f16
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Cache-Control: max-age=31536000, public, immutable
+Last-Modified: Sun, 22 Nov 2026 11:45:20 GMT
+Accept-Ranges: bytes
+
+=== /demo-preload.json body ===
+{
+  "version": 1,
+  "assets": [
+    "/assets/index-nNbCAKX0.js",
+    "/assets/index-54opOs1E.css"
+  ]
+}

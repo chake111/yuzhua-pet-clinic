@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { ElMessageBox } from '@/utils/messageBox'
 import { accept, appointmentDetail, cancel, finish, recordOfAppointment } from '@/api/admin'
 import { useAdminStore } from '@/stores/admin'
 import { APPT_STATUS, CANCEL_BY, CONSULT_TYPE, PAY_STATUS, PERIOD, tagType, text } from '@/utils/dict'

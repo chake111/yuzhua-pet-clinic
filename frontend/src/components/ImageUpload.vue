@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Close, Loading, PictureFilled, Plus } from '@element-plus/icons-vue'
 import { upload } from '@/api/http'
 import { openImageViewer } from '@/utils/imageViewer'
 

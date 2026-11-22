@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { ElMessageBox } from '@/utils/messageBox'
 import {
   createDepartment, departmentPage, removeDepartment, toggleDepartment, updateDepartment
 } from '@/api/admin'

@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted } from 'vue'
+import { markRaw, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { Notebook, Setting, Sunny, Tickets } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/client'
 import { maskPhone } from '@/utils/format'
 
@@ -12,10 +13,10 @@ const store = useUserStore()
 const route = useRoute()
 
 const nav = [
-  { to: '/me/orders', label: '我的预约', icon: 'Tickets' },
-  { to: '/me/pets', label: '宠物档案', icon: 'Sunny' },
-  { to: '/me/records', label: '病历处方', icon: 'Notebook' },
-  { to: '/me/profile', label: '账号设置', icon: 'Setting' }
+  { to: '/me/orders', label: '我的预约', icon: markRaw(Tickets) },
+  { to: '/me/pets', label: '宠物档案', icon: markRaw(Sunny) },
+  { to: '/me/records', label: '病历处方', icon: markRaw(Notebook) },
+  { to: '/me/profile', label: '账号设置', icon: markRaw(Setting) }
 ]
 
 onMounted(() => {

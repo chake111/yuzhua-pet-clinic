@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
+import { ElMessageBox } from '@/utils/messageBox'
 import {
   createDoctor, departmentList, doctorDetail, doctorPage, refreshDoctorStats, removeDoctor, toggleDoctor, updateDoctor
 } from '@/api/admin'
@@ -158,7 +160,7 @@ onBeforeUnmount(() => observer?.disconnect())
 <template>
   <div class="page">
     <div class="pc-card filter">
-      <el-input v-model="q.keyword" placeholder="姓名 / 擅长 / 职称" clearable class="w200" prefix-icon="Search"
+      <el-input v-model="q.keyword" placeholder="姓名 / 擅长 / 职称" clearable class="w200" :prefix-icon="Search"
                 @keyup.enter="search" />
       <el-select v-model="q.departmentId" placeholder="全部科室" clearable class="w140">
         <el-option v-for="d in depts" :key="d.id" :label="d.name" :value="d.id" />

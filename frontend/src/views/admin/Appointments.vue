@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { ElMessageBox } from '@/utils/messageBox'
 import { accept, appointmentPage, cancel, doctorPage, finish } from '@/api/admin'
 import { useAdminStore } from '@/stores/admin'
 import { APPT_STATUS, CONSULT_TYPE, PAY_STATUS, PERIOD, options, tagType, text } from '@/utils/dict'
@@ -161,8 +162,9 @@ const doAccept = row => run(row, async () => {
 })
 
 async function doFinish(row) {
-  const ok = await ElMessageBox.confirm('完成后该单可写病历、可由宠物主人评价，确定结束就诊？', '结束就诊',
-    { type: 'warning' }).then(() => true).catch(() => false)
+  const ok = await ElMessageBox.confirm('完成后该单可写病历、可由宠物主人评价，确定结束就诊？', '结束就诊', {
+    type: 'warning', confirmButtonText: '确定完成', cancelButtonText: '取消'
+  }).then(() => true).catch(() => false)
   if (!ok) return
   await run(row, async () => {
     await finish(row.id)

@@ -1,6 +1,6 @@
 <script setup>
 import brandLogo from '@/assets/logo.svg'
-import mascot from '@/assets/tuantuan-a-final.png'
+import mascot from '@/assets/tuantuan.webp'
 import { BRAND } from '@/brand.js'
 
 defineProps({
@@ -34,7 +34,7 @@ defineProps({
             <path d="M18 45c0-9 10-18 17-18s17 13 17 20c0 12-12 6-17 6s-17 5-17-8Z" />
           </svg>
         </div>
-        <img class="mascot" :src="mascot" width="1774" height="887" alt="吉祥物团团，一只戴着珊瑚色项圈、垂耳和前爪搭在卡片边缘的小狗" fetchpriority="high" />
+        <img class="mascot" :src="mascot" width="1020" height="510" alt="吉祥物团团，一只戴着珊瑚色项圈、垂耳和前爪搭在卡片边缘的小狗" fetchpriority="high" />
         <section class="login-card" aria-labelledby="login-heading">
           <div class="heading">
             <span class="eyebrow">{{ staff ? '医生 · 管理员' : '宠物主人' }}</span>

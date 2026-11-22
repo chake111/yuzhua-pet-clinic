@@ -2,6 +2,7 @@
 import LoadFailure from '@/components/LoadFailure.vue'
 import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import PaymentTicket from '@/components/PaymentTicket.vue'
 import {
   createAppointment, doctorDetail, doctorSchedules, pets

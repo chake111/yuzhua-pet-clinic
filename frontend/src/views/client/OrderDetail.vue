@@ -4,7 +4,8 @@ import ImageGallery from '@/components/ImageGallery.vue'
 import StatusChip from '@/components/StatusChip.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { ElMessageBox } from '@/utils/messageBox'
 import {
   appointmentDetail, appointmentRecord, cancelAppointment, payAppointment
 } from '@/api/user'

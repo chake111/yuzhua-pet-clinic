@@ -1,10 +1,33 @@
+<script>
+let echartsPromise = null
+
+function loadEcharts() {
+  if (!echartsPromise) {
+    echartsPromise = Promise.all([
+      import('echarts/core'),
+      import('echarts/charts'),
+      import('echarts/components'),
+      import('echarts/renderers')
+    ]).then(([
+      echarts,
+      { BarChart, LineChart, PieChart },
+      { GridComponent, LegendComponent, TooltipComponent },
+      { CanvasRenderer }
+    ]) => {
+      echarts.use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
+      return echarts
+    }).catch((err) => {
+      echartsPromise = null
+      throw err
+    })
+  }
+  return echartsPromise
+}
+</script>
+
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import * as echarts from 'echarts/core'
-import { BarChart, LineChart, PieChart } from 'echarts/charts'
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
 import { consultUnread, dashboard } from '@/api/admin'
 import LoadFailure from '@/components/LoadFailure.vue'
 import { useAdminStore } from '@/stores/admin'
@@ -12,9 +35,8 @@ import { APPT_STATUS, tagType, text } from '@/utils/dict'
 import { money, today } from '@/utils/format'
 
 /**
- * 后台看板。图表按需引入 echarts 子模块，全量 import 会把首屏撑到 1MB 以上。
+ * 后台看板。图表子模块动态按需加载，不阻塞 KPI 卡片与待办区块先渲染。
  */
-echarts.use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
 
 const store = useAdminStore()
 const router = useRouter()
@@ -27,6 +49,7 @@ const unreadLoading = ref(false)
 const unreadFailed = ref(false)
 let requestId = 0
 let unreadRequestId = 0
+let echartsLib = null
 
 const elTrend = ref(null)
 const elStatus = ref(null)
@@ -35,7 +58,7 @@ const elTop = ref(null)
 const charts = []
 const chartResize = new ResizeObserver(entries => {
   for (const { target } of entries) {
-    if (target.clientWidth && target.clientHeight) echarts.getInstanceByDom(target)?.resize()
+    if (target.clientWidth && target.clientHeight) echartsLib?.getInstanceByDom(target)?.resize()
   }
 })
 
@@ -45,9 +68,9 @@ function disposeCharts() {
   charts.length = 0
 }
 
-function mount(el, option) {
+function mount(echarts, el, option) {
   // 空数据时容器隐藏；等内容可见再创建画布。
-  if (!el?.clientWidth || !el.clientHeight) return
+  if (!el?.isConnected || !el.clientWidth || !el.clientHeight) return
   const c = echarts.getInstanceByDom(el) || echarts.init(el)
   c.setOption(option, true)
   c.resize()
@@ -65,9 +88,18 @@ const WARNING = '#b3541e'
 const TONE_COLOR = { ongoing: ONGOING, success: SUCCESS, warning: WARNING, danger: '#c13515', terminated: '#6a6a6a' }
 const NEUTRAL = '#929292'
 
-function draw(v) {
+async function draw(v, current) {
+  let echarts
+  try {
+    echarts = await loadEcharts()
+  } catch {
+    return
+  }
+  if (current !== requestId) return
+  echartsLib = echarts
+
   const t = v.trend || []
-  mount(elTrend.value, {
+  mount(echarts, elTrend.value, {
     tooltip: { trigger: 'axis' },
     legend: { data: ['预约量', '营收'], left: 'center', top: 0 },
     grid: { left: 42, right: 60, top: 58, bottom: 26 },
@@ -82,7 +114,7 @@ function draw(v) {
     ]
   })
 
-  mount(elStatus.value, {
+  mount(echarts, elStatus.value, {
     tooltip: { trigger: 'item' },
     legend: { bottom: 0, type: 'scroll' },
     series: [{
@@ -99,7 +131,7 @@ function draw(v) {
   })
 
   const dd = v.deptDist || []
-  mount(elDept.value, {
+  mount(echarts, elDept.value, {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: 76, right: 24, top: 16, bottom: 24 },
     xAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { type: 'dashed' } } },
@@ -108,7 +140,7 @@ function draw(v) {
   })
 
   const td = v.topDoctors || []
-  mount(elTop.value, {
+  mount(echarts, elTop.value, {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: 76, right: 24, top: 16, bottom: 24 },
     xAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { type: 'dashed' } } },
@@ -125,18 +157,19 @@ async function load() {
     const result = await dashboard(days.value)
     if (current !== requestId) return
     vo.value = result
-    // 图表容器在 v-if="vo" 里，不等这一帧 ref 还是 null
-    await nextTick()
-    if (current !== requestId) return
-    draw(vo.value)
   } catch {
     if (current === requestId) {
       disposeCharts()
       failed.value = true
     }
+    return
   } finally {
     if (current === requestId) loading.value = false
   }
+  // 图表容器在 v-if="vo" 里，不等这一帧 ref 还是 null
+  await nextTick()
+  if (current !== requestId) return
+  await draw(vo.value, current)
 }
 
 async function loadUnread() {

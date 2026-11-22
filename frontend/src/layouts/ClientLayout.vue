@@ -1,8 +1,9 @@
 <script setup>
 import brandLogo from '@/assets/logo.svg'
 import { BRAND } from '@/brand.js'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, markRaw, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ChatDotRound, HomeFilled, Search, User } from '@element-plus/icons-vue'
 import { consultUnread } from '@/api/user'
 import { useUserStore } from '@/stores/client'
 
@@ -18,10 +19,10 @@ const unread = ref(0)
 let timer = null
 
 const tabs = [
-  { to: '/', label: '首页', icon: 'HomeFilled' },
-  { to: '/doctors', label: '找医生', icon: 'Search' },
-  { to: '/consult', label: '问诊', icon: 'ChatDotRound', badge: true },
-  { to: '/me', label: '我的', icon: 'User' }
+  { to: '/', label: '首页', icon: markRaw(HomeFilled) },
+  { to: '/doctors', label: '找医生', icon: markRaw(Search) },
+  { to: '/consult', label: '问诊', icon: markRaw(ChatDotRound), badge: true },
+  { to: '/me', label: '我的', icon: markRaw(User) }
 ]
 
 // 从已完成的路由确定位置，兼容返回、深链接和登录重定向。

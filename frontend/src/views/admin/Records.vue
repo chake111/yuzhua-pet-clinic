@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Search } from '@element-plus/icons-vue'
 import { doctorPage, recordPage } from '@/api/admin'
 import { useAdminStore } from '@/stores/admin'
 import { toDate } from '@/utils/format'
@@ -47,7 +48,7 @@ onMounted(() => {
 <template>
   <div class="page">
     <div class="pc-card filter">
-      <el-input v-model="q.keyword" placeholder="病历号 / 诊断 / 主诉" clearable class="w220" prefix-icon="Search"
+      <el-input v-model="q.keyword" placeholder="病历号 / 诊断 / 主诉" clearable class="w220" :prefix-icon="Search"
                 @keyup.enter="search" />
       <el-select v-if="store.isAdmin" v-model="q.doctorId" placeholder="全部医生" clearable filterable class="w150">
         <el-option v-for="d in doctors" :key="d.id" :label="d.name" :value="d.id" />

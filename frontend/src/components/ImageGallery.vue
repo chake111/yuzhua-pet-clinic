@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { PictureFilled, ZoomIn } from '@element-plus/icons-vue'
 import { openImageViewer } from '@/utils/imageViewer'
 
 /**

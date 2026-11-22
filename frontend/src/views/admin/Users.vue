@@ -1,6 +1,8 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
+import { ElMessageBox } from '@/utils/messageBox'
 import { userDetail, userPage, userStatus } from '@/api/admin'
 import { ACCOUNT_STATUS, APPT_STATUS, PERIOD, PET_GENDER, USER_GENDER, options, tagType, text } from '@/utils/dict'
 import { money, toDate, toDateTime } from '@/utils/format'
@@ -74,7 +76,7 @@ onMounted(load)
   <div class="page">
     <div class="pc-card filter">
       <el-input v-model="q.keyword" placeholder="昵称 / 手机号 / 账号" clearable class="w220"
-                prefix-icon="Search" @keyup.enter="search" />
+                :prefix-icon="Search" @keyup.enter="search" />
       <el-select v-model="q.status" placeholder="全部状态" clearable class="w120">
         <el-option v-for="o in options(ACCOUNT_STATUS)" :key="o.value" :label="o.label" :value="o.value" />
       </el-select>

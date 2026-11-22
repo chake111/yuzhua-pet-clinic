@@ -1,0 +1,204 @@
+{
+  "measuredAt": "2026-11-22T11:49:01.671Z",
+  "base": "http://127.0.0.1:8088",
+  "demoIdlePreload": {
+    "ok": true,
+    "manifestAssets": [
+      "/assets/index-nNbCAKX0.js",
+      "/assets/index-54opOs1E.css"
+    ],
+    "demoFetchedManifest": true,
+    "navCacheHits": [
+      {
+        "asset": "/assets/index-nNbCAKX0.js",
+        "foundInNav": true,
+        "servedFromCache": false,
+        "fromDiskCache": true,
+        "encodedDataLength": 0,
+        "cacheHit": true
+      },
+      {
+        "asset": "/assets/index-54opOs1E.css",
+        "foundInNav": true,
+        "servedFromCache": false,
+        "fromDiskCache": true,
+        "encodedDataLength": 0,
+        "cacheHit": true
+      }
+    ]
+  },
+  "demoSaveDataSkip": {
+    "ok": true,
+    "preloadFetched": false,
+    "totalRequests": 8
+  },
+  "demoQueryPrefill": {
+    "ok": true,
+    "cases": [
+      {
+        "url": "/login?demo=user",
+        "username": "zhangsan",
+        "password": ""
+      },
+      {
+        "url": "/admin/login?demo=doctor&redirect=/admin/my-schedule",
+        "username": "doctor01",
+        "password": ""
+      },
+      {
+        "url": "/admin/login?demo=admin&redirect=/admin/dashboard",
+        "username": "admin",
+        "password": ""
+      },
+      {
+        "url": "/login?demo=admin",
+        "username": "",
+        "password": ""
+      },
+      {
+        "url": "/admin/login?demo=user",
+        "username": "",
+        "password": ""
+      }
+    ],
+    "autoLoginPosts": 0,
+    "existingAuthUntouched": true,
+    "manualEditVerified": true
+  },
+  "vitePreloadErrorGuard": {
+    "ok": true,
+    "initialLoads": 1,
+    "loadsAfterFirst404": 2,
+    "loadsAfterSecond404Within30s": 2,
+    "sessionStorageTimestamp": 1795348153460
+  },
+  "cdpThrottledBenchmarks": {
+    "profile": "250 ms RTT + 38.7 KB/s (down/up) + 4x CPU, cache disabled, 390x844 @2x",
+    "home": {
+      "runs": [
+        {
+          "wallElapsedMs": 5737,
+          "fcpMs": 1584,
+          "lcpMs": 5364,
+          "lcpElement": "h1.",
+          "shellInteractiveTtiMs": 5397,
+          "businessReadyTtiMs": 5402,
+          "shellTtiMinusFcpMs": 3813,
+          "businessTtiMinusFcpMs": 3818,
+          "totalTransferBytes": 170332,
+          "criticalTransferBytes": 166948,
+          "homePrefetchStartedBeforeEntryJsFinished": true,
+          "pageErrors": []
+        },
+        {
+          "wallElapsedMs": 5662,
+          "fcpMs": 1520,
+          "lcpMs": 5304,
+          "lcpElement": "h1.",
+          "shellInteractiveTtiMs": 5333,
+          "businessReadyTtiMs": 5337,
+          "shellTtiMinusFcpMs": 3813,
+          "businessTtiMinusFcpMs": 3817,
+          "totalTransferBytes": 170332,
+          "criticalTransferBytes": 166948,
+          "homePrefetchStartedBeforeEntryJsFinished": true,
+          "pageErrors": []
+        },
+        {
+          "wallElapsedMs": 5702,
+          "fcpMs": 1544,
+          "lcpMs": 5336,
+          "lcpElement": "h1.",
+          "shellInteractiveTtiMs": 5364,
+          "businessReadyTtiMs": 5368,
+          "shellTtiMinusFcpMs": 3820,
+          "businessTtiMinusFcpMs": 3824,
+          "totalTransferBytes": 170332,
+          "criticalTransferBytes": 166948,
+          "homePrefetchStartedBeforeEntryJsFinished": true,
+          "pageErrors": []
+        }
+      ],
+      "median": {
+        "fcpMs": 1544,
+        "lcpMs": 5336,
+        "shellInteractiveTtiMs": 5364,
+        "businessReadyTtiMs": 5368,
+        "shellTtiMinusFcpMs": 3813,
+        "businessTtiMinusFcpMs": 3818,
+        "totalTransferBytes": 170332,
+        "criticalTransferBytes": 166948
+      }
+    },
+    "login": {
+      "runs": [
+        {
+          "wallElapsedMs": 7148,
+          "fcpMs": 1448,
+          "lcpMs": 6832,
+          "lcpElement": "img.mascot",
+          "shellInteractiveTtiMs": 5890,
+          "businessReadyTtiMs": 6816,
+          "shellTtiMinusFcpMs": 4442,
+          "businessTtiMinusFcpMs": 5368,
+          "totalTransferBytes": 218510,
+          "criticalTransferBytes": 166948,
+          "homePrefetchStartedBeforeEntryJsFinished": null,
+          "pageErrors": []
+        },
+        {
+          "wallElapsedMs": 7148,
+          "fcpMs": 1472,
+          "lcpMs": 6836,
+          "lcpElement": "img.mascot",
+          "shellInteractiveTtiMs": 5863,
+          "businessReadyTtiMs": 6819,
+          "shellTtiMinusFcpMs": 4391,
+          "businessTtiMinusFcpMs": 5347,
+          "totalTransferBytes": 218510,
+          "criticalTransferBytes": 166948,
+          "homePrefetchStartedBeforeEntryJsFinished": null,
+          "pageErrors": []
+        },
+        {
+          "wallElapsedMs": 7188,
+          "fcpMs": 1480,
+          "lcpMs": 6880,
+          "lcpElement": "img.mascot",
+          "shellInteractiveTtiMs": 5916,
+          "businessReadyTtiMs": 6863,
+          "shellTtiMinusFcpMs": 4436,
+          "businessTtiMinusFcpMs": 5383,
+          "totalTransferBytes": 218510,
+          "criticalTransferBytes": 166948,
+          "homePrefetchStartedBeforeEntryJsFinished": null,
+          "pageErrors": []
+        }
+      ],
+      "median": {
+        "fcpMs": 1472,
+        "lcpMs": 6836,
+        "shellInteractiveTtiMs": 5890,
+        "businessReadyTtiMs": 6819,
+        "shellTtiMinusFcpMs": 4436,
+        "businessTtiMinusFcpMs": 5368,
+        "totalTransferBytes": 218510,
+        "criticalTransferBytes": 166948
+      }
+    }
+  },
+  "screenshots": [
+    {
+      "path": "C:\\Users\\chake\\.gemini\\antigravity\\brain\\40ec0bf6-72b6-49a0-bd8e-f9357d2fdb3c\\l3-home-desktop.png",
+      "note": "Client home with instant shell and section skeletons"
+    },
+    {
+      "path": "C:\\Users\\chake\\.gemini\\antigravity\\brain\\40ec0bf6-72b6-49a0-bd8e-f9357d2fdb3c\\l3-login-demo-user.png",
+      "note": "Client login with 30KB tuantuan WebP and zhangsan prefill"
+    },
+    {
+      "path": "C:\\Users\\chake\\.gemini\\antigravity\\brain\\40ec0bf6-72b6-49a0-bd8e-f9357d2fdb3c\\l3-admin-login-demo-admin.png",
+      "note": "Admin login with tuantuan WebP and admin prefill"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { loadWithSavedScroll } from '@/utils/listScroll'
 import LoadFailure from '@/components/LoadFailure.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ArrowRight, ChatDotRound, Search, Tickets } from '@element-plus/icons-vue'
 import { homeData } from '@/api/user'
 import { NOTICE_TYPE, text } from '@/utils/dict'
 import { toDate } from '@/utils/format'
@@ -20,12 +21,28 @@ const keyword = ref('')
 const showAllDepartments = ref(false)
 const data = reactive({ departments: [], doctors: [], notices: [] })
 const visibleDepartments = computed(() => showAllDepartments.value ? data.departments : data.departments.slice(0, 6))
+let prefetchConsumed = false
 
-async function load() {
+function takeHomePrefetch() {
+  if (prefetchConsumed || typeof window === 'undefined') return null
+  prefetchConsumed = true
+  const rec = window.__YUZHUA_HOME_PREFETCH__
+  if (!rec) return null
+  delete window.__YUZHUA_HOME_PREFETCH__
+  if (typeof rec.ts !== 'number' || Date.now() - rec.ts > 30_000 || !rec.promise) return null
+  return rec.promise
+}
+
+async function load(usePrefetch = false) {
   loading.value = true
   failed.value = false
   try {
-    const res = await homeData()
+    let res = null
+    if (usePrefetch) {
+      const prefetched = takeHomePrefetch()
+      if (prefetched) res = await prefetched.catch(() => null)
+    }
+    if (!res) res = await homeData()
     Object.assign(data, { departments: [], doctors: [], notices: [] }, res || {})
   } catch {
     failed.value = true
@@ -40,19 +57,19 @@ function search() {
 
 const byDept = (d) => router.push({ path: '/doctors', query: { departmentId: d.id, name: d.name } })
 
-onMounted(() => loadWithSavedScroll(load))
+onMounted(() => loadWithSavedScroll(() => load(true)))
 </script>
 
 <template>
-  <div class="pc-narrow home" v-loading="loading">
-    <LoadFailure v-if="failed" @retry="load" />
+  <div class="pc-narrow home">
+    <LoadFailure v-if="failed" @retry="load(false)" />
     <section class="hero">
       <h1>为爱宠，找到合适的医生</h1>
       <el-input v-model="keyword" placeholder="医生姓名或擅长领域" aria-label="搜索医生"
                 clearable size="large" @keyup.enter="search" @clear="search">
         <template #prefix><el-icon><Search /></el-icon></template>
         <template #append>
-          <el-button icon="Search" @click="search">搜索</el-button>
+          <el-button :icon="Search" @click="search">搜索</el-button>
         </template>
       </el-input>
     </section>
@@ -65,7 +82,13 @@ onMounted(() => loadWithSavedScroll(load))
         {{ showAllDepartments ? '收起科室' : '全部科室' }}
       </el-button>
     </h2>
-    <div id="home-departments" class="depts">
+    <div id="home-departments" class="depts" :aria-busy="loading && !data.departments.length">
+      <template v-if="loading && !data.departments.length">
+        <div v-for="i in 6" :key="`ds-${i}`" class="dept sk-dept" aria-hidden="true">
+          <span class="sk sk-ico" />
+          <span class="sk sk-nm" />
+        </div>
+      </template>
       <button v-for="d in visibleDepartments" :key="d.id" class="dept" @click="byDept(d)">
         <span class="ico"><DeptIcon :name="d.icon" :size="26" /></span>
         <span class="nm">{{ d.name }}</span>
@@ -82,7 +105,27 @@ onMounted(() => loadWithSavedScroll(load))
       推荐医生
       <el-link class="more" underline="never" @click="router.push('/doctors')">查看全部 →</el-link>
     </h2>
-    <div class="doctors">
+    <div class="doctors" :aria-busy="loading && !data.doctors.length">
+      <template v-if="loading && !data.doctors.length">
+        <div v-for="i in 3" :key="`doc-${i}`" class="pc-card sk-doc" aria-hidden="true">
+          <div class="sk-doc-head">
+            <span class="sk sk-ava" />
+            <div class="sk-doc-meta">
+              <span class="sk sk-line w-45" />
+              <span class="sk sk-line w-65" />
+            </div>
+            <span class="sk sk-fee" />
+          </div>
+          <div class="sk-doc-tags">
+            <span class="sk sk-chip" />
+            <span class="sk sk-chip" />
+          </div>
+          <div class="sk-doc-foot">
+            <span class="sk sk-line w-50" />
+          </div>
+          <span class="sk sk-btn" />
+        </div>
+      </template>
       <DoctorCard v-for="d in data.doctors" :key="d.id" :doctor="d" />
       <el-empty v-if="!failed && !loading && !data.doctors.length" description="暂无出诊医生" />
     </div>
@@ -91,7 +134,13 @@ onMounted(() => loadWithSavedScroll(load))
       公告与养宠科普
       <el-link class="more" underline="never" @click="router.push('/notices')">更多 →</el-link>
     </h2>
-    <div class="notices pc-card">
+    <div class="notices pc-card" :aria-busy="loading && !data.notices.length">
+      <template v-if="loading && !data.notices.length">
+        <div v-for="i in 3" :key="`nt-${i}`" class="notice sk-notice" aria-hidden="true">
+          <span class="sk sk-line w-75" />
+          <span class="sk sk-line w-35" />
+        </div>
+      </template>
       <router-link v-for="n in data.notices" :key="n.id" :to="`/notice/${n.id}`" class="notice">
         <span class="tt">
           <em v-if="n.topFlag === 1" class="top">置顶</em>
@@ -154,6 +203,28 @@ onMounted(() => loadWithSavedScroll(load))
 }
 .meta { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--color-muted); flex-shrink: 0; }
 .meta i { font-style: normal; }
+
+/* 轻量静态骨架：仅在首屏数据尚未到达时占位，避免全页遮罩与布局跳动 */
+.sk { display: block; background: var(--color-surface-strong); border-radius: var(--radius-xs); }
+.sk-dept { cursor: default; pointer-events: none; }
+.sk-ico { width: 26px; height: 26px; border-radius: var(--radius-sm); }
+.sk-nm { width: 38px; height: 14px; }
+.sk-doc { display: flex; flex-direction: column; gap: 12px; pointer-events: none; }
+.sk-doc-head { display: flex; align-items: center; gap: 12px; }
+.sk-ava { width: 52px; height: 52px; border-radius: var(--radius-full); flex-shrink: 0; }
+.sk-doc-meta { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.sk-fee { width: 56px; height: 34px; flex-shrink: 0; }
+.sk-doc-tags { display: flex; gap: 8px; }
+.sk-chip { width: 64px; height: 24px; border-radius: var(--radius-full); }
+.sk-doc-foot { padding-top: 12px; border-top: 1px solid var(--color-hairline-soft); }
+.sk-btn { width: 100%; height: 44px; border-radius: var(--radius-sm); }
+.sk-notice { pointer-events: none; }
+.sk-line { height: 15px; }
+.w-35 { width: 35%; }
+.w-45 { width: 45%; }
+.w-50 { width: 50%; }
+.w-65 { width: 65%; }
+.w-75 { width: 75%; }
 
 @media (min-width: 560px) {
   .depts { grid-template-columns: repeat(6, minmax(0, 1fr)); }

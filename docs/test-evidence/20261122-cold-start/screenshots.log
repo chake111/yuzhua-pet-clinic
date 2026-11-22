@@ -1,0 +1,73 @@
+[browser] msedge
+[1/32] 01-client-login.png  [viewport]  876x1920  target 876x1920  ✓
+[2/32] 02-client-register.png  [viewport]  876x1754  target 876x1754  ✓
+[login] client -> zhangsan
+[3/32] 03-client-home.png  [viewport]  430x2184  target 430x2184  ✓
+[4/32] 04-client-doctors.png  [viewport]  860x1648  target 860x1648  ✓
+[5/32] 05-client-doctor.png  [viewport]  860x1636  target 860x1636  ✓
+[6/32] 06-client-booking.png  [viewport]  860x998  target 860x998  ✓
+[7/32] 07-client-pets.png  [viewport]  876x1808  target 876x1808  ✓
+[8/32] 08-client-orders.png  [viewport]  860x1996  target 860x1996  ✓
+[9/32] 09-client-consult.png  [viewport]  876x1808  target 876x1808  ✓
+[10/32] 10-client-consultroom.png  [viewport]  860x1952  target 860x1952  ✓
+[11/32] 11-client-records.png  [viewport]  860x1768  target 860x1768  ✓
+[12/32] 12-client-consult-new.png  [viewport]  860x1756  target 860x1756  ✓
+[13/32] 13-client-pay.png  [viewport]  860x1872  target 860x1872  ✓
+[14/32] 14-client-review.png  [viewport]  860x1752  target 860x1752  ✓
+[15/32] 20-admin-login.png  [full]  880x1510  target 880x1510  ✓
+[login] admin -> admin
+[16/32] 21-admin-dashboard.png  [full]  1440x1149  target 1440x1149  ✓
+[17/32] 22-admin-appointments.png  [table]  1416x900  target 1416x900  ✓
+[18/32] 23-admin-schedule.png  [full]  1440x1901  target 1440x1901  ✓
+[19/32] 24-admin-doctors.png  [table]  1452x882  target 1452x882  ✓
+[20/32] 25-admin-records.png  [table]  1440x722  target 1440x722  ✓
+[21/32] 26-admin-reviews.png  [table]  1560x2056  target 1560x2056  ✓
+[22/32] 27-admin-notices.png  [table]  1484x666  target 1484x666  ✓
+[23/32] 28-admin-users.png  [table]  1772x916  target 1772x916  ✓
+[24/32] 29-admin-pets.png  [table]  1852x1498  target 1852x1498  ✓
+[login] doctor -> doctor11
+[25/32] 30-doctor-consult.png  [table]  2096x458  target 2096x458  ✓
+[26/32] 31-doctor-workbench.png  [viewport]  1512x1858  target 1512x1858  ✓
+[27/32] 32-doctor-consultroom.png  [viewport]  1512x1808  target 1512x1808  ✓
+[28/32] 33-admin-consult-records.png  [table]  2128x794  target 2128x794  ✓
+[29/32] 35-doctor-my-schedule.png  [table]  1136x652  target 1136x652  ✓
+[30/32] 36-doctor-summary.png  [viewport]  1512x1808  target 1512x1808  ✓
+[31/32] 41-admin-schedule-stopped-slot.png  [full]  1440x1901  target 1440x1901  ✓
+[32/32] 42-admin-schedule-adjust-frozen.png  [full]  1440x1901  target 1440x1901  ✓
+
+完成：成功 32/32，失败 0
+
+| 文件 | 模式 | 目标 px | 实际 px | Δ宽 | Δ高 | 高/宽 | 元素宽 CSS |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 01-client-login.png | viewport | 876x1920 | 876x1920 | 0 | 0 | 2.19 | — |
+| 02-client-register.png | viewport | 876x1754 | 876x1754 | 0 | 0 | 2.00 | — |
+| 03-client-home.png | viewport | 430x2184 | 430x2184 | 0 | 0 | 5.08 | — |
+| 04-client-doctors.png | viewport | 860x1648 | 860x1648 | 0 | 0 | 1.92 | — |
+| 05-client-doctor.png | viewport | 860x1636 | 860x1636 | 0 | 0 | 1.90 | — |
+| 06-client-booking.png | viewport | 860x998 | 860x998 | 0 | 0 | 1.16 | — |
+| 07-client-pets.png | viewport | 876x1808 | 876x1808 | 0 | 0 | 2.06 | — |
+| 08-client-orders.png | viewport | 860x1996 | 860x1996 | 0 | 0 | 2.32 | — |
+| 09-client-consult.png | viewport | 876x1808 | 876x1808 | 0 | 0 | 2.06 | — |
+| 10-client-consultroom.png | viewport | 860x1952 | 860x1952 | 0 | 0 | 2.27 | — |
+| 11-client-records.png | viewport | 860x1768 | 860x1768 | 0 | 0 | 2.06 | — |
+| 12-client-consult-new.png | viewport | 860x1756 | 860x1756 | 0 | 0 | 2.04 | — |
+| 13-client-pay.png | viewport | 860x1872 | 860x1872 | 0 | 0 | 2.18 | — |
+| 14-client-review.png | viewport | 860x1752 | 860x1752 | 0 | 0 | 2.04 | — |
+| 20-admin-login.png | full | 880x1510 | 880x1510 | 0 | 0 | 1.72 | — |
+| 21-admin-dashboard.png | full | 1440x1149 | 1440x1149 | 0 | 0 | 0.80 | — |
+| 22-admin-appointments.png | table | 1416x900 | 1416x900 | 0 | 0 | 0.64 | 708.0 |
+| 23-admin-schedule.png | full | 1440x1901 | 1440x1901 | 0 | 0 | 1.32 | — |
+| 24-admin-doctors.png | table | 1452x882 | 1452x882 | 0 | 0 | 0.61 | 726.0 |
+| 25-admin-records.png | table | 1440x722 | 1440x722 | 0 | 0 | 0.50 | 1440.0 |
+| 26-admin-reviews.png | table | 1560x2056 | 1560x2056 | 0 | 0 | 1.32 | 780.0 |
+| 27-admin-notices.png | table | 1484x666 | 1484x666 | 0 | 0 | 0.45 | 742.0 |
+| 28-admin-users.png | table | 1772x916 | 1772x916 | 0 | 0 | 0.52 | 886.0 |
+| 29-admin-pets.png | table | 1852x1498 | 1852x1498 | 0 | 0 | 0.81 | 926.0 |
+| 30-doctor-consult.png | table | 2096x458 | 2096x458 | 0 | 0 | 0.22 | 1048.0 |
+| 31-doctor-workbench.png | viewport | 1512x1858 | 1512x1858 | 0 | 0 | 1.23 | — |
+| 32-doctor-consultroom.png | viewport | 1512x1808 | 1512x1808 | 0 | 0 | 1.20 | — |
+| 33-admin-consult-records.png | table | 2128x794 | 2128x794 | 0 | 0 | 0.37 | 1064.0 |
+| 35-doctor-my-schedule.png | table | 1136x652 | 1136x652 | 0 | 0 | 0.57 | 568.0 |
+| 36-doctor-summary.png | viewport | 1512x1808 | 1512x1808 | 0 | 0 | 1.20 | — |
+| 41-admin-schedule-stopped-slot.png | full | 1440x1901 | 1440x1901 | 0 | 0 | 1.32 | — |
+| 42-admin-schedule-adjust-frozen.png | full | 1440x1901 | 1440x1901 | 0 | 0 | 1.32 | — |

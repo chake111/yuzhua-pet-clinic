@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, watch } from 'vue'
+import { PictureFilled } from '@element-plus/icons-vue'
 import { closeImageViewer, imageViewer, onViewerSwitch } from '@/utils/imageViewer'
 
 /**
@@ -24,7 +25,7 @@ const altText = computed(() => {
 watch([() => imageViewer.open, () => imageViewer.index], async () => {
   await nextTick()
   document.querySelector('.el-image-viewer__img')?.setAttribute('alt', altText.value)
-})
+}, { immediate: true })
 </script>
 
 <template>

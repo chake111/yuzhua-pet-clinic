@@ -1,6 +1,8 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
+import { ElMessageBox } from '@/utils/messageBox'
 import { consultMessages, consultPage, hideConsultMessage, moderateConsult } from '@/api/admin'
 import { useAdminStore } from '@/stores/admin'
 import { CONSULT_MSG_STATUS, MODERATE_STATUS, SESSION_STATUS, options, tagType, text } from '@/utils/dict'
@@ -104,8 +106,9 @@ async function toggleHidden(m, hidden) {
     if (value === undefined) return
     await hideConsultMessage(m.id, 1, value.trim())
   } else {
-    const ok = await ElMessageBox.confirm('恢复后该消息重新对患者与医生可见。', '恢复消息', { type: 'warning' })
-      .then(() => true).catch(() => false)
+    const ok = await ElMessageBox.confirm('恢复后该消息重新对患者与医生可见。', '恢复消息', {
+      type: 'warning', confirmButtonText: '确认恢复', cancelButtonText: '取消'
+    }).then(() => true).catch(() => false)
     if (!ok) return
     await hideConsultMessage(m.id, 0)
   }
@@ -117,8 +120,9 @@ async function toggleHidden(m, hidden) {
 /** 会话级处置：1 无效关闭 / 2 违规屏蔽（必填原因，非 0 连带关闭）/ 0 撤销 */
 async function moderate(row, next) {
   if (next === 0) {
-    const ok = await ElMessageBox.confirm('撤销后该会话重新对患者与医生可见（已关闭的会话保持关闭）。', '撤销处置', { type: 'warning' })
-      .then(() => true).catch(() => false)
+    const ok = await ElMessageBox.confirm('撤销后该会话重新对患者与医生可见（已关闭的会话保持关闭）。', '撤销处置', {
+      type: 'warning', confirmButtonText: '确认撤销', cancelButtonText: '取消'
+    }).then(() => true).catch(() => false)
     if (!ok) return
     await moderateConsult(row.id, 0)
     ElMessage.success('已撤销处置')
