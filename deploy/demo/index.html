@@ -398,7 +398,7 @@
         <h3>宠主端</h3>
         <p class="intro">首页可以搜医生、选科室，再看推荐医生。</p>
         <figure class="shot phone-shot">
-          <img src="agent-assets/client-home.webp" width="430" height="860" alt="宠主端首页：可以搜索医生，就诊科室有宠物内科、外科、皮肤科、眼科、口腔科和影像检验科，下面是推荐医生陈明远" loading="lazy" decoding="async">
+          <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="agent-assets/client-home.webp" width="430" height="860" alt="宠主端首页：可以搜索医生，就诊科室有宠物内科、外科、皮肤科、眼科、口腔科和影像检验科，下面是推荐医生陈明远" loading="lazy" decoding="async">
         </figure>
         <figcaption>宠主端首页：搜索、科室、推荐医生。</figcaption>
         <a class="text-go" href="/login?demo=user">进入宠主端</a>
@@ -408,7 +408,7 @@
         <h3>医生端</h3>
         <p class="intro">查看排班与候诊列表，处理图文问诊并书写病历。</p>
         <figure class="shot doctor-shot">
-          <img src="agent-assets/doctor-consult.webp" width="1000" height="458" alt="医生端问诊列表左侧：患者王五的宠物小灰、张三的布丁和奶糖，以及各自的症状摘要" loading="lazy" decoding="async">
+          <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="agent-assets/doctor-consult.webp" width="1000" height="458" alt="医生端问诊列表左侧：患者王五的宠物小灰、张三的布丁和奶糖，以及各自的症状摘要" loading="lazy" decoding="async">
         </figure>
         <figcaption>问诊列表左侧：患者、宠物、症状。</figcaption>
         <p class="pan-hint">左右滑动可以看清患者和症状。</p>
@@ -419,7 +419,7 @@
         <h3>管理端</h3>
         <p class="intro">工作台汇总今日预约、营收和医生在线，下面是趋势和科室分布。</p>
         <figure class="shot admin-shot">
-          <img src="agent-assets/admin-dashboard.webp" width="720" height="575" alt="管理端工作台：今日预约、今日营收、医生在线，以及预约趋势、预约状态分布、科室预约量和医生接诊排行" loading="lazy" decoding="async">
+          <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="agent-assets/admin-dashboard.webp" width="720" height="575" alt="管理端工作台：今日预约、今日营收、医生在线，以及预约趋势、预约状态分布、科室预约量和医生接诊排行" loading="lazy" decoding="async">
         </figure>
         <figcaption>工作台：今日概览、趋势、状态和科室预约量。</figcaption>
         <p class="pan-hint">左右滑动可以看清看板。</p>
@@ -431,11 +431,11 @@
         <p class="intro">下面两张是宠主端里会走到的确认挂号和在线问诊。</p>
         <div class="pair">
           <figure>
-            <img src="agent-assets/client-booking.webp" width="430" height="499" alt="宠主端确认挂号：医生陈明远，今天 11 月 18 日有 32 个号，底栏是布丁的下午时段和 80 元到院问诊费" loading="lazy" decoding="async">
+            <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="agent-assets/client-booking.webp" width="430" height="499" alt="宠主端确认挂号：医生陈明远，今天 11 月 18 日有 32 个号，底栏是布丁的下午时段和 80 元到院问诊费" loading="lazy" decoding="async">
             <figcaption>确认挂号：选好日期和时段后，底栏提交。</figcaption>
           </figure>
           <figure>
-            <img src="agent-assets/client-consult.webp" width="438" height="490" alt="宠主端在线问诊：刘恋与布丁的会话进行中，摘要里有建议到院；奶糖的会话已结束" loading="lazy" decoding="async">
+            <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="agent-assets/client-consult.webp" width="438" height="490" alt="宠主端在线问诊：刘恋与布丁的会话进行中，摘要里有建议到院；奶糖的会话已结束" loading="lazy" decoding="async">
             <figcaption>在线问诊：宠主发送图文主诉，医生在线回复并给出到院建议。</figcaption>
           </figure>
         </div>
@@ -448,17 +448,31 @@
   </footer>
   <script>
     (function () {
+      var hydrateImg = function (img) {
+        var real = img && img.getAttribute('data-src');
+        if (real) {
+          img.removeAttribute('data-src');
+          img.src = real;
+        }
+      };
+      var hydrateAllShots = function () {
+        document.querySelectorAll('img[data-src]').forEach(hydrateImg);
+      };
+
       var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (!reduce && 'IntersectionObserver' in window) {
-        document.documentElement.classList.add('js');
+      if ('IntersectionObserver' in window) {
+        if (!reduce) document.documentElement.classList.add('js');
         var io = new IntersectionObserver(function (entries) {
           entries.forEach(function (entry) {
             if (!entry.isIntersecting) return;
             entry.target.classList.add('in');
+            entry.target.querySelectorAll('img[data-src]').forEach(hydrateImg);
             io.unobserve(entry.target);
           });
         }, { threshold: 0.18 });
         document.querySelectorAll('.rise').forEach(function (el) { io.observe(el); });
+      } else {
+        hydrateAllShots();
       }
 
       if (typeof window.fetch === 'function') {
@@ -486,6 +500,20 @@
           }).catch(function () {});
         };
 
+        var runQueue = function (items, maxWorkers) {
+          var queue = items.slice();
+          var concurrency = Math.min(maxWorkers, queue.length);
+          var workers = [];
+          function next() {
+            if (!queue.length || shouldSkipPreload()) return Promise.resolve();
+            return preloadAsset(queue.shift()).then(next);
+          }
+          for (var i = 0; i < concurrency; i++) {
+            workers.push(next());
+          }
+          return Promise.all(workers);
+        };
+
         var runPreload = function () {
           if (shouldSkipPreload()) return;
           try {
@@ -498,34 +526,37 @@
               return res.json();
             }).then(function (manifest) {
               if (!manifest || !Array.isArray(manifest.assets) || !manifest.assets.length) return;
-              var queue = manifest.assets.slice();
-              var concurrency = Math.min(2, queue.length);
-              var workers = [];
-              function next() {
-                if (!queue.length || shouldSkipPreload()) return Promise.resolve();
-                return preloadAsset(queue.shift()).then(next);
-              }
-              for (var i = 0; i < concurrency; i++) {
-                workers.push(next());
-              }
-              return Promise.all(workers);
+              var blocking = [];
+              var media = [];
+              manifest.assets.forEach(function (url) {
+                if (/\.(?:js|css)$/i.test(url)) blocking.push(url);
+                else media.push(url);
+              });
+              // 第一阶段独占带宽预热阻塞型入口 JS/CSS，完成后再预热登录页图片与第二屏截图
+              return runQueue(blocking, 2).then(function () {
+                hydrateAllShots();
+                return runQueue(media, 1);
+              });
             }).catch(function () {});
           } catch (err) {}
         };
 
+        var preloadStarted = false;
         var schedulePreload = function () {
-          if (shouldSkipPreload()) return;
-          if (typeof window.requestIdleCallback === 'function') {
-            window.requestIdleCallback(runPreload, { timeout: 2500 });
-          } else {
-            window.setTimeout(runPreload, 800);
-          }
+          if (preloadStarted || shouldSkipPreload()) return;
+          preloadStarted = true;
+          window.setTimeout(runPreload, 60);
         };
 
-        if (document.readyState === 'complete') {
-          schedulePreload();
-        } else {
+        var heroImg = document.querySelector('.dog');
+        if (heroImg && !heroImg.complete) {
+          heroImg.addEventListener('load', schedulePreload, { once: true });
+          heroImg.addEventListener('error', schedulePreload, { once: true });
           window.addEventListener('load', schedulePreload, { once: true });
+        } else if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', schedulePreload, { once: true });
+        } else {
+          schedulePreload();
         }
       }
     })();

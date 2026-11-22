@@ -76,7 +76,6 @@ async function request(method, url, data, cfg = {}) {
     const text = await res.text()
     payload = text ? JSON.parse(text) : null
   } catch (err) {
-    clearTimeout(timer)
     const isTimeout = timedOut || Boolean(err?.message?.includes('timeout'))
     const action = httpFailureAction({
       business: false,
@@ -87,8 +86,9 @@ async function request(method, url, data, cfg = {}) {
       toast.error(action.message)
     }
     throw isTimeout ? new Error(`timeout of ${timeoutMs}ms exceeded`) : err
+  } finally {
+    clearTimeout(timer)
   }
-  clearTimeout(timer)
 
   if (!payload || typeof payload.code === 'undefined') return payload
   if (payload.code === 200) return payload
