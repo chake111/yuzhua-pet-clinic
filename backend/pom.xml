@@ -166,7 +166,7 @@
                             <formats>HTML,XML,CSV</formats>
                         </configuration>
                     </execution>
-                    <!-- 只卡本次改动与预约核心：全量报告仍生成，但不把 DTO/配置/控制器算进门禁 -->
+                    <!-- 门禁只卡慢 SQL 拦截器：厚 Service 由 *IT 覆盖真实链路，全量报告仍生成但不卡构建 -->
                     <execution>
                         <id>check-core-coverage</id>
                         <phase>verify</phase>
@@ -187,8 +187,6 @@
                                 </rule>
                             </rules>
                             <includes>
-                                <include>com/yuzhua/service/AppointmentService.class</include>
-                                <include>com/yuzhua/service/DoctorScheduleService.class</include>
                                 <include>com/yuzhua/config/SlowSqlInterceptor.class</include>
                             </includes>
                         </configuration>

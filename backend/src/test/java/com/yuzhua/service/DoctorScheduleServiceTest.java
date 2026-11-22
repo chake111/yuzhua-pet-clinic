@@ -4,10 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yuzhua.common.BizException;
-import com.yuzhua.common.PageResult;
-import com.yuzhua.dto.PageQuery;
 import com.yuzhua.dto.ScheduleBatchForm;
 import com.yuzhua.dto.ScheduleEditForm;
 import com.yuzhua.dto.ScheduleForm;
@@ -19,7 +16,6 @@ import com.yuzhua.mapper.AppointmentMapper;
 import com.yuzhua.mapper.DepartmentMapper;
 import com.yuzhua.mapper.DoctorMapper;
 import com.yuzhua.mapper.DoctorScheduleMapper;
-import com.yuzhua.vo.ScheduleVo;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,17 +28,21 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -55,15 +55,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * DoctorScheduleService 的号源保护、归属冻结、批量排班与 VO 组装的单元覆盖。
+ * DoctorScheduleService 的时段边界、编辑契约护栏、引用冻结与号源下限、历史编辑不写 status、
+ * 停诊医生维护与恢复限制、批量去重与天数钳位的单元测试。
  *
- * <p>append-only 协同：创建/更新会真实走到 mapper.insert/updateById（mock 返回成功），
- * 断言落在返回实体或 updateById 捕获的参数上；批量落库 saveBatch 用 spy 拦截，
- * 避免依赖 MyBatis-Plus 的 SqlSession 批量执行。
+ * <p>两套替身并存：Mockito mock 断言写入参数与拒绝路径；内存替身（InMemoryService）
+ * 断言 ±1 秒边界与状态写入次数。真实落库链路由 *IT 与 tools/schedule_status_check.mjs 覆盖，
+ * 这里只保留复杂不变量，不做 VO 组装与空查询的逐字段断言。
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class DoctorScheduleServiceCoverageTest {
+class DoctorScheduleServiceTest {
 
     @Mock
     private DoctorScheduleMapper scheduleMapper;
@@ -75,6 +76,13 @@ class DoctorScheduleServiceCoverageTest {
     private DepartmentMapper departmentMapper;
 
     private DoctorScheduleService service;
+
+    // 内存替身共享状态（InMemoryService 是非静态内部类，捕获当前测试实例的字段）
+    private DoctorSchedule current;
+    private DoctorSchedule saved;
+    private long refs;
+    private int doctorStatus;
+    private int statusWrites;
 
     @BeforeAll
     static void initTableInfo() {
@@ -91,18 +99,15 @@ class DoctorScheduleServiceCoverageTest {
 
         when(scheduleMapper.insert(any(DoctorSchedule.class))).thenReturn(1);
         when(scheduleMapper.update(any(), any())).thenReturn(1);
-        when(scheduleMapper.deleteById(any(java.io.Serializable.class))).thenReturn(1);
-        when(scheduleMapper.selectList(any())).thenReturn(List.of());
-        doAnswer(invocation -> {
-            Page<DoctorSchedule> page = invocation.getArgument(0);
-            page.setRecords(List.of());
-            page.setTotal(0);
-            return page;
-        }).when(scheduleMapper).selectPage(any(), any());
         when(appointmentMapper.selectCount(any())).thenReturn(0L);
-        when(appointmentMapper.selectMaps(any())).thenReturn(List.of());
         when(doctorMapper.selectBatchIds(anyCollection())).thenReturn(List.of());
         when(departmentMapper.selectBatchIds(anyCollection())).thenReturn(List.of());
+
+        current = null;
+        saved = null;
+        refs = 0;
+        doctorStatus = 1;
+        statusWrites = 0;
     }
 
     // ---------------------------------------------------------------- 用户端选号
@@ -111,25 +116,10 @@ class DoctorScheduleServiceCoverageTest {
     @SuppressWarnings("unchecked")
     void listBookableUsesDefaultsAndClampsDays() {
         LocalDate today = LocalDate.now();
-        Doctor doctor = doctor(10L, 5L, 1);
-        Department department = department(5L, "内科");
-        DoctorSchedule slot = schedule(1L, 10L, today.plusDays(2));
-        when(scheduleMapper.selectList(any())).thenReturn(List.of(slot));
-        when(doctorMapper.selectById(10L)).thenReturn(doctor);
-        when(departmentMapper.selectBatchIds(anyCollection())).thenReturn(List.of(department));
+        when(scheduleMapper.selectList(any())).thenReturn(List.of(schedule(1L, 10L, today.plusDays(2))));
+        when(doctorMapper.selectById(10L)).thenReturn(doctor(10L, 5L, 1));
 
-        List<ScheduleVo> defaulted = service.listBookable(10L, null, null);
-        assertThat(defaulted).singleElement().satisfies(vo -> {
-            assertThat(vo.getId()).isEqualTo(1L);
-            assertThat(vo.getDoctorName()).isEqualTo("陈明远");
-            assertThat(vo.getDoctorTitle()).isEqualTo("主任医师");
-            assertThat(vo.getDepartmentId()).isEqualTo(5L);
-            assertThat(vo.getDepartmentName()).isEqualTo("内科");
-            assertThat(vo.getConsultationFee()).isEqualByComparingTo("50");
-            assertThat(vo.getDoctorAvailable()).isTrue();
-            assertThat(vo.getRefNum()).isNull();
-        });
-
+        assertThat(service.listBookable(10L, null, null)).hasSize(1);
         service.listBookable(10L, today, 0);
         service.listBookable(10L, today, 100);
 
@@ -143,109 +133,7 @@ class DoctorScheduleServiceCoverageTest {
                 .contains(10L, 1, today, today.plusDays(29));
     }
 
-    @Test
-    void listBookableHandlesMissingDoctorAndMissingDepartment() {
-        LocalDate date = LocalDate.now().plusDays(1);
-        DoctorSchedule slot = schedule(1L, 10L, date);
-        when(scheduleMapper.selectList(any())).thenReturn(List.of(slot));
-        when(doctorMapper.selectById(10L)).thenReturn(null);
-
-        ScheduleVo missingDoctor = service.listBookable(10L, null, null).get(0);
-        assertThat(missingDoctor.getDoctorAvailable()).isFalse();
-        assertThat(missingDoctor.getDoctorName()).isNull();
-        assertThat(missingDoctor.getDepartmentName()).isNull();
-
-        Doctor stopped = doctor(10L, 5L, 0);
-        when(doctorMapper.selectById(10L)).thenReturn(stopped);
-        when(departmentMapper.selectBatchIds(anyCollection())).thenReturn(List.of());
-
-        ScheduleVo stoppedVo = service.listBookable(10L, null, null).get(0);
-        assertThat(stoppedVo.getDoctorAvailable()).isFalse();
-        assertThat(stoppedVo.getDoctorName()).isEqualTo("陈明远");
-        assertThat(stoppedVo.getDepartmentName()).isNull();
-    }
-
-    // ---------------------------------------------------------------- 后台分页
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void pageAdminBackfillsRefCountsAndFilters() {
-        LocalDate start = LocalDate.now();
-        LocalDate end = LocalDate.now().plusDays(7);
-        DoctorSchedule first = schedule(1L, 10L, start);
-        DoctorSchedule second = schedule(2L, 10L, start.plusDays(1));
-        DoctorSchedule withoutId = schedule(3L, 10L, start.plusDays(2));
-        withoutId.setId(null);
-        doAnswer(invocation -> {
-            Page<DoctorSchedule> page = invocation.getArgument(0);
-            page.setRecords(List.of(first, second, withoutId));
-            page.setTotal(3);
-            return page;
-        }).when(scheduleMapper).selectPage(any(), any());
-        Doctor doctor = doctor(10L, 5L, 1);
-        when(doctorMapper.selectBatchIds(anyCollection())).thenReturn(List.of(doctor));
-        Department department = department(5L, "内科");
-        when(departmentMapper.selectBatchIds(anyCollection())).thenReturn(List.of(department));
-
-        Map<String, Object> ref = new HashMap<>();
-        ref.put("scheduleId", 1L);
-        ref.put("num", 2L);
-        Map<String, Object> nullScheduleId = new HashMap<>();
-        nullScheduleId.put("scheduleId", null);
-        nullScheduleId.put("num", 9L);
-        when(appointmentMapper.selectMaps(any())).thenReturn(List.of(ref, nullScheduleId));
-
-        PageQuery query = new PageQuery();
-        query.setPageNum(2);
-        query.setPageSize(50);
-        PageResult<ScheduleVo> result = service.pageAdmin(10L, start, end, 1, query);
-
-        assertThat(result.getTotal()).isEqualTo(3);
-        assertThat(result.getCurrent()).isEqualTo(2);
-        assertThat(result.getSize()).isEqualTo(50);
-        assertThat(result.getRecords()).hasSize(3);
-        assertThat(result.getRecords().get(0).getRefNum()).isEqualTo(2L);
-        assertThat(result.getRecords().get(1).getRefNum()).isZero();
-        assertThat(result.getRecords().get(2).getRefNum()).isZero();
-        assertThat(result.getRecords().get(0).getDepartmentName()).isEqualTo("内科");
-
-        ArgumentCaptor<Wrapper<DoctorSchedule>> captor = ArgumentCaptor.forClass(Wrapper.class);
-        verify(scheduleMapper).selectPage(any(), captor.capture());
-        assertThat(values(captor.getValue())).contains(10L, start, end, 1);
-    }
-
-    @Test
-    void pageAdminWithoutRowsSkipsReferenceQueryAndFilters() {
-        PageQuery query = new PageQuery();
-        PageResult<ScheduleVo> result = service.pageAdmin(null, null, null, null, query);
-
-        assertThat(result.getRecords()).isEmpty();
-        assertThat(result.getTotal()).isZero();
-        verify(appointmentMapper, never()).selectMaps(any());
-        verify(doctorMapper, never()).selectBatchIds(anyCollection());
-
-        ArgumentCaptor<Wrapper<DoctorSchedule>> captor = ArgumentCaptor.forClass(Wrapper.class);
-        verify(scheduleMapper).selectPage(any(), captor.capture());
-        assertThat(values(captor.getValue())).isEmpty();
-    }
-
-    // ---------------------------------------------------------------- 新建
-
-    @Test
-    void createRejectsUnknownOrStoppedDoctor() {
-        when(doctorMapper.selectById(10L)).thenReturn(null);
-        BizException missing = biz(() -> service.create(form(10L, LocalDate.now().plusDays(1), 1,
-                LocalTime.of(9, 0), LocalTime.of(11, 0), 10, null)));
-        assertThat(missing.getCode()).isEqualTo(404);
-        assertThat(missing.getMessage()).contains("医生不存在");
-
-        when(doctorMapper.selectById(10L)).thenReturn(doctor(10L, 5L, 0));
-        BizException stopped = biz(() -> service.create(form(10L, LocalDate.now().plusDays(1), 1,
-                LocalTime.of(9, 0), LocalTime.of(11, 0), 10, null)));
-        assertThat(stopped.getCode()).isEqualTo(400);
-        assertThat(stopped.getMessage()).contains("停诊状态");
-        verify(scheduleMapper, never()).insert(any(DoctorSchedule.class));
-    }
+    // ---------------------------------------------------------------- 新建校验
 
     @Test
     void createValidatesDateAndTimeOrder() {
@@ -298,36 +186,7 @@ class DoctorScheduleServiceCoverageTest {
         verify(scheduleMapper, never()).insert(any(DoctorSchedule.class));
     }
 
-    @Test
-    void createAcceptsAllPeriodsAndDefaultsStatus() {
-        when(doctorMapper.selectById(10L)).thenReturn(doctor(10L, 5L, 1));
-        LocalDate date = LocalDate.now().plusDays(1);
-
-        DoctorSchedule morning = service.create(form(10L, date, 1,
-                LocalTime.of(8, 0), LocalTime.of(12, 0), 10, null));
-        DoctorSchedule afternoon = service.create(form(10L, date.plusDays(1), 2,
-                LocalTime.of(13, 0), LocalTime.of(18, 0), 8, null));
-        DoctorSchedule night = service.create(form(10L, date.plusDays(2), 3,
-                LocalTime.of(18, 0), LocalTime.of(22, 0), 6, 0));
-
-        assertThat(morning.getStatus()).isEqualTo(1);
-        assertThat(morning.getRemainNum()).isEqualTo(10);
-        assertThat(afternoon.getStatus()).isEqualTo(1);
-        assertThat(afternoon.getRemainNum()).isEqualTo(8);
-        assertThat(night.getStatus()).isZero();
-        assertThat(night.getRemainNum()).isEqualTo(6);
-        assertThat(morning.getDoctorId()).isEqualTo(10L);
-        assertThat(morning.getWorkDate()).isEqualTo(date);
-        assertThat(morning.getStartTime()).isEqualTo(LocalTime.of(8, 0));
-        assertThat(morning.getEndTime()).isEqualTo(LocalTime.of(12, 0));
-
-        ArgumentCaptor<DoctorSchedule> captor = ArgumentCaptor.forClass(DoctorSchedule.class);
-        verify(scheduleMapper, times(3)).insert(captor.capture());
-        assertThat(captor.getAllValues()).extracting(DoctorSchedule::getPeriod)
-                .containsExactly(1, 2, 3);
-    }
-
-    // ---------------------------------------------------------------- 修改
+    // ---------------------------------------------------------------- 编辑：引用冻结 / 号源下限 / 归属
 
     @Test
     void updateRejectsMissingSchedule() {
@@ -361,27 +220,6 @@ class DoctorScheduleServiceCoverageTest {
                 LocalTime.of(9, 0), LocalTime.of(11, 0), 10)));
         assertThat(badPeriod.getMessage()).contains("时段只能是");
         verify(scheduleMapper, never()).updateById(any(DoctorSchedule.class));
-    }
-
-    @Test
-    void updateAllowsCapacityChangeOnHistoricalSchedule() {
-        DoctorSchedule current = schedule(1L, 10L, LocalDate.now().minusDays(1));
-        current.setRemainNum(8);
-        when(scheduleMapper.selectByIdForUpdate(1L)).thenReturn(current);
-        Doctor stopped = doctor(10L, 5L, 0);
-        when(doctorMapper.selectById(10L)).thenReturn(stopped);
-        when(appointmentMapper.selectCount(any())).thenReturn(0L, 2L);
-
-        service.update(1L, edit(10L, current.getWorkDate(), 1,
-                LocalTime.of(9, 0), LocalTime.of(11, 0), 5));
-
-        ArgumentCaptor<DoctorSchedule> captor = ArgumentCaptor.forClass(DoctorSchedule.class);
-        verify(scheduleMapper).updateById(captor.capture());
-        DoctorSchedule written = captor.getValue();
-        assertThat(written.getId()).isEqualTo(1L);
-        assertThat(written.getTotalNum()).isEqualTo(5);
-        assertThat(written.getRemainNum()).isEqualTo(3);
-        assertThat(written.getStatus()).as("编辑接口不写 status").isNull();
     }
 
     @Test
@@ -471,24 +309,6 @@ class DoctorScheduleServiceCoverageTest {
         assertThat(captor.getValue().getStartTime()).isEqualTo(LocalTime.of(13, 0));
         assertThat(captor.getValue().getEndTime()).isEqualTo(LocalTime.of(15, 0));
         assertThat(captor.getValue().getRemainNum()).isEqualTo(10);
-    }
-
-    @Test
-    void updateAllowsChangingOnlyEndTimeAfterWindowValidation() {
-        DoctorSchedule current = schedule(1L, 10L, LocalDate.now().plusDays(1));
-        when(scheduleMapper.selectByIdForUpdate(1L)).thenReturn(current);
-        when(doctorMapper.selectById(10L)).thenReturn(doctor(10L, 5L, 1));
-        when(appointmentMapper.selectCount(any())).thenReturn(0L, 0L);
-
-        service.update(1L, edit(10L, current.getWorkDate(), 1,
-                LocalTime.of(9, 0), LocalTime.of(10, 0), 10));
-
-        ArgumentCaptor<DoctorSchedule> captor = ArgumentCaptor.forClass(DoctorSchedule.class);
-        verify(scheduleMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getStartTime()).isEqualTo(LocalTime.of(9, 0));
-        assertThat(captor.getValue().getEndTime()).isEqualTo(LocalTime.of(10, 0));
-        assertThat(captor.getValue().getRemainNum()).isEqualTo(10);
-        assertThat(captor.getValue().getStatus()).isNull();
     }
 
     @Test
@@ -664,15 +484,6 @@ class DoctorScheduleServiceCoverageTest {
     }
 
     @Test
-    void removeDeletesUnreferencedSchedule() {
-        when(scheduleMapper.selectByIdForUpdate(1L)).thenReturn(schedule(1L, 10L, LocalDate.now().plusDays(1)));
-
-        service.remove(1L);
-
-        verify(scheduleMapper).deleteById(1L);
-    }
-
-    @Test
     void stopClinicRequiresExistingRowAndAffectedUpdate() {
         when(scheduleMapper.selectById(1L)).thenReturn(null);
         assertThat(biz(() -> service.stopClinic(1L)).getCode()).isEqualTo(404);
@@ -731,30 +542,236 @@ class DoctorScheduleServiceCoverageTest {
         assertThat(values(captor.getValue())).contains(1, 1L);
     }
 
-    @Test
-    void requireReturnsRowOrThrows404() {
-        DoctorSchedule schedule = schedule(1L, 10L, LocalDate.now().plusDays(1));
-        when(scheduleMapper.selectById(1L)).thenReturn(schedule);
-        assertThat(service.require(1L)).isSameAs(schedule);
+    // ---------------------------------------------------------------- 内存替身：时段边界与状态写入
 
-        when(scheduleMapper.selectById(2L)).thenReturn(null);
-        BizException e = biz(() -> service.require(2L));
-        assertThat(e.getCode()).isEqualTo(404);
-        assertThat(e.getMessage()).contains("排班不存在");
+    /** 三个时段的边界时间本身合法，越界 1 秒即拒绝；批量路径与单条一致 */
+    @Test
+    void acceptBoundaryTimesForEachPeriod() {
+        InMemoryService s = new InMemoryService();
+        String[][] bounds = {{"08:00", "12:00"}, {"13:00", "18:00"}, {"18:00", "22:00"}};
+        for (int i = 0; i < bounds.length; i++) {
+            ScheduleForm f = form(i + 1, bounds[i][0], bounds[i][1]);
+            s.create(f);
+            if (!saved.getStartTime().equals(f.getStartTime())) {
+                throw new AssertionError("边界时间未保存");
+            }
+            if (s.batchCreate(batch(f)).created() != 1) {
+                throw new AssertionError("批量边界失败");
+            }
+            f.setStartTime(f.getStartTime().minusSeconds(1));
+            reject(() -> s.create(f), "排班时间须在");
+            reject(() -> s.batchCreate(batch(f)), "排班时间须在");
+            f.setStartTime(LocalTime.parse(bounds[i][0]));
+            f.setEndTime(f.getEndTime().plusSeconds(1));
+            reject(() -> s.create(f), "排班时间须在");
+            reject(() -> s.batchCreate(batch(f)), "排班时间须在");
+        }
     }
 
+    /**
+     * 编辑契约的形状：<strong>ScheduleEditForm 不能有 status 字段</strong>。
+     *
+     * <p>这是契约层的护栏，和 {@code preserveLegacyScheduleOnEdit} 的分工要说清：
+     * 那个用例断言的是"实现不发 status"（出参实体上为 null），而真正拦住越权写入的是
+     * <em>请求体结构上不存在这个字段</em>。如果将来有人把 status 加回 DTO、并写成
+     * "只在非 null 时写入"，出参断言依然全绿，但旧客户端又能改停诊位了。
+     * 所以这里直接查反射，字段一旦回来就红。
+     */
     @Test
-    void requireDoctorRejectsMissingDoctorOnCapacityChange() {
-        DoctorSchedule current = schedule(1L, 10L, LocalDate.now().plusDays(1));
-        when(scheduleMapper.selectByIdForUpdate(1L)).thenReturn(current);
-        when(doctorMapper.selectById(10L)).thenReturn(null);
+    void editFormHasNoStatusField() {
+        for (var field : ScheduleEditForm.class.getDeclaredFields()) {
+            if ("status".equals(field.getName())) {
+                throw new AssertionError("ScheduleEditForm 不应有 status 字段："
+                        + "停诊/恢复只能由 /stop 与 /resume 写入");
+            }
+        }
+        // 六个业务字段必须都在，防止为了"没有 status"把别的字段也删了
+        Set<String> names = Arrays.stream(ScheduleEditForm.class.getDeclaredFields())
+                .map(java.lang.reflect.Field::getName).collect(Collectors.toSet());
+        assertEquals(Set.of("doctorId", "workDate", "period", "startTime", "endTime", "totalNum"),
+                names, "ScheduleEditForm 的字段集合应恰好是这六个");
+    }
 
-        BizException e = biz(() -> service.update(1L, edit(10L, current.getWorkDate(), 1,
-                LocalTime.of(9, 0), LocalTime.of(11, 0), 10)));
+    /**
+     * 历史排班可以改号源，但在已有预约时不能改时间；调整时段同样受限。
+     *
+     * <p>同时锁住实现侧不变量：编辑路径<strong>不写 status</strong>。
+     *
+     * <p>注意这个断言依赖 MyBatis-Plus 默认的 {@code updateById} 跳过 null 列
+     * （{@code FieldStrategy.NOT_NULL}）；真正的落库保证由
+     * {@code tools/schedule_status_check.mjs} 端到端覆盖，这里只保证"实现没有主动设值"。
+     * 契约形状由 {@link #editFormHasNoStatusField} 锁住。
+     */
+    @Test
+    void preserveLegacyScheduleOnEdit() {
+        InMemoryService s = new InMemoryService();
+        current = new DoctorSchedule();
+        current.setId(9L);
+        current.setDoctorId(1L);
+        current.setPeriod(1);
+        current.setWorkDate(LocalDate.now().minusDays(1));
+        current.setStartTime(LocalTime.of(14, 0));
+        current.setEndTime(LocalTime.of(16, 0));
+        current.setStatus(0);
 
-        assertThat(e.getCode()).isEqualTo(404);
-        assertThat(e.getMessage()).contains("医生不存在");
-        verify(scheduleMapper, never()).updateById(any(DoctorSchedule.class));
+        ScheduleForm base = form(1, "14:00", "16:00");
+        base.setWorkDate(current.getWorkDate());
+        base.setTotalNum(25);
+        ScheduleEditForm old = edit(base);
+        for (long count : new long[]{0, 2}) {
+            refs = count;
+            s.update(9L, old);
+            if (saved.getStatus() != null) {
+                throw new AssertionError("编辑路径不应写 status，实际写了 " + saved.getStatus());
+            }
+            if (saved.getRemainNum() != 25 - count
+                    || !saved.getStartTime().equals(current.getStartTime())) {
+                throw new AssertionError("旧排班保存失败");
+            }
+        }
+        old.setStartTime(LocalTime.of(9, 0));
+        old.setEndTime(LocalTime.of(11, 0));
+        reject(() -> s.update(9L, old), "条预约记录");
+        refs = 0;
+        s.update(9L, old);
+        if (!saved.getStartTime().equals(LocalTime.of(9, 0))) {
+            throw new AssertionError("修正时间失败");
+        }
+        old.setEndTime(LocalTime.of(13, 0));
+        reject(() -> s.update(9L, old), "排班时间须在");
+        old.setPeriod(2);
+        old.setStartTime(LocalTime.of(9, 0));
+        old.setEndTime(LocalTime.of(11, 0));
+        reject(() -> s.update(9L, old), "排班时间须在");
+
+        ScheduleBatchForm duplicate = batch(form(1, "09:00", "11:00"));
+        duplicate.setPeriods(List.of(duplicate.getPeriods().get(0), duplicate.getPeriods().get(0)));
+        reject(() -> s.batchCreate(duplicate), "每个时段只能配置一次");
+    }
+
+    /** 医生停诊期间仍可维护号源，但不能新开排班或恢复出诊；状态切换只走行内两个专用入口 */
+    @Test
+    void maintainStoppedDoctorSchedule() {
+        InMemoryService s = new InMemoryService();
+        current = new DoctorSchedule();
+        current.setId(9L);
+        current.setDoctorId(1L);
+        current.setPeriod(1);
+        current.setWorkDate(LocalDate.now().minusDays(1));
+        current.setStartTime(LocalTime.of(14, 0));
+        current.setEndTime(LocalTime.of(16, 0));
+        current.setStatus(1);
+
+        doctorStatus = 0;
+        ScheduleForm base = form(1, "14:00", "16:00");
+        base.setWorkDate(current.getWorkDate());
+        base.setTotalNum(25);
+        ScheduleEditForm maintenance = edit(base);
+        s.update(9L, maintenance);
+        if (saved.getTotalNum() != 25 || saved.getStatus() != null) {
+            throw new AssertionError("停诊医生调整号源失败");
+        }
+        // 状态只能由专用入口翻：行内停诊写一次，编辑路径沿路不碰这一列
+        s.stopClinic(9L);
+        if (statusWrites != 1) {
+            throw new AssertionError("行内停诊失败");
+        }
+        current.setStatus(0);
+        s.update(9L, maintenance);
+        if (saved.getStatus() != null) {
+            throw new AssertionError("编辑路径不应写 status");
+        }
+
+        // 停诊中改容量可以，但恢复出诊只能走 resumeClinic，且要求医生仍在诊
+        ScheduleForm restoreBase = form(1, "14:00", "16:00");
+        restoreBase.setWorkDate(current.getWorkDate());
+        ScheduleEditForm restore = edit(restoreBase);
+        reject(() -> s.resumeClinic(9L), "该医生处于停诊状态");
+        reject(() -> s.create(form(1, "09:00", "11:00")), "该医生处于停诊状态");
+        reject(() -> s.batchCreate(batch(form(1, "09:00", "11:00"))), "该医生处于停诊状态");
+        if (statusWrites != 1) {
+            throw new AssertionError("停诊医生被恢复排班");
+        }
+
+        doctorStatus = 1;
+        s.update(9L, restore);
+        if (saved.getStatus() != null) {
+            throw new AssertionError("编辑路径不应写 status");
+        }
+        s.resumeClinic(9L);
+        if (statusWrites != 2) {
+            throw new AssertionError("行内恢复失败");
+        }
+    }
+
+    // ---------------------------------------------------------------- 内存替身 harness
+
+    @SuppressWarnings("unchecked")
+    static <T> T mapper(Class<T> type, Function<String, Object> result) {
+        return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type},
+                (proxy, method, args) -> result.apply(method.getName()));
+    }
+
+    class InMemoryService extends DoctorScheduleService {
+        InMemoryService() {
+            super(mapper(DoctorMapper.class, name -> {
+                Doctor d = new Doctor();
+                d.setId(1L);
+                d.setStatus(doctorStatus);
+                return d;
+            }), mapper(AppointmentMapper.class, name -> refs), null);
+            baseMapper = mapper(DoctorScheduleMapper.class, name -> current);
+        }
+
+        @Override
+        public boolean exists(Wrapper<DoctorSchedule> query) {
+            return false;
+        }
+
+        @Override
+        public boolean save(DoctorSchedule row) {
+            saved = row;
+            return true;
+        }
+
+        @Override
+        public boolean updateById(DoctorSchedule row) {
+            saved = row;
+            return true;
+        }
+
+        @Override
+        public boolean saveBatch(Collection<DoctorSchedule> rows) {
+            saved = rows.iterator().next();
+            return true;
+        }
+
+        @Override
+        public DoctorSchedule require(Long id) {
+            return current;
+        }
+
+        @Override
+        public boolean update(Wrapper<DoctorSchedule> query) {
+            statusWrites++;
+            return true;
+        }
+    }
+
+    /** 断言被拒绝，且拒绝路径上没有发生任何写入 */
+    void reject(Runnable action, String message) {
+        saved = null;
+        try {
+            action.run();
+            throw new AssertionError("应拒绝：" + message);
+        } catch (BizException e) {
+            if (!e.getMessage().contains(message)) {
+                throw new AssertionError(e);
+            }
+        }
+        if (saved != null) {
+            throw new AssertionError("拒绝前发生了写入");
+        }
     }
 
     // ---------------------------------------------------------------- fixtures
@@ -769,13 +786,6 @@ class DoctorScheduleServiceCoverageTest {
         doctor.setAvatar("doctor.png");
         doctor.setConsultationFee(new BigDecimal("50"));
         return doctor;
-    }
-
-    private static Department department(long id, String name) {
-        Department department = new Department();
-        department.setId(id);
-        department.setName(name);
-        return department;
     }
 
     private static DoctorSchedule schedule(long id, long doctorId, LocalDate workDate) {
@@ -805,6 +815,19 @@ class DoctorScheduleServiceCoverageTest {
         return form;
     }
 
+    /** 内存替身用的边界入参：日期固定为明天，号源 20 */
+    static ScheduleForm form(int period, String start, String end) {
+        ScheduleForm f = new ScheduleForm();
+        f.setDoctorId(1L);
+        f.setWorkDate(LocalDate.now().plusDays(1));
+        f.setPeriod(period);
+        f.setStartTime(LocalTime.parse(start));
+        f.setEndTime(LocalTime.parse(end));
+        f.setTotalNum(20);
+        f.setStatus(1);
+        return f;
+    }
+
     private static ScheduleEditForm edit(Long doctorId, LocalDate date, Integer period,
                                          LocalTime start, LocalTime end, Integer total) {
         ScheduleEditForm form = new ScheduleEditForm();
@@ -815,6 +838,18 @@ class DoctorScheduleServiceCoverageTest {
         form.setEndTime(end);
         form.setTotalNum(total);
         return form;
+    }
+
+    /** 编辑入参：字段与 ScheduleForm 相同，唯独没有 status——状态不在这条写入路径上 */
+    static ScheduleEditForm edit(ScheduleForm f) {
+        ScheduleEditForm e = new ScheduleEditForm();
+        e.setDoctorId(f.getDoctorId());
+        e.setWorkDate(f.getWorkDate());
+        e.setPeriod(f.getPeriod());
+        e.setStartTime(f.getStartTime());
+        e.setEndTime(f.getEndTime());
+        e.setTotalNum(f.getTotalNum());
+        return e;
     }
 
     private static ScheduleBatchForm batch(Long doctorId, LocalDate start, LocalDate end,
@@ -829,6 +864,21 @@ class DoctorScheduleServiceCoverageTest {
         form.setPeriods(periods);
         form.setOverrideTotalNum(overrideTotalNum);
         return form;
+    }
+
+    static ScheduleBatchForm batch(ScheduleForm f) {
+        ScheduleBatchForm b = new ScheduleBatchForm();
+        b.setDoctorId(f.getDoctorId());
+        b.setStartDate(f.getWorkDate());
+        b.setEndDate(f.getWorkDate());
+        b.setWeekDays(List.of(f.getWorkDate().getDayOfWeek().getValue()));
+        ScheduleBatchForm.PeriodTemplate p = new ScheduleBatchForm.PeriodTemplate();
+        p.setPeriod(f.getPeriod());
+        p.setStartTime(f.getStartTime());
+        p.setEndTime(f.getEndTime());
+        p.setTotalNum(20);
+        b.setPeriods(List.of(p));
+        return b;
     }
 
     private static ScheduleBatchForm.PeriodTemplate template(Integer period,

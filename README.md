@@ -75,7 +75,7 @@
 每次 push 到 `main` 或向 `main` 提交 PR，GitHub Actions 会执行：
 
 - 后端：JDK 17 + `mvn --batch-mode --no-transfer-progress verify`（单元测试 + 集成测试 + 打包，见[测试与压测](#测试与压测)）
-- 前端：Node.js 22 + `npm ci`、`npm run lint`、`npm run test:coverage`、`npm run build`
+- 前端：Node.js 22 + `npm ci`、`npm run lint`、`npm run style-guard`、`npm run test:coverage`、`npm run build`，另跑 Dependabot 标题本地化脚本单测（`node --test .github/scripts/localize-dependabot.test.mjs`）
 - 部署：Docker Compose 构建并启动 MySQL、后端、nginx，校验健康接口与种子数据（仅 PR）
 
 工作流见 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 与 [`.github/workflows/docker.yml`](.github/workflows/docker.yml)，action 版本由 Dependabot 每周检查。Dependabot 的英文 PR 标题由 `Localize Dependabot PR` 工作流自动改成中文。
@@ -88,7 +88,7 @@
 cd backend && mvn --batch-mode --no-transfer-progress test
 ```
 
-覆盖 JWT 密钥与令牌版本、账号状态校验、状态取值、排班周期校验、批量查询、WebSocket 会话注册表，以及预约与排班两个核心服务的状态机分支；下单幂等键的预查、唯一键回读、非法键，清扫任务的租约跳过/释放与租约有效期校验，慢 SQL 拦截器的阈值语义、异常透传、4/6 参 query 签名与 MyBatis-Plus 改写只记一次也在其中。只跑 surefire，不需要 Docker。
+覆盖 JWT 密钥与令牌版本、账号状态校验、状态取值、批量查询、WebSocket 会话注册表、配置启动期校验（租约有效期必须为正、慢 SQL 阈值不能为负），以及预约与排班两个核心服务的越权隔离、状态机、前置拒绝与表单写语义；清扫任务的租约跳过/释放与租约有效期校验，慢 SQL 拦截器的阈值语义、异常透传、4/6 参 query 签名与 MyBatis-Plus 改写只记一次也在其中。下单幂等键的预查、唯一键回读、重放等真实链路由集成测试覆盖。只跑 surefire，不需要 Docker。
 
 ### 集成测试
 
@@ -125,7 +125,7 @@ bash tools/load/run-steady.sh
 
 ### 覆盖率门禁
 
-后端 `mvn verify` 中 JaCoCo 对 `AppointmentService` / `DoctorScheduleService` / `SlowSqlInterceptor` 行覆盖 ≥95%；前端 `npm run test:coverage` 对 `tools/style-guard/index.mjs` 与 `src/utils/tableDensity.js` 行/分支/函数 ≥95%。门禁与代码同一次提交；用例数与压测数值以复跑的原始输出为准。
+后端 `mvn verify` 中 JaCoCo 仅对 `SlowSqlInterceptor` 卡行覆盖 ≥95%（`AppointmentService` / `DoctorScheduleService` 等厚 Service 继续生成全量报告但不卡构建，真实链路由 `*IT` 覆盖）；前端 `npm run test:coverage` 对 `tools/style-guard/index.mjs` 与 `src/utils/tableDensity.js` 行/分支/函数 ≥95%。门禁与代码同一次提交；用例数与压测数值以复跑的原始输出为准。
 
 ### 可观测性
 

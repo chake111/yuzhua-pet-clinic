@@ -1,0 +1,2 @@
+$ docker compose config -q
+（无输出；退出码 0，编排校验通过）

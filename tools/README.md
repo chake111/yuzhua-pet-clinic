@@ -1,6 +1,6 @@
 # tools
 
-隔离测试环境与业务回归脚本。它们不是生产入口，也不会在 CI 中执行；CI 跑 `backend` 的 `mvn verify`（单元 + 集成测试）与 `frontend` 的 lint / test:coverage / build。
+隔离测试环境与业务回归脚本。它们不是生产入口，也不会在 CI 中执行；CI 跑 `backend` 的 `mvn verify`（单元 + 集成测试）与 `frontend` 的 lint / style-guard / test:coverage / build，另跑 Dependabot 本地化脚本单测。
 
 ## 前置条件
 

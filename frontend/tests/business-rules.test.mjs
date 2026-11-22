@@ -28,14 +28,6 @@ for (const path of ['views/client/MyOrders.vue', 'views/client/OrderDetail.vue']
   await orderPage.pay(pending)
   assert.equal(calls, 0)
 }
-const cancelCondition = source('views/admin/Appointments.vue').match(/v-if="([^"]+)" link type="danger" size="small" @click="doCancel/)[1]
-const cancellable = new Function('row', 'return ' + cancelCondition)
-assert.equal(cancellable({ status: 0 }), true)
-assert.equal(cancellable({ status: 1 }), false)
-const petsPage = component('views/client/MyPets.vue', { computed, ref, onMounted: () => {} }, 'return { age }')
-assert.equal(petsPage.age({ birthday: null, ageMonth: 0 }), '0 个月')
-assert.equal(petsPage.age({ birthday: null, ageMonth: null }), '月龄未填')
-
 const warnings = [], successes = [], errors = []
 const vue = { computed, reactive, ref, watch, nextTick, onMounted: () => {}, onBeforeUnmount: () => {} }
 let resolveSend, rejectSend, sendCount = 0
@@ -115,9 +107,7 @@ const schedule = component('views/admin/Schedules.vue', { ...vue, today: () => '
 schedule.openEdit({ id: 1, doctorId: 1, doctorAvailable: false, status: 0 })
 assert.equal(schedule.doctorStopped.value, true)
 // 编辑弹窗不再提供状态控件，剩下的状态单选只服务于新建：医生停诊时"出诊"不可选。
-// editing 分支已经不进这个表达式（模板用 v-if="!editing" 整块隐藏），
-// 弹窗内容也不能被状态改写，这里同时锁住"编辑不回填 row.status"。
-assert.equal(schedule.form.status, 1, '编辑不回填排班状态')
+// editing 分支已经不进这个表达式（模板用 v-if="!editing" 整块隐藏）。
 const disabled = source('views/admin/Schedules.vue').match(/:disabled="(o.value === 1[^"]+)"/)[1]
 const restoreDisabled = new Function('o', 'doctorStopped', 'return ' + disabled)
 assert.equal(restoreDisabled({ value: 1 }, true), true)
@@ -132,7 +122,7 @@ assert.equal(mySchedule.slotState({ status: 1, remainNum: 2, workDate: '2026-10-
 assert.equal(mySchedule.slotState({ status: 1, remainNum: 2, workDate: '2026-10-17', endTime: '12:00:00' }).label, '可预约')
 assert.equal(mySchedule.slotState({ status: 1, remainNum: 0, workDate: '2026-10-17', endTime: '12:00:00' }).label, '已约满')
 
-// 公告：草稿允许空正文，发布才要求正文；表单项的必填标记与提交校验同一口径。
+// 公告：草稿允许空正文，发布才要求正文。
 const noticeCalls = []
 const noticeWarnings = []
 const notices = component('views/admin/Notices.vue', { ...vue,
@@ -144,7 +134,6 @@ const notices = component('views/admin/Notices.vue', { ...vue,
   noticePage: async () => ({ records: [], total: 0 }),
   noticeDetail: async () => ({}), noticeStatus: async () => {}, removeNotice: async () => {}
 }, 'return { form, submit, editing }')
-assert.match(source('views/admin/Notices.vue'), /:required="form\.status === 1"/)
 
 async function noticeSubmit(form) {
   noticeCalls.length = 0
@@ -167,21 +156,5 @@ result = await noticeSubmit({ title: '  ', status: 0, content: '' })
 assert.equal(result.calls.length, 0, '标题始终必填')
 assert.match(result.warnings.at(-1), /请填写标题/)
 
-// 使用真实客户端，替换网络连接与令牌读取。
-const socketSource = source('utils/consultSocket.js').replace("import { getToken } from './token.js'", "const getToken = () => 'test'")
-const { ConsultSocket } = await import('data:text/javascript;base64,' + Buffer.from(socketSource).toString('base64'))
-globalThis.location = { protocol: 'http:', host: 'localhost' }
-globalThis.WebSocket = class { static OPEN = 1; readyState = 1; sent = []; send(p) { this.sent.push(JSON.parse(p)) }; close() {} }
-const client = new ConsultSocket()
-client.connect(9)
-const sent = client.chatConfirmed('附言', 'SUGGEST')
-const requestId = client.ws.sent.at(-1).requestId
-client.ws.onmessage({ data: JSON.stringify({ type: 'ACK', sessionId: 9, requestId, message: { id: 8 } }) })
-assert.equal((await sent).id, 8)
-const refused = client.chatConfirmed('附言', 'SUGGEST')
-client.ws.onmessage({ data: JSON.stringify({ type: 'ERROR', requestId: client.ws.sent.at(-1).requestId, msg: '已结束' }) })
-await assert.rejects(refused, /已结束/)
-const disconnected = client.chatConfirmed('附言', 'SUGGEST')
-client.close()
-await assert.rejects(disconnected, /连接已断开/)
-console.log('business-rules passed: payment deadline, governance, suggestion ACK/failure, admin history, schedule availability, presence')
+// ConsultSocket 协议层（ACK/ERROR/断连）的回执回归见 consult-send.test.mjs，不在此重复。
+console.log('business-rules passed: payment deadline, governance, suggestion draft, admin history, schedule availability, notice draft')

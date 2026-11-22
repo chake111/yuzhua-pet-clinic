@@ -1,0 +1,44 @@
+TAP version 13
+# Subtest: 鍒嗙粍鏇存柊
+ok 1 - 鍒嗙粍鏇存柊
+  ---
+  duration_ms: 0.7113
+  type: 'test'
+  ...
+# Subtest: 鍒嗙粍鏇存柊锛屽甫鐩綍鏁伴噺
+ok 2 - 鍒嗙粍鏇存柊锛屽甫鐩綍鏁伴噺
+  ---
+  duration_ms: 0.1623
+  type: 'test'
+  ...
+# Subtest: 鍗曚釜渚濊禆锛屽甫鐗堟湰鍖洪棿
+ok 3 - 鍗曚釜渚濊禆锛屽甫鐗堟湰鍖洪棿
+  ---
+  duration_ms: 0.5737
+  type: 'test'
+  ...
+# Subtest: 鍗曚釜渚濊禆锛屽彧鏈夌洰鏍囩増鏈?ok 4 - 鍗曚釜渚濊禆锛屽彧鏈夌洰鏍囩増鏈?  ---
+  duration_ms: 0.136
+  type: 'test'
+  ...
+# Subtest: 宸茬粡鏄腑鏂囨椂杩斿洖 null
+ok 5 - 宸茬粡鏄腑鏂囨椂杩斿洖 null
+  ---
+  duration_ms: 0.4287
+  type: 'test'
+  ...
+# Subtest: 涓嶈璇嗙殑鏍煎紡杩斿洖 null
+ok 6 - 涓嶈璇嗙殑鏍煎紡杩斿洖 null
+  ---
+  duration_ms: 0.1954
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 103.5778
