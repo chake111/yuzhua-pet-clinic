@@ -1,9 +1,9 @@
 <script setup>
 import brandLogo from '@/assets/logo.svg'
 import { BRAND } from '@/brand.js'
-import { computed, markRaw, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChatDotRound, HomeFilled, Search, User } from '@element-plus/icons-vue'
+import EntryIcon from '@/components/EntryIcon.vue'
 import { consultUnread } from '@/api/user'
 import { useUserStore } from '@/stores/client'
 
@@ -16,14 +16,19 @@ const route = useRoute()
 const router = useRouter()
 const isConsultRoom = computed(() => route.name === 'consultRoom')
 const unread = ref(0)
+const menuOpen = ref(false)
+const menuWrapEl = ref(null)
+const avatarError = ref(false)
 let timer = null
 
 const tabs = [
-  { to: '/', label: '首页', icon: markRaw(HomeFilled) },
-  { to: '/doctors', label: '找医生', icon: markRaw(Search) },
-  { to: '/consult', label: '问诊', icon: markRaw(ChatDotRound), badge: true },
-  { to: '/me', label: '我的', icon: markRaw(User) }
+  { to: '/', label: '首页', icon: 'HomeFilled' },
+  { to: '/doctors', label: '找医生', icon: 'Search' },
+  { to: '/consult', label: '问诊', icon: 'ChatDotRound', badge: true },
+  { to: '/me', label: '我的', icon: 'User' }
 ]
+
+watch(() => store.user?.avatar, () => { avatarError.value = false })
 
 // 从已完成的路由确定位置，兼容返回、深链接和登录重定向。
 const activeTab = computed(() => {
@@ -53,18 +58,48 @@ function loop(on) {
 }
 
 watch(() => store.logged, (on) => {
+  if (!on) menuOpen.value = false
   pollUnread()
   loop(on)
 }, { immediate: true })
 
 // 聊天页读过的消息要立刻反映到角标上，返回外壳时主动刷一次
 watch(() => route.path, (p) => {
+  menuOpen.value = false
   if (p.startsWith('/consult') || p.startsWith('/me')) pollUnread()
 })
 
-onBeforeUnmount(() => clearInterval(timer))
+function onDocClick(event) {
+  if (!menuOpen.value) return
+  if (menuWrapEl.value && !menuWrapEl.value.contains(event.target)) {
+    menuOpen.value = false
+  }
+}
+
+function onDocKeydown(event) {
+  if (event.key === 'Escape' && menuOpen.value) {
+    menuOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', onDocClick)
+  document.addEventListener('keydown', onDocKeydown)
+})
+
+onBeforeUnmount(() => {
+  clearInterval(timer)
+  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('keydown', onDocKeydown)
+})
+
+function goMenu(path) {
+  menuOpen.value = false
+  router.push(path)
+}
 
 function logout() {
+  menuOpen.value = false
   store.logout()
   router.push('/')
 }
@@ -81,23 +116,30 @@ function logout() {
         </span>
       </router-link>
       <div class="who">
-        <template v-if="store.logged">
-          <el-dropdown trigger="click">
-            <span class="me">
-              <el-avatar :size="26" :src="store.user?.avatar" alt="">{{ store.nickname.slice(0, 1) }}</el-avatar>
-              <em>{{ store.nickname }}</em>
+        <div v-if="store.logged" ref="menuWrapEl" class="me-wrap">
+          <button
+            type="button"
+            class="me"
+            aria-haspopup="menu"
+            :aria-expanded="menuOpen"
+            @click="menuOpen = !menuOpen"
+          >
+            <span class="el-avatar el-avatar--circle" style="--el-avatar-size: 26px">
+              <img v-if="store.user?.avatar && !avatarError" :src="store.user.avatar" alt="" @error="avatarError = true" />
+              <template v-else>{{ store.nickname.slice(0, 1) }}</template>
             </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="router.push('/me/orders')">我的预约</el-dropdown-item>
-                <el-dropdown-item @click="router.push('/me/pets')">宠物档案</el-dropdown-item>
-                <el-dropdown-item @click="router.push('/me/profile')">账号设置</el-dropdown-item>
-                <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-        <el-button v-else type="primary" size="small" @click="router.push('/login')">登录</el-button>
+            <em>{{ store.nickname }}</em>
+          </button>
+          <ul v-if="menuOpen" class="me-menu" role="menu">
+            <li role="none"><button type="button" role="menuitem" @click="goMenu('/me/orders')">我的预约</button></li>
+            <li role="none"><button type="button" role="menuitem" @click="goMenu('/me/pets')">宠物档案</button></li>
+            <li role="none"><button type="button" role="menuitem" @click="goMenu('/me/profile')">账号设置</button></li>
+            <li role="none" class="divided"><button type="button" role="menuitem" @click="logout">退出登录</button></li>
+          </ul>
+        </div>
+        <button v-else type="button" class="el-button el-button--primary el-button--small" @click="router.push('/login')">
+          <span>登录</span>
+        </button>
       </div>
     </header>
 
@@ -116,9 +158,10 @@ function logout() {
       >
         <button class="tab" :class="{ on: activeTab === index }" :aria-current="activeTab === index ? 'page' : undefined" @click="navigate">
           <span class="ico">
-            <el-badge :value="t.badge ? unread : 0" :hidden="!t.badge || !unread" :max="99">
-              <el-icon :size="24"><component :is="t.icon" /></el-icon>
-            </el-badge>
+            <span class="el-badge">
+              <EntryIcon :name="t.icon" :size="24" />
+              <sup v-if="t.badge && unread > 0" class="el-badge__content is-fixed">{{ unread > 99 ? '99+' : unread }}</sup>
+            </span>
           </span>
           <span>{{ t.label }}</span>
         </button>
@@ -188,10 +231,18 @@ function logout() {
   text-overflow: ellipsis;
 }
 
+.me-wrap {
+  position: relative;
+}
+
 .me {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
   cursor: pointer;
   border-radius: var(--radius-sm);
 }
@@ -201,6 +252,45 @@ function logout() {
   font-size: 13px;
   max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--color-body);
+}
+
+.me-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 128px;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+}
+
+.me-menu li.divided {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-hairline-soft);
+}
+
+.me-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  border: 0;
+  background: none;
+  color: var(--color-body);
+  font: 14px/1.5 inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.me-menu button:hover {
+  background: var(--color-surface-soft);
+  color: var(--color-ink);
 }
 
 /* 为底栏和设备安全区预留空间。 */

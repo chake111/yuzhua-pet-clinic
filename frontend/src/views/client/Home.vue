@@ -3,7 +3,7 @@ import { loadWithSavedScroll } from '@/utils/listScroll'
 import LoadFailure from '@/components/LoadFailure.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, ChatDotRound, Search, Tickets } from '@element-plus/icons-vue'
+import EntryIcon from '@/components/EntryIcon.vue'
 import { homeData } from '@/api/user'
 import { NOTICE_TYPE, text } from '@/utils/dict'
 import { toDate } from '@/utils/format'
@@ -18,6 +18,7 @@ const router = useRouter()
 const failed = ref(false)
 const loading = ref(true)
 const keyword = ref('')
+const searchFocused = ref(false)
 const showAllDepartments = ref(false)
 const data = reactive({ departments: [], doctors: [], notices: [] })
 const visibleDepartments = computed(() => showAllDepartments.value ? data.departments : data.departments.slice(0, 6))
@@ -55,6 +56,11 @@ function search() {
   router.push({ path: '/doctors', query: keyword.value.trim() ? { keyword: keyword.value.trim() } : {} })
 }
 
+function clearKeyword() {
+  keyword.value = ''
+  search()
+}
+
 const byDept = (d) => router.push({ path: '/doctors', query: { departmentId: d.id, name: d.name } })
 
 onMounted(() => loadWithSavedScroll(() => load(true)))
@@ -65,22 +71,54 @@ onMounted(() => loadWithSavedScroll(() => load(true)))
     <LoadFailure v-if="failed" @retry="load(false)" />
     <section class="hero">
       <h1>为爱宠，找到合适的医生</h1>
-      <el-input v-model="keyword" placeholder="医生姓名或擅长领域" aria-label="搜索医生"
-                clearable size="large" @keyup.enter="search" @clear="search">
-        <template #prefix><el-icon><Search /></el-icon></template>
-        <template #append>
-          <el-button :icon="Search" @click="search">搜索</el-button>
-        </template>
-      </el-input>
+      <div class="el-input el-input--large el-input-group el-input-group--append">
+        <div class="el-input__wrapper" :class="{ 'is-focus': searchFocused }">
+          <span class="el-input__prefix">
+            <span class="el-input__prefix-inner">
+              <EntryIcon name="Search" />
+            </span>
+          </span>
+          <input
+            v-model="keyword"
+            class="el-input__inner"
+            type="text"
+            placeholder="医生姓名或擅长领域"
+            aria-label="搜索医生"
+            @focus="searchFocused = true"
+            @blur="searchFocused = false"
+            @keyup.enter="search"
+          />
+          <span v-if="keyword" class="el-input__suffix">
+            <span class="el-input__suffix-inner">
+              <button
+                type="button"
+                class="el-input__icon el-input__clear"
+                aria-label="清空搜索"
+                tabindex="-1"
+                @mousedown.prevent
+                @click="clearKeyword"
+              >
+                <EntryIcon name="CircleClose" />
+              </button>
+            </span>
+          </span>
+        </div>
+        <div class="el-input-group__append">
+          <button type="button" class="el-button" @click="search">
+            <EntryIcon name="Search" />
+            <span>搜索</span>
+          </button>
+        </div>
+      </div>
     </section>
 
     <h2 class="pc-section-title">
       就诊科室
-      <el-button v-if="data.departments.length > 6" class="more" link
-                 :aria-expanded="showAllDepartments" aria-controls="home-departments"
-                 @click="showAllDepartments = !showAllDepartments">
-        {{ showAllDepartments ? '收起科室' : '全部科室' }}
-      </el-button>
+      <button v-if="data.departments.length > 6" type="button" class="el-button is-link more"
+              :aria-expanded="showAllDepartments" aria-controls="home-departments"
+              @click="showAllDepartments = !showAllDepartments">
+        <span>{{ showAllDepartments ? '收起科室' : '全部科室' }}</span>
+      </button>
     </h2>
     <div id="home-departments" class="depts" :aria-busy="loading && !data.departments.length">
       <template v-if="loading && !data.departments.length">
@@ -97,13 +135,13 @@ onMounted(() => loadWithSavedScroll(() => load(true)))
     <div v-if="!failed && !loading && !data.departments.length" class="pc-empty">暂无就诊科室</div>
 
     <div class="quick">
-      <router-link to="/me/orders"><el-icon><Tickets /></el-icon><span>我的预约</span><el-icon class="arrow"><ArrowRight /></el-icon></router-link>
-      <router-link to="/consult"><el-icon><ChatDotRound /></el-icon><span>在线问诊</span><el-icon class="arrow"><ArrowRight /></el-icon></router-link>
+      <router-link to="/me/orders"><EntryIcon name="Tickets" /><span>我的预约</span><EntryIcon name="ArrowRight" class="arrow" /></router-link>
+      <router-link to="/consult"><EntryIcon name="ChatDotRound" /><span>在线问诊</span><EntryIcon name="ArrowRight" class="arrow" /></router-link>
     </div>
 
     <h2 class="pc-section-title">
       推荐医生
-      <el-link class="more" underline="never" @click="router.push('/doctors')">查看全部 →</el-link>
+      <router-link to="/doctors" class="el-link more">查看全部 →</router-link>
     </h2>
     <div class="doctors" :aria-busy="loading && !data.doctors.length">
       <template v-if="loading && !data.doctors.length">
@@ -127,12 +165,12 @@ onMounted(() => loadWithSavedScroll(() => load(true)))
         </div>
       </template>
       <DoctorCard v-for="d in data.doctors" :key="d.id" :doctor="d" />
-      <el-empty v-if="!failed && !loading && !data.doctors.length" description="暂无出诊医生" />
+      <div v-if="!failed && !loading && !data.doctors.length" class="pc-empty">暂无出诊医生</div>
     </div>
 
     <h2 class="pc-section-title">
       公告与养宠科普
-      <el-link class="more" underline="never" @click="router.push('/notices')">更多 →</el-link>
+      <router-link to="/notices" class="el-link more">更多 →</router-link>
     </h2>
     <div class="notices pc-card" :aria-busy="loading && !data.notices.length">
       <template v-if="loading && !data.notices.length">

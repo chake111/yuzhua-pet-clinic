@@ -1,6 +1,6 @@
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
-import 'element-plus/es/components/message/style/css'
+import './styles/entry-el.css'
 import './styles/main.css'
 import './styles/admin.css'
 import App from './App.vue'

@@ -62,6 +62,14 @@ export function collectEntryAssets(manifest) {
   }
 
   visit(entryKey)
+  // 静态图片/图标资产（如登录页吉祥物 tuantuan.webp、品牌 logo.svg）排在阻塞型 JS/CSS 之后预热，
+  // 确保用户在 /demo 停留几秒即跳转时优先命中入口 JS/CSS 缓存。
+  for (const key of visited) {
+    const node = manifest[key]
+    if (Array.isArray(node?.assets)) {
+      for (const assetPath of node.assets) pushAsset(assetPath)
+    }
+  }
   return assets
 }
 

@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import ClientLayout from '@/layouts/ClientLayout.vue'
 import Home from '@/views/client/Home.vue'
+import ClientLogin from '@/views/client/Login.vue'
+import AdminLogin from '@/views/admin/Login.vue'
+import { useAdminStore } from '@/stores/admin'
 import { useUserStore } from '@/stores/client'
 
 /**
@@ -9,9 +12,10 @@ import { useUserStore } from '@/stores/client'
  * meta.auth  → 需要用户端登录
  * meta.admin → 需要后台登录；meta.roles 再细分管理员/医生
  * 未登录可浏览首页、医生列表与详情，这是需求里明确要的（G3）。
+ * 首屏高频直达的 /、/login、/admin/login 均已去 Element Plus 化并直入入口包，消除二次 chunk 瀑布。
  */
 const routes = [
-  { path: '/login', name: 'login', component: () => import('@/views/client/Login.vue') },
+  { path: '/login', name: 'login', component: ClientLogin },
   { path: '/register', name: 'register', component: () => import('@/views/client/Register.vue') },
   {
     path: '/',
@@ -44,7 +48,7 @@ const routes = [
     ]
   },
 
-  { path: '/admin/login', name: 'admin-login', component: () => import('@/views/admin/Login.vue') },
+  { path: '/admin/login', name: 'admin-login', component: AdminLogin },
   {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
@@ -83,9 +87,8 @@ const router = createRouter({
   scrollBehavior: (to, from, saved) => saved || { top: 0 }
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach((to) => {
   if (to.meta.admin) {
-    const { useAdminStore } = await import('@/stores/admin')
     const store = useAdminStore()
     if (!store.logged) return { path: '/admin/login', query: { redirect: to.fullPath } }
     if (to.meta.roles && !to.meta.roles.includes(store.role)) {

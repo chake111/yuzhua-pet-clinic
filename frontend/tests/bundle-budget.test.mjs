@@ -166,9 +166,9 @@ test('index.html gzip 超过 14 KB 时拦截失败', () => {
   })
 })
 
-test('首屏入口关键路径总 gzip 超过 165 KB 时拦截失败', () => {
+test('首屏入口关键路径总 gzip 超过 85 KB 时拦截失败', () => {
   withTempDir((distDir) => {
-    // 不可压缩的随机数据（base64 编码后 gzip 仍约原字节 75%，240 KB raw -> ~180 KB gz > 165 KB）
+    // 不可压缩的随机数据（base64 编码后 gzip 仍约原字节 75%，超出 85 KB 上限）
     const blob = randomBytes(Math.ceil(ENTRY_GZIP_MAX * 1.15)).toString('base64')
     createValidFixture(distDir, {
       indexJsContent: `export const payload = "${blob}";`

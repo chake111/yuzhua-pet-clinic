@@ -1,6 +1,6 @@
 import { computed } from 'vue'
 import { defineStore } from 'pinia'
-import * as adminApi from '@/api/admin'
+import { login as adminLogin, profile as adminProfile } from '@/api/admin'
 import { createSession } from '@/stores/session'
 
 const USER_KEY = 'yuzhua_admin_user'
@@ -11,7 +11,7 @@ const USER_KEY = 'yuzhua_admin_user'
  */
 export const useAdminStore = defineStore('admin', () => {
   const { token, user, apply, refresh, logout } = createSession({
-    kind: 'admin', userKey: USER_KEY, fetchProfile: adminApi.profile
+    kind: 'admin', userKey: USER_KEY, fetchProfile: adminProfile
   })
 
   const logged = computed(() => !!token.value)
@@ -22,7 +22,7 @@ export const useAdminStore = defineStore('admin', () => {
   const name = computed(() => user.value?.name || user.value?.username || '')
 
   async function login(form) {
-    const vo = await adminApi.login(form)
+    const vo = await adminLogin(form)
     apply(vo)
     return vo
   }

@@ -1,9 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/client'
 import { resolveDemoPreset } from '@/utils/demoPreset'
+import { toast } from '@/utils/toast'
 import LoginForm from '@/components/LoginForm.vue'
 
 const store = useUserStore()
@@ -14,7 +14,7 @@ const initialUsername = computed(() => demoPreset.value?.username || '')
 const initialPassword = computed(() => demoPreset.value?.password || '')
 
 function onLoginSuccess() {
-  ElMessage.success('欢迎回来')
+  toast.success('欢迎回来')
   router.replace(route.query.redirect || '/')
 }
 </script>

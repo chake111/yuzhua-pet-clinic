@@ -5,7 +5,7 @@
  * 校验项：
  *   1. dist/index.html gzip 体积 <= HTML_GZIP_MAX（默认 14 KB）；
  *   2. 首屏入口关键路径（<script type="module">、<link rel="stylesheet">、
- *      <link rel="modulepreload">）gzip 总字节 <= ENTRY_GZIP_MAX（默认 165 KB）；
+ *      <link rel="modulepreload">）gzip 总字节 <= ENTRY_GZIP_MAX（默认 85 KB）；
  *   3. 关键路径 chunk 路径与内容均不得包含 echarts；
  *   4. dist/assets/ 下所有 .png/.jpg/.jpeg/.webp 单图 <= IMAGE_MAX（默认 50 KB）；
  *   5. dist/demo-preload.json 存在、非空、所列路径均真实存在于 dist/ 且不含 echarts；
@@ -21,7 +21,7 @@ import { gzipSync } from 'node:zlib'
 
 export const DEFAULT_DIST_DIR = fileURLToPath(new URL('../dist', import.meta.url))
 export const HTML_GZIP_MAX = 14 * 1024
-export const ENTRY_GZIP_MAX = 165 * 1024
+export const ENTRY_GZIP_MAX = 85 * 1024
 export const IMAGE_MAX = 50 * 1024
 export const MIN_GZIP_BYTES = 256
 
