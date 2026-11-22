@@ -47,6 +47,7 @@
 ## 仓库约定
 
 - 提交信息用 Conventional Commits，主题必须含中文（`commitlint.config.cjs`）；PR 审查用中文、按严重级别（`.pr_agent.toml`）。
+- 纯文档、截图与本地工具脚本变更不触发线上重部署：`.github/workflows/deploy.yml` 已通过 `paths-ignore` 排除 `docs/**`、`*.md`、`tools/**`、`deploy/demo/agent-shots/**` 等非镜像构建路径；直推纯文档或工作流元配置至 `main` 时，可在提交正文附 `[skip ci]` 跳过冗余 Actions。
 - 新增迁移放 `sql/migrations/YYYYMMDD_*.sql`，同步更新 `sql/01_schema.sql`；存量部署先跑迁移再上代码。
 - 不改历史证据、JWT 历史密钥黑名单与 `docs/品牌沿革.md` 的旧名记录。
 - 部署与排障入口：`compose.yaml`、`deploy/nginx/default.conf`、`docs/部署步骤.md`、`docs/adr/0012-frontend-cold-start-and-asset-delivery.md`。
