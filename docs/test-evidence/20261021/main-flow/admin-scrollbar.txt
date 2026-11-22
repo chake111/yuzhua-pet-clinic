@@ -1,6 +1,0 @@
-# 2026-10-21 10:02 +0800
-# node frontend/tests/admin-scrollbar.browser.mjs；Vite 127.0.0.1:5189 服务当前工作区源码，脚本内拦截 /api/**
-# Playwright + Microsoft Edge headless
-{"viewport":1440,"before":{"x":216,"width":1209},"after":{"x":216,"width":1209}}
-{"viewport":800,"before":{"x":64,"width":721},"after":{"x":64,"width":721}}
-Admin scrollbar checks passed

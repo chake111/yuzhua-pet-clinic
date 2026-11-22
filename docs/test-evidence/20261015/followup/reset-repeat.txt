@@ -1,3 +1,0 @@
-32372
-READY: isolated database 3307, backend 8082, frontend 5174
-RESTORE VERIFIED demo-ready 1102311a90e13a9b15db5be2eb8650b9ba15254de77d2d93a14462868fd2de06

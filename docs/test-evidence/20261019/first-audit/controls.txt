@@ -1,6 +1,0 @@
-CURRENT_SCHEDULE_CHECK_PASS {"checks":4,"actualFunction":"slotState","sourceChanged":false}
-business-rules passed: payment deadline, governance, suggestion ACK/failure, admin history, schedule availability, presence
-DOWNSTREAM_SOCKET_CHECK_PASS {"checks":["ACK","ERROR","disconnect"],"originalAssertionsUnchanged":true,"fullOriginalSuiteStillFails":true}
-HTTP {"who":"admin","method":"PUT","path":"/admin/user/1/status?status=0","http":200,"response":{"code":200,"msg":"已更新"}}
-DISABLED_HANDSHAKE_CONTROL {"http":401}
-HTTP {"who":"admin","method":"PUT","path":"/admin/user/1/status?status=1","http":200,"response":{"code":200,"msg":"已更新"}}

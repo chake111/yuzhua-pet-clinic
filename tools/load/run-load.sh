@@ -21,7 +21,8 @@ BASE_URL=http://backend:8081/api
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 LOAD_DIR="${ROOT_DIR}/tools/load"
-EVIDENCE_DIR="${EVIDENCE_DIR:-${ROOT_DIR}/docs/test-evidence/20261116-it-load}"
+# 证据按运行日期归档 (AGENTS.md 规矩二), 复跑不写回旧轮次目录
+EVIDENCE_DIR="${EVIDENCE_DIR:-${ROOT_DIR}/docs/test-evidence/$(date +%Y%m%d)-it-load}"
 
 # k6 的 --summary-export 会把 setup() 返回的登录 token 写进 setup_data；
 # 证据要能公开提交，复制到证据目录后立刻删掉该字段

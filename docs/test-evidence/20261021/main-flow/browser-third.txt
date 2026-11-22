@@ -1,6 +1,0 @@
-INSTANCE OK pid=15620 user=petqa_2a6a1907 db=pet_clinic_test_1021abcd connections=7
-PASS UI-login
-PASS UI-book-pay 151
-PASS UI-record-finish-review
-PASS UI-consult-send-reload-close 228
-{"results":["appointment","consultation"],"pageErrors":[]}

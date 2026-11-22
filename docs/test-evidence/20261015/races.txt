@@ -1,2 +1,0 @@
-PASS 10 cancellation/acceptance races: single winner, payment and capacity consistent
-PASS 10 capacity-reduction/booking races: zero overselling and correct remaining seats
