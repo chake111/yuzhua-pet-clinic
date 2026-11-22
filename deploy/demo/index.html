@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#f7f7f7">
   <title>愈爪演示 · 宠物医院预约与在线问诊</title>
-  <meta name="description" content="愈爪是单家宠物医院的预约与在线图文问诊。宠主、医生、管理三端可直接进入，不用注册。演示账号 zhangsan、doctor01、admin，密码 Yuzhua@2026。">
+  <meta name="description" content="愈爪是单家宠物医院的预约与在线图文问诊。宠主、医生、管理三端可直接进入，不用注册。">
   <link rel="icon" href="agent-assets/logo.svg" type="image/svg+xml">
   <style>
     :root {
@@ -179,25 +179,14 @@
       gap: 4px 12px;
       margin-top: 0;
       padding-top: 8px;
+      padding-bottom: 24px;
       border-top: 1px solid var(--rule);
       font-size: 16px;
       line-height: 1.7;
       color: var(--body);
     }
-    .fine + .fine { border-top: 0; padding-top: 0; margin-top: 0; padding-bottom: 28px; }
     .nowrap { white-space: nowrap; }
     .pw { color: var(--ink); font-weight: 700; }
-
-    .copy {
-      min-height: 44px;
-      padding: 0 12px;
-      background: transparent;
-      color: var(--body);
-      border: 1px solid #6a6a6a;
-      font: 400 16px/1.2 var(--font);
-      cursor: pointer;
-    }
-    .copy:active { transform: scale(.985); }
 
     .fold { padding: 20px 32px 36px; }
     .fold h2 { font-size: 24px; margin: 0 0 4px; }
@@ -286,7 +275,7 @@
       .stamp-row { margin-top: 32px; }
       .doors { margin-top: 32px; }
       .note-break { display: block; }
-      .fine + .fine { padding-bottom: 8px; }
+      .fine { padding-bottom: 12px; }
       .stamp, .fold .stamp { width: 100%; }
       .pan-hint {
         display: block;
@@ -341,11 +330,11 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .stamp:active, .copy:active { transform: none; }
+      .stamp:active { transform: none; }
     }
 
     @media (forced-colors: active) {
-      .stamp, .copy, .paper { border: 1px solid ButtonText; }
+      .stamp, .paper { border: 1px solid ButtonText; }
     }
   </style>
 </head>
@@ -371,8 +360,7 @@
       <div class="stamp-row">
         <a class="stamp" href="https://www.bilibili.com/video/BV17tyazJEVD/" target="_blank" rel="noopener noreferrer">看演示<span class="sr-only">（哔哩哔哩，新窗口打开）</span></a>
         <div class="side">
-          <a class="side-link" href="/login?demo=user" aria-describedby="slow-note">进入宠主端</a>
-          <p class="note" id="slow-note">完整系统首次加载较慢，<span class="note-break">建议 Wi-Fi / 桌面打开</span></p>
+          <a class="side-link" href="/login?demo=user">进入宠主端</a>
         </div>
       </div>
       <ul class="doors">
@@ -396,49 +384,45 @@
         </li>
       </ul>
       <p class="fine">
-        <span class="nowrap">密码都是 <strong class="pw" id="pw">Yuzhua@2026</strong></span>
-        <button type="button" class="copy" id="copy-pw">复制密码</button>
-        <span id="copy-live" class="sr-only" role="status"></span>
+        <span class="nowrap">密码都是 <strong class="pw" id="pw">Yuzhua@2026</strong>（点击入口自动填入）</span>
       </p>
-      <p class="fine"><span class="note-break">每日 04:00（北京时间）重置。</span>数据全部虚构，管理端删除已禁用。</p>
     </div>
   </article>
 
   <article class="paper next">
     <div class="fold">
       <h2>三端的界面</h2>
-      <p class="intro">同一张单的下一折。若停在登录页，用上面的账号，密码是 Yuzhua@2026。</p>
 
       <section class="rise">
         <h3>宠主端</h3>
-        <p class="intro">首页可以搜医生、选科室，再看推荐医生。页面上的宠主是张三。</p>
+        <p class="intro">首页可以搜医生、选科室，再看推荐医生。</p>
         <figure class="shot phone-shot">
           <img src="agent-assets/client-home.webp" width="430" height="860" alt="宠主端首页：可以搜索医生，就诊科室有宠物内科、外科、皮肤科、眼科、口腔科和影像检验科，下面是推荐医生陈明远" loading="lazy" decoding="async">
         </figure>
         <figcaption>宠主端首页：搜索、科室、推荐医生。</figcaption>
-        <a class="text-go" href="/login?demo=user" aria-describedby="slow-note">进入宠主端</a>
+        <a class="text-go" href="/login?demo=user">进入宠主端</a>
       </section>
 
       <section class="rise">
         <h3>医生端</h3>
-        <p class="intro">问诊列表的左侧能读到王五的小灰、张三的布丁和奶糖。doctor01 进入后打开「我的排班」，页面上的医生是陈明远。</p>
+        <p class="intro">查看排班与候诊列表，处理图文问诊并书写病历。</p>
         <figure class="shot doctor-shot">
           <img src="agent-assets/doctor-consult.webp" width="1000" height="458" alt="医生端问诊列表左侧：患者王五的宠物小灰、张三的布丁和奶糖，以及各自的症状摘要" loading="lazy" decoding="async">
         </figure>
         <figcaption>问诊列表左侧：患者、宠物、症状。</figcaption>
         <p class="pan-hint">左右滑动可以看清患者和症状。</p>
-        <a class="text-go" href="/admin/login?demo=doctor&redirect=/admin/my-schedule" aria-describedby="slow-note">进入医生端</a>
+        <a class="text-go" href="/admin/login?demo=doctor&redirect=/admin/my-schedule">进入医生端</a>
       </section>
 
       <section class="rise">
         <h3>管理端</h3>
-        <p class="intro">工作台汇总今日预约、营收和医生在线，下面是趋势和科室分布。这些数字来自虚构数据，每天重置。admin 进入后打开工作台，页面上显示为苏幼薇。</p>
+        <p class="intro">工作台汇总今日预约、营收和医生在线，下面是趋势和科室分布。</p>
         <figure class="shot admin-shot">
           <img src="agent-assets/admin-dashboard.webp" width="720" height="575" alt="管理端工作台：今日预约、今日营收、医生在线，以及预约趋势、预约状态分布、科室预约量和医生接诊排行" loading="lazy" decoding="async">
         </figure>
         <figcaption>工作台：今日概览、趋势、状态和科室预约量。</figcaption>
         <p class="pan-hint">左右滑动可以看清看板。</p>
-        <a class="text-go" href="/admin/login?demo=admin&redirect=/admin/dashboard" aria-describedby="slow-note">进入管理端</a>
+        <a class="text-go" href="/admin/login?demo=admin&redirect=/admin/dashboard">进入管理端</a>
       </section>
 
       <section class="rise">
@@ -447,11 +431,11 @@
         <div class="pair">
           <figure>
             <img src="agent-assets/client-booking.webp" width="430" height="499" alt="宠主端确认挂号：医生陈明远，今天 11 月 18 日有 32 个号，底栏是布丁的下午时段和 80 元到院问诊费" loading="lazy" decoding="async">
-            <figcaption>确认挂号。选好日期和时段后，底栏提交。这一单是布丁，医生陈明远，到院问诊费 80 元。</figcaption>
+            <figcaption>确认挂号：选好日期和时段后，底栏提交。</figcaption>
           </figure>
           <figure>
             <img src="agent-assets/client-consult.webp" width="438" height="490" alt="宠主端在线问诊：刘恋与布丁的会话进行中，摘要里有建议到院；奶糖的会话已结束" loading="lazy" decoding="async">
-            <figcaption>在线问诊。进行中的那条是布丁，会话里有到院建议；奶糖的会话已经结束。</figcaption>
+            <figcaption>在线问诊：宠主发送图文主诉，医生在线回复并给出到院建议。</figcaption>
           </figure>
         </div>
         <a class="stamp" href="https://www.bilibili.com/video/BV17tyazJEVD/" target="_blank" rel="noopener noreferrer">看演示<span class="sr-only">（哔哩哔哩，新窗口打开）</span></a>
@@ -460,7 +444,6 @@
   </article>
   <footer class="foot">
     <p><strong>愈爪</strong> · 宠物医院预约与在线问诊平台</p>
-    <p>数据每日 04:00（北京时间）重置，全部虚构。管理端删除已在网关禁用。</p>
   </footer>
   <script>
     (function () {
@@ -475,43 +458,6 @@
           });
         }, { threshold: 0.18 });
         document.querySelectorAll('.rise').forEach(function (el) { io.observe(el); });
-      }
-
-      var btn = document.getElementById('copy-pw');
-      var live = document.getElementById('copy-live');
-      var pw = document.getElementById('pw');
-      if (btn && pw) {
-        var label = btn.textContent;
-        btn.addEventListener('click', function () {
-          var text = pw.textContent;
-          function restore() {
-            window.setTimeout(function () { btn.textContent = label; }, 2000);
-          }
-          function ok() {
-            btn.textContent = '已复制';
-            if (live) live.textContent = '密码已复制';
-            restore();
-          }
-          function fallback() {
-            try {
-              var range = document.createRange();
-              range.selectNodeContents(pw);
-              var sel = window.getSelection();
-              if (sel) {
-                sel.removeAllRanges();
-                sel.addRange(range);
-              }
-            } catch (err) {}
-            btn.textContent = '请手动复制';
-            if (live) live.textContent = '已选中密码，可以手动复制';
-            restore();
-          }
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(ok, fallback);
-          } else {
-            fallback();
-          }
-        });
       }
 
       if (typeof window.fetch === 'function') {
