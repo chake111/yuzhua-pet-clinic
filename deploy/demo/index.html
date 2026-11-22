@@ -109,14 +109,7 @@
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 6px;
       margin-top: 40px;
-    }
-    .side {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0;
     }
 
     .stamp {
@@ -133,44 +126,48 @@
     }
     .stamp:active { background: var(--action-active); border-color: var(--action-active); transform: scale(.985); }
 
-    .side-link {
-      display: inline-flex;
-      align-items: center;
-      min-height: 44px;
-      font-size: 16px;
-      font-weight: 400;
-      text-decoration: underline;
-      text-underline-offset: 4px;
-    }
-
-    .note {
-      margin: 0;
-      max-width: 24em;
-      font-size: 15px;
-      line-height: 1.7;
-      color: var(--body);
-    }
-    .note-break { display: inline; }
-
     .doors {
       list-style: none;
-      margin: 40px 0 0;
+      margin: 32px 0 0;
       padding: 0;
+    }
+    .doors li {
+      border-top: 1px solid var(--rule);
     }
     .doors a {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      min-height: 44px;
-      padding: 0;
-      border-top: 1px solid var(--rule);
+      min-height: 48px;
+      margin: 0 -12px;
+      padding: 0 12px;
       font-size: 16px;
       line-height: 1.5;
       font-weight: 400;
+      transition: background-color 140ms var(--ease);
     }
-    .doors .who { font-weight: 400; }
+    .doors a:active { background: #efefef; }
+    .doors .who {
+      font-weight: 500;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      text-decoration-thickness: 1px;
+    }
+    .doors .meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
     .doors .id { color: var(--body); }
+    .doors .arr {
+      color: var(--ink);
+      transition: transform 160ms var(--ease);
+    }
+    .doors a:active .arr,
+    .doors a:focus-visible .arr {
+      transform: translateX(3px);
+    }
 
     .fine {
       display: flex;
@@ -272,9 +269,8 @@
     @media (max-width: 799px) {
       .paper { margin-top: 72px; }
       .slip { padding: 22px 20px 4px; }
-      .stamp-row { margin-top: 32px; }
-      .doors { margin-top: 32px; }
-      .note-break { display: block; }
+      .stamp-row { margin-top: 28px; }
+      .doors { margin-top: 24px; }
       .fine { padding-bottom: 12px; }
       .stamp, .fold .stamp { width: 100%; }
       .pan-hint {
@@ -324,13 +320,21 @@
 
     @media (hover: hover) and (pointer: fine) {
       .stamp:hover { background: var(--action-hover); border-color: var(--action-hover); }
+      .doors a:hover { background: #f7f7f7; }
       .doors a:hover .who,
-      .side-link:hover,
       .text-go:hover { text-decoration-thickness: 2px; }
+      .doors a:hover .arr { transform: translateX(3px); }
     }
 
     @media (prefers-reduced-motion: reduce) {
       .stamp:active { transform: none; }
+      .doors .arr,
+      .doors a:hover .arr,
+      .doors a:active .arr,
+      .doors a:focus-visible .arr {
+        transition: none;
+        transform: none;
+      }
     }
 
     @media (forced-colors: active) {
@@ -359,32 +363,29 @@
       <p class="lead"><span class="ln">愈爪是单家宠物医院的预约和问诊。</span><span class="ln">三端同一套数据，不用注册。</span></p>
       <div class="stamp-row">
         <a class="stamp" href="https://www.bilibili.com/video/BV17tyazJEVD/" target="_blank" rel="noopener noreferrer">看演示<span class="sr-only">（哔哩哔哩，新窗口打开）</span></a>
-        <div class="side">
-          <a class="side-link" href="/login?demo=user">进入宠主端</a>
-        </div>
       </div>
       <ul class="doors">
         <li>
           <a href="/login?demo=user">
-            <span class="who">宠主端</span>
-            <span class="id">zhangsan</span>
+            <span class="who">进入宠主端</span>
+            <span class="meta"><span class="id">zhangsan</span><span class="arr" aria-hidden="true">→</span></span>
           </a>
         </li>
         <li>
           <a href="/admin/login?demo=doctor&redirect=/admin/my-schedule">
-            <span class="who">医生端</span>
-            <span class="id">doctor01</span>
+            <span class="who">进入医生端</span>
+            <span class="meta"><span class="id">doctor01</span><span class="arr" aria-hidden="true">→</span></span>
           </a>
         </li>
         <li>
           <a href="/admin/login?demo=admin&redirect=/admin/dashboard">
-            <span class="who">管理端</span>
-            <span class="id">admin</span>
+            <span class="who">进入管理端</span>
+            <span class="meta"><span class="id">admin</span><span class="arr" aria-hidden="true">→</span></span>
           </a>
         </li>
       </ul>
       <p class="fine">
-        <span class="nowrap">密码都是 <strong class="pw" id="pw">Yuzhua@2026</strong>（点击入口自动填入）</span>
+        <span>点击上方三端入口自动填入账号与<span class="nowrap">密码（<strong class="pw" id="pw">Yuzhua@2026</strong>）</span></span>
       </p>
     </div>
   </article>
