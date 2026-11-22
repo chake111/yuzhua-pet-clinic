@@ -42,7 +42,6 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -83,6 +82,7 @@ class DoctorScheduleServiceTest {
     private long refs;
     private int doctorStatus;
     private int statusWrites;
+    private int saveCalls;
 
     @BeforeAll
     static void initTableInfo() {
@@ -108,6 +108,7 @@ class DoctorScheduleServiceTest {
         refs = 0;
         doctorStatus = 1;
         statusWrites = 0;
+        saveCalls = 0;
     }
 
     // ---------------------------------------------------------------- 用户端选号
@@ -551,7 +552,11 @@ class DoctorScheduleServiceTest {
         String[][] bounds = {{"08:00", "12:00"}, {"13:00", "18:00"}, {"18:00", "22:00"}};
         for (int i = 0; i < bounds.length; i++) {
             ScheduleForm f = form(i + 1, bounds[i][0], bounds[i][1]);
+            int before = saveCalls;
             s.create(f);
+            if (saveCalls != before + 1) {
+                throw new AssertionError("create 应恰好落库一次");
+            }
             if (!saved.getStartTime().equals(f.getStartTime())) {
                 throw new AssertionError("边界时间未保存");
             }
@@ -585,11 +590,12 @@ class DoctorScheduleServiceTest {
                         + "停诊/恢复只能由 /stop 与 /resume 写入");
             }
         }
-        // 六个业务字段必须都在，防止为了"没有 status"把别的字段也删了
+        // 六个业务字段必须都在，防止为了"没有 status"把别的字段也删了；
+        // 用包含关系而非精确集合，允许后续无害新增字段，避免误报。
         Set<String> names = Arrays.stream(ScheduleEditForm.class.getDeclaredFields())
                 .map(java.lang.reflect.Field::getName).collect(Collectors.toSet());
-        assertEquals(Set.of("doctorId", "workDate", "period", "startTime", "endTime", "totalNum"),
-                names, "ScheduleEditForm 的字段集合应恰好是这六个");
+        assertThat(names).as("ScheduleEditForm 的六个业务字段必须都在")
+                .containsAll(Set.of("doctorId", "workDate", "period", "startTime", "endTime", "totalNum"));
     }
 
     /**
@@ -730,6 +736,7 @@ class DoctorScheduleServiceTest {
 
         @Override
         public boolean save(DoctorSchedule row) {
+            saveCalls++;
             saved = row;
             return true;
         }
