@@ -46,6 +46,7 @@
 
 ## 仓库约定
 
+- **主动遵循工程最佳实践并收口缺口**：改代码、配工作流或提交前，主动核对上游机制与相邻配置——遇到靠人工记忆的临时绕过（如手写 `[skip ci]`），顺手补齐结构性约束（如 `paths-ignore`、ESLint 禁导、包体预算或本地仿真验证）；改动涉及外部状态、破坏性操作或扩大既有契约时，先交代影响并确认再动手。
 - 提交信息用 Conventional Commits，主题必须含中文（`commitlint.config.cjs`）；PR 审查用中文、按严重级别（`.pr_agent.toml`）。
 - 纯文档、截图与本地工具脚本变更不触发线上重部署：`.github/workflows/deploy.yml` 已通过 `paths-ignore` 排除 `docs/**`、`*.md`、`tools/**`、`deploy/demo/agent-shots/**` 等非镜像构建路径；直推纯文档或工作流元配置至 `main` 时，可在提交正文附 `[skip ci]` 跳过冗余 Actions。
 - 新增迁移放 `sql/migrations/YYYYMMDD_*.sql`，同步更新 `sql/01_schema.sql`；存量部署先跑迁移再上代码。
