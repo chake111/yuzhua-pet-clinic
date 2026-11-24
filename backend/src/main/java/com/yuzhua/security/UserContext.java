@@ -1,6 +1,7 @@
 package com.yuzhua.security;
 
 import com.yuzhua.common.BizException;
+import org.jspecify.annotations.Nullable;
 
 /**
  * 当前登录用户上下文。AuthInterceptor 在 preHandle 写入、afterCompletion 清理。
@@ -23,7 +24,7 @@ public final class UserContext {
     }
 
     /** 读取当前线程登录态，未登录时返回 null（不抛异常）。 */
-    public static LoginUser get() {
+    public static @Nullable LoginUser get() {
         return HOLDER.get();
     }
 
@@ -43,15 +44,20 @@ public final class UserContext {
 
     /** 读取当前登录账号主键，未登录时抛 401。 */
     public static Long requireId() {
-        return require().getId();
+        Long id = require().getId();
+        if (id == null) {
+            throw new BizException(401, "请先登录");
+        }
+        return id;
     }
 
     /** 取当前医生的 doctorId；管理员调用则抛 403 */
     public static Long requireDoctorId() {
         LoginUser u = require();
-        if (u.getDoctorId() == null) {
+        Long doctorId = u.getDoctorId();
+        if (doctorId == null) {
             throw BizException.forbidden("当前账号未绑定医生身份");
         }
-        return u.getDoctorId();
+        return doctorId;
     }
 }

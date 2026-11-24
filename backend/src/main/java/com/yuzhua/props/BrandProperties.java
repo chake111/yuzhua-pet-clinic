@@ -1,4 +1,4 @@
-package com.yuzhua.config;
+package com.yuzhua.props;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

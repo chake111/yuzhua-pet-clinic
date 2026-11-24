@@ -1,7 +1,12 @@
 package com.yuzhua.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
 
@@ -22,23 +27,23 @@ public class ConsultMessage {
     public static final int HIDE_YES = 1;
 
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private @Nullable Long id;
 
-    private Long sessionId;
+    private @Nullable Long sessionId;
 
-    private Long senderId;
-    private String senderRole;
-    private String senderName;
-    private String senderAvatar;
-    private String msgType;
-    private String content;
-    private Integer isRead;
+    private @Nullable Long senderId;
+    private @Nullable String senderRole;
+    private @Nullable String senderName;
+    private @Nullable String senderAvatar;
+    private @Nullable String msgType;
+    private @Nullable String content;
+    private @Nullable Integer isRead;
 
-    private Integer hidden;
-    private String hiddenReason;
-    private Long hiddenBy;
-    private LocalDateTime hiddenTime;
+    private @Nullable Integer hidden;
+    private @Nullable String hiddenReason;
+    private @Nullable Long hiddenBy;
+    private @Nullable LocalDateTime hiddenTime;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private @Nullable LocalDateTime createTime;
 }

@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @SpringBootApplication
 @EnableTransactionManagement
 @EnableScheduling
-@ConfigurationPropertiesScan("com.yuzhua.config")
+@ConfigurationPropertiesScan("com.yuzhua.props")
 @MapperScan("com.yuzhua.mapper")
 public class YuzhuaApplication {
 

@@ -12,6 +12,7 @@ import com.yuzhua.service.ConsultService;
 import com.yuzhua.websocket.ConsultSocketRegistry.Conn;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 图文问诊的 WebSocket 端点。
@@ -66,8 +68,9 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
             closeQuietly(stale);
         }
         runAs(user, () -> {
-            if (user.isDoctor()) {
-                consultService.markDoctorOnline(user.getDoctorId(), true);
+            Long doctorId = user.getDoctorId();
+            if (user.isDoctor() && doctorId != null) {
+                consultService.markDoctorOnline(doctorId, true);
             }
             writeControl(conn, envelope("READY", Map.of("name", String.valueOf(user.getName()))));
             Object sid = session.getAttributes().get(WsHandshakeInterceptor.ATTR_SESSION_ID);
@@ -86,10 +89,13 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
         if (!accountGuard.active(conn.getUser())) {
             err(conn, "账号状态或权限已变化，请重新登录");
-            try {
-                conn.getWs().close(CloseStatus.POLICY_VIOLATION.withReason("account disabled"));
-            } catch (IOException e) {
-                log.debug("关闭停用账号连接失败 key={}", conn.getKey());
+            WebSocketSession ws = conn.getWs();
+            if (ws != null) {
+                try {
+                    ws.close(CloseStatus.POLICY_VIOLATION.withReason("account disabled"));
+                } catch (IOException e) {
+                    log.debug("关闭停用账号连接失败 key={}", conn.getKey());
+                }
             }
             return;
         }
@@ -143,12 +149,13 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         for (Long roomId : conn.getRooms()) {
             broadcast(roomId, envelope("PRESENCE", Map.of("sessionId", roomId, "doctorOnline", false)), conn.getKey());
         }
-        if (!registry.doctorConnected(user.getDoctorId())) {
-            consultService.markDoctorOnline(user.getDoctorId(), false);
+        Long doctorId = user.getDoctorId();
+        if (doctorId != null && !registry.doctorConnected(doctorId)) {
+            consultService.markDoctorOnline(doctorId, false);
         }
     }
 
-    private void subscribe(Conn conn, Long sessionId) {
+    private void subscribe(Conn conn, @Nullable Long sessionId) {
         if (sessionId == null) {
             err(conn, "缺少 sessionId");
             return;
@@ -162,7 +169,8 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
                 registry.inRoom(sessionId).stream().anyMatch(c -> c.getUser().isDoctor()))));
     }
 
-    private void chat(Conn conn, Long sessionId, String msgType, String content, String requestId) {
+    private void chat(Conn conn, @Nullable Long sessionId, @Nullable String msgType,
+                      @Nullable String content, @Nullable String requestId) {
         if (sessionId == null) {
             err(conn, "缺少 sessionId");
             return;
@@ -175,7 +183,7 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         if (requestId != null) write(conn, sessionId, envelope("ACK", Map.of("sessionId", sessionId, "requestId", requestId, "message", msg)));
     }
 
-    private void read(Conn conn, Long sessionId) {
+    private void read(Conn conn, @Nullable Long sessionId) {
         if (sessionId == null) {
             err(conn, "缺少 sessionId");
             return;
@@ -210,7 +218,7 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void broadcast(Long roomId, Map<String, Object> payload, String exceptKey) {
+    private void broadcast(Long roomId, Map<String, Object> payload, @Nullable String exceptKey) {
         List<Conn> targets = registry.inRoom(roomId);
         for (Conn c : targets) {
             if (exceptKey == null || !exceptKey.equals(c.getKey())) {
@@ -227,11 +235,11 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         consultPush.sendControl(conn, payload);
     }
 
-    private void err(Conn conn, String msg) {
-        writeControl(conn, envelope("ERROR", Map.of("msg", msg)));
+    private void err(Conn conn, @Nullable String msg) {
+        writeControl(conn, envelope("ERROR", Map.of("msg", msg == null || msg.isBlank() ? "服务处理失败，请稍后重试" : msg)));
     }
 
-    private void chatFailed(Conn conn, String msg, String requestId) {
+    private void chatFailed(Conn conn, @Nullable String msg, @Nullable String requestId) {
         Map<String, Object> data = new HashMap<>();
         data.put("msg", msg == null || msg.isBlank() ? "消息未保存，请稍后重试" : msg);
         data.put("requestId", requestId == null ? "" : requestId);
@@ -245,8 +253,12 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void closeQuietly(Conn conn) {
+        WebSocketSession ws = conn.getWs();
+        if (ws == null) {
+            return;
+        }
         try {
-            conn.getWs().close(CloseStatus.NORMAL.withReason("replaced"));
+            ws.close(CloseStatus.NORMAL.withReason("replaced"));
         } catch (IOException e) {
             log.debug("关闭被顶掉的连接失败 key={}", conn.getKey());
         }
@@ -272,19 +284,19 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
     }
 
     private static LoginUser user(WebSocketSession session) {
-        return (LoginUser) session.getAttributes().get(WsHandshakeInterceptor.ATTR_USER);
+        return Objects.requireNonNull((LoginUser) session.getAttributes().get(WsHandshakeInterceptor.ATTR_USER));
     }
 
-    private static Conn conn(WebSocketSession session) {
+    private static @Nullable Conn conn(WebSocketSession session) {
         Object v = session.getAttributes().get(ATTR_CONN);
         return v instanceof Conn c ? c : null;
     }
 
-    private static String str(Object v) {
+    private static @Nullable String str(@Nullable Object v) {
         return v == null ? null : String.valueOf(v);
     }
 
-    private static Long asLong(Object v) {
+    private static @Nullable Long asLong(@Nullable Object v) {
         if (v instanceof Number n) {
             return n.longValue();
         }

@@ -1,7 +1,12 @@
 package com.yuzhua.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,24 +17,24 @@ import java.time.LocalTime;
 public class DoctorSchedule {
 
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private @Nullable Long id;
 
-    private Long doctorId;
-    private LocalDate workDate;
+    private @Nullable Long doctorId;
+    private @Nullable LocalDate workDate;
 
-    private Integer period;
-    private LocalTime startTime;
-    private LocalTime endTime;
-    private Integer totalNum;
-    private Integer remainNum;
+    private @Nullable Integer period;
+    private @Nullable LocalTime startTime;
+    private @Nullable LocalTime endTime;
+    private @Nullable Integer totalNum;
+    private @Nullable Integer remainNum;
 
-    private Integer lastQueueNo;
+    private @Nullable Integer lastQueueNo;
 
-    private Integer status;
+    private @Nullable Integer status;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private @Nullable LocalDateTime createTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    private @Nullable LocalDateTime updateTime;
 }

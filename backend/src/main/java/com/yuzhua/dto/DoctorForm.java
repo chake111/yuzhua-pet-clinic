@@ -1,23 +1,24 @@
 package com.yuzhua.dto;
 
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 
 @Data
 public class DoctorForm {
 
-    private String name;
-    private String avatar;
-    private Integer gender;
-    private String phone;
-    private String title;
-    private Long departmentId;
-    private String specialty;
-    private String introduction;
-    private Integer workYears;
-    private BigDecimal consultationFee;
+    private @Nullable String name;
+    private @Nullable String avatar;
+    private @Nullable Integer gender;
+    private @Nullable String phone;
+    private @Nullable String title;
+    private @Nullable Long departmentId;
+    private @Nullable String specialty;
+    private @Nullable String introduction;
+    private @Nullable Integer workYears;
+    private @Nullable BigDecimal consultationFee;
 
-    private Integer status;
-    private Integer sort;
+    private @Nullable Integer status;
+    private @Nullable Integer sort;
 }

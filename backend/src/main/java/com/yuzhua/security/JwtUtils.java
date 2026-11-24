@@ -1,6 +1,6 @@
 package com.yuzhua.security;
 
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -8,6 +8,7 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -58,7 +59,11 @@ public class JwtUtils {
     }
 
     private SecretKey key() {
-        byte[] raw = props.getJwt().getSecret().getBytes(StandardCharsets.UTF_8);
+        String secret = props.getJwt().getSecret();
+        if (secret == null) {
+            throw new IllegalStateException("yuzhua.jwt.secret 未配置");
+        }
+        byte[] raw = secret.getBytes(StandardCharsets.UTF_8);
         if (raw.length < 32) {
             throw new IllegalStateException("yuzhua.jwt.secret 长度必须不小于 32 字节");
         }
@@ -90,7 +95,10 @@ public class JwtUtils {
     }
 
     /** 解析并验签；失败返回 null，由调用方决定是 401 还是放行 */
-    public LoginUser parse(String token) {
+    public @Nullable LoginUser parse(@Nullable String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
         try {
             Claims c = Jwts.parser().verifyWith(key()).build()
                     .parseSignedClaims(token).getPayload();
@@ -116,7 +124,7 @@ public class JwtUtils {
     }
 
     /** 从 "Bearer xxx" 里取出裸 token */
-    public String strip(String header) {
+    public @Nullable String strip(@Nullable String header) {
         if (header == null || header.isBlank()) {
             return null;
         }

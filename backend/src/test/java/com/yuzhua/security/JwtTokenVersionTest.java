@@ -1,6 +1,6 @@
 package com.yuzhua.security;
 
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;

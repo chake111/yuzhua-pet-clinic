@@ -5,6 +5,7 @@ import com.yuzhua.entity.ConsultSession;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
 
@@ -16,7 +17,7 @@ public interface ConsultSessionMapper extends BaseMapper<ConsultSession> {
      * 必须在事务内调用。
      */
     @Select("SELECT * FROM consult_session WHERE id = #{sessionId} FOR UPDATE")
-    ConsultSession selectByIdForUpdate(@Param("sessionId") Long sessionId);
+    @Nullable ConsultSession selectByIdForUpdate(@Param("sessionId") Long sessionId);
 
     // 原因: countUnread 仅区分不涨未读的系统消息，参与方消息一律累加并由 markRead 同锁清零
     @Update("""
@@ -59,6 +60,6 @@ public interface ConsultSessionMapper extends BaseMapper<ConsultSession> {
             WHERE id = #{sessionId}
             """)
     int setLastMessage(@Param("sessionId") Long sessionId,
-                       @Param("preview") String preview,
-                       @Param("time") LocalDateTime time);
+                       @Param("preview") @Nullable String preview,
+                       @Param("time") @Nullable LocalDateTime time);
 }

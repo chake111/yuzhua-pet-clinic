@@ -5,6 +5,7 @@ import com.yuzhua.entity.Appointment;
 import lombok.Data;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -15,11 +16,11 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
 
     /** 锁定单张预约行供状态更新前重判归属与当前状态，避免快照读并发退号。 */
     @Select("SELECT * FROM appointment WHERE id = #{id} AND deleted = 0 FOR UPDATE")
-    Appointment selectByIdForUpdate(@Param("id") Long id);
+    @Nullable Appointment selectByIdForUpdate(@Param("id") Long id);
 
     /** 幂等键当前读：raw @Select 须显式过滤 deleted = 0，避免已删历史单阻断重用同键。 */
     @Select("SELECT * FROM appointment WHERE user_id = #{userId} AND idem_key = #{idemKey} AND deleted = 0 LIMIT 1")
-    Appointment selectByUserAndIdemKey(@Param("userId") Long userId, @Param("idemKey") String idemKey);
+    @Nullable Appointment selectByUserAndIdemKey(@Param("userId") Long userId, @Param("idemKey") String idemKey);
 
     @Select("SELECT id FROM appointment "
             + "WHERE deleted = 0 AND status = 0 AND pay_status = 0 AND create_time <= #{cutoff} "
@@ -41,7 +42,7 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
               AND appointment_date BETWEEN DATE_SUB(CURDATE(), INTERVAL #{days} DAY) AND CURDATE()
             GROUP BY day ORDER BY day
             """)
-    List<Map<String, Object>> statDaily(@Param("days") int days, @Param("doctorId") Long doctorId);
+    List<Map<String, Object>> statDaily(@Param("days") int days, @Param("doctorId") @Nullable Long doctorId);
 
     @Select("""
             SELECT status, COUNT(*) AS cnt FROM appointment
@@ -50,7 +51,7 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
               AND appointment_date BETWEEN DATE_SUB(CURDATE(), INTERVAL #{days} DAY) AND CURDATE()
             GROUP BY status ORDER BY status
             """)
-    List<Map<String, Object>> statStatus(@Param("days") int days, @Param("doctorId") Long doctorId);
+    List<Map<String, Object>> statStatus(@Param("days") int days, @Param("doctorId") @Nullable Long doctorId);
 
     @Select("""
             SELECT dep.name AS name, COUNT(*) AS cnt
@@ -60,7 +61,7 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
               AND a.appointment_date BETWEEN DATE_SUB(CURDATE(), INTERVAL #{days} DAY) AND CURDATE()
             GROUP BY dep.name ORDER BY cnt DESC
             """)
-    List<Map<String, Object>> statDepartment(@Param("days") int days, @Param("doctorId") Long doctorId);
+    List<Map<String, Object>> statDepartment(@Param("days") int days, @Param("doctorId") @Nullable Long doctorId);
 
     @Select("""
             SELECT d.name AS name, COUNT(*) AS cnt
@@ -82,7 +83,7 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
             WHERE deleted = 0 AND appointment_date = CURDATE()
               AND (#{doctorId,jdbcType=BIGINT} IS NULL OR doctor_id = #{doctorId,jdbcType=BIGINT})
             """)
-    TodayCard todayCard(@Param("doctorId") Long doctorId);
+    @Nullable TodayCard todayCard(@Param("doctorId") @Nullable Long doctorId);
 
     @Data
     class TodayCard {
@@ -90,7 +91,7 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
         private long pending;
         private long accepted;
         private long finished;
-        private BigDecimal income;
+        private @Nullable BigDecimal income;
     }
 
     @Select("""
@@ -99,11 +100,11 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
             WHERE deleted = 0 AND status <> 3
               AND (#{doctorId,jdbcType=BIGINT} IS NULL OR doctor_id = #{doctorId,jdbcType=BIGINT})
             """)
-    ServedCount countServed(@Param("doctorId") Long doctorId);
+    @Nullable ServedCount countServed(@Param("doctorId") @Nullable Long doctorId);
 
     @Data
     class ServedCount {
-        private Long users;
-        private Long pets;
+        private @Nullable Long users;
+        private @Nullable Long pets;
     }
 }

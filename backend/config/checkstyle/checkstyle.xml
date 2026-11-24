@@ -21,6 +21,7 @@
     </module>
 
     <module name="TreeWalker">
+        <module name="AvoidStarImport"/>
         <module name="UnusedImports"/>
         <module name="RedundantImport"/>
         <module name="IllegalImport">

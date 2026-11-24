@@ -1,7 +1,13 @@
 package com.yuzhua.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,36 +18,36 @@ import java.time.LocalDateTime;
 public class Pet {
 
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private @Nullable Long id;
 
-    private Long userId;
-    private String name;
+    private @Nullable Long userId;
+    private @Nullable String name;
 
-    private String species;
-    private String breed;
+    private @Nullable String species;
+    private @Nullable String breed;
 
-    private Integer gender;
-    private LocalDate birthday;
-    private Integer ageMonth;
-    private BigDecimal weight;
-    private String color;
+    private @Nullable Integer gender;
+    private @Nullable LocalDate birthday;
+    private @Nullable Integer ageMonth;
+    private @Nullable BigDecimal weight;
+    private @Nullable String color;
 
-    private Integer isNeutered;
-    private Integer vaccineStatus;
-    private Integer dewormFlag;
+    private @Nullable Integer isNeutered;
+    private @Nullable Integer vaccineStatus;
+    private @Nullable Integer dewormFlag;
 
-    private String avatar;
-    private String allergy;
-    private String medicalHistory;
-    private String remark;
+    private @Nullable String avatar;
+    private @Nullable String allergy;
+    private @Nullable String medicalHistory;
+    private @Nullable String remark;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private @Nullable LocalDateTime createTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    private @Nullable LocalDateTime updateTime;
 
     @TableLogic
     @TableField(select = false)
-    private Integer deleted;
+    private @Nullable Integer deleted;
 }

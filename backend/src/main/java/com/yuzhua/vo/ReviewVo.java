@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.yuzhua.entity.DoctorReview;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 
@@ -12,16 +13,16 @@ import java.time.LocalDate;
 @JsonIgnoreProperties({"userId"})
 public class ReviewVo extends DoctorReview {
 
-    private String userNickname;
-    private String userAvatar;
+    private @Nullable String userNickname;
+    private @Nullable String userAvatar;
 
-    private String doctorName;
-    private String doctorTitle;
+    private @Nullable String doctorName;
+    private @Nullable String doctorTitle;
 
-    private String orderNo;
-    private LocalDate appointmentDate;
-    private String petName;
-    private String petSpecies;
+    private @Nullable String orderNo;
+    private @Nullable LocalDate appointmentDate;
+    private @Nullable String petName;
+    private @Nullable String petSpecies;
 
     public void maskAnonymous() {
         if (!Integer.valueOf(1).equals(getIsAnonymous())) {

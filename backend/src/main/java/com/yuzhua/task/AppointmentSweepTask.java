@@ -1,6 +1,6 @@
 package com.yuzhua.task;
 
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import com.yuzhua.service.AppointmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

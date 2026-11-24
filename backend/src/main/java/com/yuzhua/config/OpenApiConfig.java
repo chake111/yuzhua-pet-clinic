@@ -1,5 +1,6 @@
 package com.yuzhua.config;
 
+import com.yuzhua.props.BrandProperties;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;

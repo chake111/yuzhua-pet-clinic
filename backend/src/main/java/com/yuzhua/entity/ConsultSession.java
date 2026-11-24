@@ -1,7 +1,12 @@
 package com.yuzhua.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
 
@@ -18,35 +23,35 @@ public class ConsultSession {
     public static final int MV_VIOLATION = 2;
 
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private @Nullable Long id;
 
-    private Long appointmentId;
-    private Long userId;
-    private Long doctorId;
-    private Long petId;
+    private @Nullable Long appointmentId;
+    private @Nullable Long userId;
+    private @Nullable Long doctorId;
+    private @Nullable Long petId;
 
-    private String symptom;
-    private String images;
+    private @Nullable String symptom;
+    private @Nullable String images;
 
-    private String summary;
+    private @Nullable String summary;
 
-    private Integer status;
+    private @Nullable Integer status;
 
-    private Integer moderateStatus;
-    private String moderateReason;
-    private Long moderateBy;
-    private LocalDateTime moderateTime;
+    private @Nullable Integer moderateStatus;
+    private @Nullable String moderateReason;
+    private @Nullable Long moderateBy;
+    private @Nullable LocalDateTime moderateTime;
 
-    private String lastMessage;
-    private LocalDateTime lastMessageTime;
-    private Integer userUnread;
-    private Integer doctorUnread;
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
+    private @Nullable String lastMessage;
+    private @Nullable LocalDateTime lastMessageTime;
+    private @Nullable Integer userUnread;
+    private @Nullable Integer doctorUnread;
+    private @Nullable LocalDateTime startTime;
+    private @Nullable LocalDateTime endTime;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private @Nullable LocalDateTime createTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    private @Nullable LocalDateTime updateTime;
 }

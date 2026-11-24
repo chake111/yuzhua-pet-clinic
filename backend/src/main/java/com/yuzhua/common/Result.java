@@ -1,6 +1,7 @@
 package com.yuzhua.common;
 
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 
 /**
  * 统一响应信封：HTTP 状态码与业务状态解耦，code=200 表示成功，401/403 分别表示未认证与无权限。
@@ -10,19 +11,19 @@ public class Result<T> {
 
     private final Integer code;
     private final String msg;
-    private final T data;
+    private final @Nullable T data;
 
-    private Result(Integer code, String msg, T data) {
+    private Result(Integer code, String msg, @Nullable T data) {
         this.code = code;
         this.msg = msg;
         this.data = data;
     }
 
-    public static <T> Result<T> ok(T data) {
+    public static <T> Result<T> ok(@Nullable T data) {
         return new Result<>(200, "操作成功", data);
     }
 
-    public static <T> Result<T> ok(String msg, T data) {
+    public static <T> Result<T> ok(String msg, @Nullable T data) {
         return new Result<>(200, msg, data);
     }
 

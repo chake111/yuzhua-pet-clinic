@@ -2,6 +2,7 @@ package com.yuzhua.config;
 
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
+import com.yuzhua.props.AppProperties;
 import com.yuzhua.security.AccountGuard;
 import com.yuzhua.security.JwtUtils;
 import org.junit.jupiter.api.Test;

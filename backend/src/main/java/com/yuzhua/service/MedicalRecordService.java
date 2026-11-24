@@ -24,6 +24,7 @@ import com.yuzhua.security.UserContext;
 import com.yuzhua.vo.MedicalRecordVo;
 import com.yuzhua.vo.PetDisplayVo;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -54,7 +56,8 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         // 原因: 查空后插入必须在预约行锁内串行化，避免并发首次保存写出同预约双份病历
         Appointment a = requireStaffAppointmentLocked(appointmentId);
         // 原因: R7 状态用白名单仅放行已接诊与已完成，避免黑名单漏态导致未就诊开处方
-        if (a.getStatus() != Appointment.ST_ACCEPTED && a.getStatus() != Appointment.ST_FINISHED) {
+        if (!Integer.valueOf(Appointment.ST_ACCEPTED).equals(a.getStatus())
+                && !Integer.valueOf(Appointment.ST_FINISHED).equals(a.getStatus())) {
             throw new BizException("仅已接诊或已完成的预约可填写病历");
         }
         if (req.getDiagnosis() == null || req.getDiagnosis().isBlank()) {
@@ -155,10 +158,10 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
     public MedicalRecordVo detail(Long id) {
         MedicalRecord r = require(id);
         LoginUser u = UserContext.require();
-        if (u.isClient() && !r.getUserId().equals(u.getId())) {
+        if (u.isClient() && !Objects.equals(r.getUserId(), u.getId())) {
             throw BizException.notFound("病历");
         }
-        if (u.isDoctor() && !r.getDoctorId().equals(u.getDoctorId())) {
+        if (u.isDoctor() && !Objects.equals(r.getDoctorId(), u.getDoctorId())) {
             throw BizException.forbidden("看不到别人的病历");
         }
         MedicalRecordVo vo = new MedicalRecordVo();
@@ -182,17 +185,17 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         return vo;
     }
 
-    public MedicalRecord ofAppointment(Long appointmentId) {
+    public @Nullable MedicalRecord ofAppointment(Long appointmentId) {
         return getOne(Wrappers.<MedicalRecord>lambdaQuery()
                 .eq(MedicalRecord::getAppointmentId, appointmentId), false);
     }
 
-    public MedicalRecord ofAppointmentForStaff(Long appointmentId) {
+    public @Nullable MedicalRecord ofAppointmentForStaff(Long appointmentId) {
         requireStaffAppointment(appointmentId);
         return ofAppointment(appointmentId);
     }
 
-    public MedicalRecord ofAppointmentForOwner(Long appointmentId) {
+    public @Nullable MedicalRecord ofAppointmentForOwner(Long appointmentId) {
         appointmentService.requireMine(appointmentId);
         return ofAppointment(appointmentId);
     }
@@ -215,7 +218,7 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
 
     private void requireMayTouch(Appointment a) {
         LoginUser u = UserContext.require();
-        if (u.isDoctor() && !a.getDoctorId().equals(u.getDoctorId())) {
+        if (u.isDoctor() && !Objects.equals(a.getDoctorId(), u.getDoctorId())) {
             throw BizException.forbidden("只能处理自己接诊的单子");
         }
     }

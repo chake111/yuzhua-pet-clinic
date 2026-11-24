@@ -2,6 +2,7 @@ package com.yuzhua.dto;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
@@ -10,17 +11,17 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = true)
 public class AppointmentQuery extends PageQuery {
 
-    private Long doctorId;
-    private Long userId;
-    private Integer status;
-    private Integer payStatus;
+    private @Nullable Long doctorId;
+    private @Nullable Long userId;
+    private @Nullable Integer status;
+    private @Nullable Integer payStatus;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-    private LocalDate start;
+    private @Nullable LocalDate start;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-    private LocalDate end;
+    private @Nullable LocalDate end;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-    private LocalDate day;
+    private @Nullable LocalDate day;
 }

@@ -3,6 +3,7 @@ package com.yuzhua.vo;
 import com.yuzhua.entity.Appointment;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
 
@@ -10,22 +11,22 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 public class AppointmentVo extends Appointment {
 
-    private String petName;
-    private String petSpecies;
-    private String petBreed;
-    private String petAvatar;
+    private @Nullable String petName;
+    private @Nullable String petSpecies;
+    private @Nullable String petBreed;
+    private @Nullable String petAvatar;
 
-    private String doctorName;
-    private String doctorTitle;
-    private String doctorAvatar;
-    private String departmentName;
+    private @Nullable String doctorName;
+    private @Nullable String doctorTitle;
+    private @Nullable String doctorAvatar;
+    private @Nullable String departmentName;
 
-    private LocalDateTime payDeadline;
+    private @Nullable LocalDateTime payDeadline;
 
-    private Long sessionId;
+    private @Nullable Long sessionId;
 
-    private Long recordId;
+    private @Nullable Long recordId;
 
-    private String userNickname;
-    private String userPhone;
+    private @Nullable String userNickname;
+    private @Nullable String userPhone;
 }

@@ -4,12 +4,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.yuzhua.entity.Doctor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
 @JsonIgnoreProperties({"phone"})
 public class DoctorVo extends Doctor {
 
-    private String departmentName;
-    private String departmentIcon;
+    private @Nullable String departmentName;
+    private @Nullable String departmentIcon;
 }

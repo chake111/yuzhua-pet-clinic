@@ -7,18 +7,33 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.BatchLookup;
 import com.yuzhua.common.PageResult;
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import com.yuzhua.dto.AppointmentForm;
 import com.yuzhua.dto.AppointmentQuery;
 import com.yuzhua.dto.PageQuery;
-import com.yuzhua.entity.*;
-import com.yuzhua.mapper.*;
+import com.yuzhua.entity.Appointment;
+import com.yuzhua.entity.ConsultSession;
+import com.yuzhua.entity.Department;
+import com.yuzhua.entity.Doctor;
+import com.yuzhua.entity.DoctorSchedule;
+import com.yuzhua.entity.MedicalRecord;
+import com.yuzhua.entity.Pet;
+import com.yuzhua.entity.SysUser;
+import com.yuzhua.mapper.AppointmentMapper;
+import com.yuzhua.mapper.ConsultSessionMapper;
+import com.yuzhua.mapper.DepartmentMapper;
+import com.yuzhua.mapper.DoctorMapper;
+import com.yuzhua.mapper.DoctorScheduleMapper;
+import com.yuzhua.mapper.MedicalRecordMapper;
+import com.yuzhua.mapper.PetMapper;
+import com.yuzhua.mapper.SysUserMapper;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.vo.AppointmentVo;
 import com.yuzhua.vo.PetDisplayVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -31,7 +46,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
@@ -61,11 +83,11 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return create(req, null);
     }
 
-    public AppointmentVo create(AppointmentForm req, String idemKey) {
+    public AppointmentVo create(AppointmentForm req, @Nullable String idemKey) {
         String key = normalizeIdemKey(idemKey);
         // 原因: 仅键非空时提前取当前用户，无键路径延续 petService.requireOwned 的 401/404 校验顺序
         Long userId = key == null ? null : UserContext.requireId();
-        if (key != null) {
+        if (key != null && userId != null) {
             Appointment existing = baseMapper.selectByUserAndIdemKey(userId, key);
             if (existing != null) {
                 return replayOf(existing, req);
@@ -77,9 +99,9 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         // 原因: READ_COMMITTED 使排班行锁串行化后能读到刚提交的同键预约与同宠物占座记录
         tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         try {
-            return tx.execute(status -> doCreate(req, key, userId));
+            return Objects.requireNonNull(tx.execute(status -> doCreate(req, key, userId)));
         } catch (DuplicateKeyException e) {
-            if (key == null) {
+            if (key == null || userId == null) {
                 throw e;
             }
             // 原因: 事务已回滚扣号与计数，此时重读确认是同键并发冲突还是 uk_order_no 碰撞
@@ -92,7 +114,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
             return replayOf(existing, req);
         } catch (BizException e) {
             // 原因: 参数校验失败也可能是并发首单尚未提交，再回读确认后决定重放或抛原异常
-            if (key != null) {
+            if (key != null && userId != null) {
                 Appointment existing = readIdemRowWithRetry(userId, key);
                 if (existing != null) {
                     log.warn("下单校验失败但同键原单已存在，按幂等返回原单：user={} key={} appointment={}",
@@ -104,25 +126,30 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
     }
 
-    private AppointmentVo doCreate(AppointmentForm req, String key, Long userId) {
+    private AppointmentVo doCreate(AppointmentForm req, @Nullable String key, @Nullable Long userId) {
         // 原因: 先锁排班行并做幂等回读，确保并发同键请求即使换了非法参数也先收敛到首单，且与取消路径同向不成环
-        DoctorSchedule sch = scheduleMapper.selectByIdForUpdate(req.getScheduleId());
-        if (key != null) {
+        DoctorSchedule sch = req.getScheduleId() == null ? null : scheduleMapper.selectByIdForUpdate(req.getScheduleId());
+        if (key != null && userId != null) {
             Appointment existing = baseMapper.selectByUserAndIdemKey(userId, key);
             if (existing != null) {
                 return replayOf(existing, req);
             }
         }
 
+        if (req.getPetId() == null) {
+            throw BizException.notFound("宠物档案");
+        }
         Pet pet = petService.requireOwned(req.getPetId());
         Doctor doctor = validateCreateTarget(req, sch, pet);
-        Appointment a = buildNewAppointment(req, key, pet, doctor, sch);
+        DoctorSchedule validSch = Objects.requireNonNull(sch);
+        Long schId = Objects.requireNonNull(validSch.getId());
+        Appointment a = buildNewAppointment(req, key, pet, doctor, validSch);
         // 原因: 扣号放在写单之前，影响行数为 0 说明最后一个号已被抢走
-        if (scheduleMapper.tryOccupy(sch.getId()) == 0) {
+        if (scheduleMapper.tryOccupy(schId) == 0) {
             throw new BizException("该时段号源已约满，请换个时间");
         }
         // 原因: 队列序号取自占号时递增的当前读，避免 REPEATABLE READ 快照读到旧号
-        Integer queueNo = scheduleMapper.selectLastQueueNoForUpdate(sch.getId());
+        Integer queueNo = scheduleMapper.selectLastQueueNoForUpdate(schId);
         if (queueNo == null) {
             throw new BizException("号源状态异常，请稍后重试");
         }
@@ -131,12 +158,12 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return detailOf(a, false);
     }
 
-    private Doctor validateCreateTarget(AppointmentForm req, DoctorSchedule sch, Pet pet) {
-        Doctor doctor = doctorMapper.selectById(req.getDoctorId());
+    private Doctor validateCreateTarget(AppointmentForm req, @Nullable DoctorSchedule sch, Pet pet) {
+        Doctor doctor = req.getDoctorId() == null ? null : doctorMapper.selectById(req.getDoctorId());
         if (doctor == null) {
             throw BizException.notFound("医生");
         }
-        if (doctor.getStatus() != 1) {
+        if (!Integer.valueOf(1).equals(doctor.getStatus())) {
             throw new BizException("该医生已停诊，请改约其他医生");
         }
         if (req.getSymptom() == null || req.getSymptom().isBlank()) {
@@ -145,10 +172,10 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         if (sch == null) {
             throw BizException.notFound("排班时段");
         }
-        if (!sch.getDoctorId().equals(req.getDoctorId())) {
+        if (!Objects.equals(sch.getDoctorId(), req.getDoctorId())) {
             throw new BizException("所选时段不属于该医生");
         }
-        if (sch.getStatus() != 1) {
+        if (!Integer.valueOf(1).equals(sch.getStatus())) {
             throw new BizException("该时段已停诊，请换个时间");
         }
         requireNotPast(sch);
@@ -161,7 +188,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return doctor;
     }
 
-    private Appointment buildNewAppointment(AppointmentForm req, String key, Pet pet,
+    private Appointment buildNewAppointment(AppointmentForm req, @Nullable String key, Pet pet,
                                             Doctor doctor, DoctorSchedule sch) {
         Appointment a = new Appointment();
         a.setOrderNo(nextOrderNo());
@@ -176,7 +203,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         a.setPeriod(sch.getPeriod());
         a.setStartTime(sch.getStartTime());
         a.setEndTime(sch.getEndTime());
-        a.setSymptom(req.getSymptom().trim());
+        a.setSymptom(Objects.requireNonNull(req.getSymptom()).trim());
         a.setImages(blankToNull(req.getImages()));
         DoctorService.requireFee(doctor.getConsultationFee());
         a.setAmount(doctor.getConsultationFee());
@@ -190,7 +217,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     @Transactional
     public AppointmentVo pay(Long id) {
         Appointment a = lockOwned(id);
-        if (a.getStatus() != Appointment.ST_PENDING) {
+        if (!Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())) {
             throw new BizException("当前状态不能支付");
         }
         if (Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus())) {
@@ -218,24 +245,24 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
 
     /** 用户取消本人待接诊预约：先锁预约再条件更新并退号，已支付订单标记已退款（VisitOverdueException 不回滚）。 */
     @Transactional(noRollbackFor = VisitOverdueException.class)
-    public void cancelByUser(Long id, String reason) {
+    public void cancelByUser(Long id, @Nullable String reason) {
         cancelLocked(lockOwned(id), blankToNull(reason), "USER");
     }
 
     /** 医生或管理员取消待接诊预约：先锁预约校验权限再退号退款（VisitOverdueException 不回滚）。 */
     @Transactional(noRollbackFor = VisitOverdueException.class)
-    public void cancelByStaff(Long id, String reason) {
+    public void cancelByStaff(Long id, @Nullable String reason) {
         Appointment a = lockForUpdate(id);
         requireStaffMayTouch(a);
         cancelLocked(a, blankToNull(reason), UserContext.require().isDoctor() ? "DOCTOR" : "ADMIN");
     }
 
-    private void cancelLocked(Appointment a, String reason, String by) {
+    private void cancelLocked(Appointment a, @Nullable String reason, String by) {
         requireVisitNotOverdue(a);
-        if (a.getStatus() == Appointment.ST_CANCELLED) {
+        if (Integer.valueOf(Appointment.ST_CANCELLED).equals(a.getStatus())) {
             throw new BizException("该预约已取消");
         }
-        if (a.getStatus() != Appointment.ST_PENDING) {
+        if (!Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())) {
             throw new BizException("已进入接诊流程，无法取消，请联系前台处理");
         }
         if (baseMapper.update(null, Wrappers.<Appointment>lambdaUpdate()
@@ -260,7 +287,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         Appointment a = lockForUpdate(id);
         requireDoctorMayTouch(a);
         requireVisitNotOverdue(a);
-        if (a.getStatus() != Appointment.ST_PENDING) {
+        if (!Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())) {
             throw new BizException("只有待接诊的预约可以接诊");
         }
         if (!Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus())) {
@@ -280,7 +307,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     public void finish(Long id) {
         Appointment a = lockForUpdate(id);
         requireDoctorMayTouch(a);
-        if (a.getStatus() != Appointment.ST_ACCEPTED) {
+        if (!Integer.valueOf(Appointment.ST_ACCEPTED).equals(a.getStatus())) {
             throw new BizException("请先接诊再结束");
         }
         if (baseMapper.update(null, Wrappers.<Appointment>lambdaUpdate()
@@ -290,10 +317,13 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
                 .eq(Appointment::getStatus, Appointment.ST_ACCEPTED)) == 0) {
             throw new BizException("该预约状态已变化，请刷新后重试");
         }
-        doctorMapper.incrementAppointmentCount(a.getDoctorId());
+        Long doctorId = a.getDoctorId();
+        if (doctorId != null) {
+            doctorMapper.incrementAppointmentCount(doctorId);
+        }
     }
 
-    public PageResult<AppointmentVo> pageMine(Integer status, PageQuery q) {
+    public PageResult<AppointmentVo> pageMine(@Nullable Integer status, PageQuery q) {
         LambdaQueryWrapper<Appointment> qw = Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getUserId, UserContext.requireId())
                 .eq(status != null, Appointment::getStatus, status)
@@ -332,12 +362,12 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         LoginUser u = UserContext.require();
         if (u.isClient()) {
             // 原因: 越权查他人预约返回 404 不存在，避免泄露可枚举的订单存在信号
-            if (!a.getUserId().equals(u.getId())) {
+            if (!Objects.equals(a.getUserId(), u.getId())) {
                 throw BizException.notFound("预约记录");
             }
             return detailOf(a, false);
         }
-        if (u.isDoctor() && !a.getDoctorId().equals(u.getDoctorId())) {
+        if (u.isDoctor() && !Objects.equals(a.getDoctorId(), u.getDoctorId())) {
             throw BizException.forbidden("只能查看自己接诊的单子");
         }
         return detailOf(a, true);
@@ -345,7 +375,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
 
     public Appointment requireMine(Long id) {
         Appointment a = requireExists(id);
-        if (!a.getUserId().equals(UserContext.requireId())) {
+        if (!Objects.equals(a.getUserId(), UserContext.requireId())) {
             throw BizException.notFound("预约记录");
         }
         return a;
@@ -375,7 +405,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
 
     private Appointment lockOwned(Long id) {
         Appointment a = lockForUpdate(id);
-        if (!a.getUserId().equals(UserContext.requireId())) {
+        if (!Objects.equals(a.getUserId(), UserContext.requireId())) {
             throw BizException.notFound("预约记录");
         }
         return a;
@@ -399,7 +429,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     @Transactional
     public boolean expireOne(Long id) {
         Appointment a = baseMapper.selectByIdForUpdate(id);
-        if (a == null || a.getStatus() != Appointment.ST_PENDING
+        if (a == null || !Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())
                 || !Integer.valueOf(Appointment.PAY_NONE).equals(a.getPayStatus())
                 || !isPayExpired(a)) {
             return false;
@@ -421,7 +451,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         Appointment a = baseMapper.selectByIdForUpdate(id);
         if (a == null || a.getAppointmentDate() == null
                 || !a.getAppointmentDate().isBefore(LocalDate.now())
-                || a.getStatus() != Appointment.ST_PENDING
+                || !Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())
                 || !Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus())) {
             return false;
         }
@@ -432,7 +462,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
                 .eq(Appointment::getPayStatus, Appointment.PAY_PAID)) > 0;
     }
 
-    private static String normalizeIdemKey(String idemKey) {
+    private static @Nullable String normalizeIdemKey(@Nullable String idemKey) {
         if (idemKey == null || idemKey.isBlank()) {
             return null;
         }
@@ -457,7 +487,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return detailOf(existing, false);
     }
 
-    private Appointment readIdemRowWithRetry(Long userId, String key) {
+    private @Nullable Appointment readIdemRowWithRetry(Long userId, String key) {
         Appointment existing = baseMapper.selectByUserAndIdemKey(userId, key);
         for (int attempt = 0; existing == null && attempt < 2; attempt++) {
             try {
@@ -476,9 +506,13 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     }
 
     private void requireVisitNotOverdue(Appointment a) {
-        if (a.getStatus() == Appointment.ST_PENDING && Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus())
+        if (Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())
+                && Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus())
                 && a.getAppointmentDate() != null && a.getAppointmentDate().isBefore(LocalDate.now())) {
-            markMissedOne(a.getId());
+            Long id = a.getId();
+            if (id != null) {
+                markMissedOne(id);
+            }
             throw new VisitOverdueException();
         }
     }
@@ -493,17 +527,22 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
 
     private void requireStaffMayTouch(Appointment a) {
         LoginUser u = UserContext.require();
-        if (u.isDoctor() && !a.getDoctorId().equals(u.getDoctorId())) {
+        if (u.isDoctor() && !Objects.equals(a.getDoctorId(), u.getDoctorId())) {
             throw BizException.forbidden("只能处理自己的接诊单");
         }
     }
 
     private void requireNotPast(DoctorSchedule sch) {
+        LocalDate workDate = sch.getWorkDate();
+        LocalTime endTime = sch.getEndTime();
+        if (workDate == null || endTime == null) {
+            throw new BizException("排班时段数据异常");
+        }
         LocalDate today = LocalDate.now();
-        if (sch.getWorkDate().isBefore(today)) {
+        if (workDate.isBefore(today)) {
             throw new BizException("该时段已过期");
         }
-        if (sch.getWorkDate().isEqual(today) && LocalTime.now().isAfter(sch.getEndTime())) {
+        if (workDate.isEqual(today) && LocalTime.now().isAfter(endTime)) {
             throw new BizException("该时段的门诊已经结束，请改约其他时间");
         }
     }
@@ -559,11 +598,19 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         Map<Long, Long> sessionIds = new HashMap<>();
         sessionMapper.selectList(Wrappers.<ConsultSession>lambdaQuery()
                         .in(ConsultSession::getAppointmentId, orderIds))
-                .forEach(s -> sessionIds.putIfAbsent(s.getAppointmentId(), s.getId()));
+                .forEach(s -> {
+                    if (s.getAppointmentId() != null && s.getId() != null) {
+                        sessionIds.putIfAbsent(s.getAppointmentId(), s.getId());
+                    }
+                });
         Map<Long, Long> recordIds = new HashMap<>();
         recordMapper.selectList(Wrappers.<MedicalRecord>lambdaQuery()
                         .in(MedicalRecord::getAppointmentId, orderIds))
-                .forEach(r -> recordIds.putIfAbsent(r.getAppointmentId(), r.getId()));
+                .forEach(r -> {
+                    if (r.getAppointmentId() != null && r.getId() != null) {
+                        recordIds.putIfAbsent(r.getAppointmentId(), r.getId());
+                    }
+                });
         return new VoLookup(pets, doctors, depts, users, sessionIds, recordIds);
     }
 
@@ -609,7 +656,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
             Map<Long, Long> recordIds) {
     }
 
-    private static String blankToNull(String s) {
+    private static @Nullable String blankToNull(@Nullable String s) {
         return s == null || s.isBlank() ? null : s;
     }
 }

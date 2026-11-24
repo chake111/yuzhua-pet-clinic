@@ -15,6 +15,7 @@ import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.vo.DashboardVo;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -33,7 +34,7 @@ public class StatsService {
     private final DoctorMapper doctorMapper;
     private final DoctorReviewMapper reviewMapper;
 
-    public DashboardVo dashboard(Integer days) {
+    public DashboardVo dashboard(@Nullable Integer days) {
         LoginUser u = UserContext.require();
         // 原因: 仅医生账号按本人 doctorId 收窄统计口径，管理员即便绑定 doctorId 也看全院
         Long doctorId = u.isDoctor() ? UserContext.requireDoctorId() : null;
@@ -42,19 +43,21 @@ public class StatsService {
         DashboardVo vo = new DashboardVo();
         vo.setDays(win);
         AppointmentMapper.TodayCard today = appointmentMapper.todayCard(doctorId);
-        vo.setTodayOrders(today.getOrders());
-        vo.setTodayPending(today.getPending());
-        vo.setTodayAccepted(today.getAccepted());
-        vo.setTodayFinished(today.getFinished());
-        vo.setTodayIncome(today.getIncome() == null ? BigDecimal.ZERO : today.getIncome());
+        if (today != null) {
+            vo.setTodayOrders(today.getOrders());
+            vo.setTodayPending(today.getPending());
+            vo.setTodayAccepted(today.getAccepted());
+            vo.setTodayFinished(today.getFinished());
+            vo.setTodayIncome(today.getIncome() == null ? BigDecimal.ZERO : today.getIncome());
+        }
 
         AppointmentMapper.ServedCount served = appointmentMapper.countServed(doctorId);
         if (doctorId == null) {
             vo.setTotalUsers(count(sysUserMapper.selectCount(Wrappers.<SysUser>lambdaQuery())));
             vo.setTotalPets(count(petMapper.selectCount(Wrappers.<Pet>lambdaQuery())));
-        } else {
-            vo.setTotalUsers(served.getUsers());
-            vo.setTotalPets(served.getPets());
+        } else if (served != null) {
+            vo.setTotalUsers(served.getUsers() == null ? 0L : served.getUsers());
+            vo.setTotalPets(served.getPets() == null ? 0L : served.getPets());
         }
         vo.setTotalDoctors(count(doctorMapper.selectCount(Wrappers.<Doctor>lambdaQuery())));
         vo.setOnlineDoctors(count(doctorMapper.selectCount(

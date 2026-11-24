@@ -16,6 +16,7 @@ import com.yuzhua.security.UserContext;
 import com.yuzhua.vo.LoginVo;
 import com.yuzhua.vo.UserDetailVo;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +55,9 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
     }
 
     public LoginVo login(AuthDto.Login req) {
+        if (req.getUsername() == null || req.getPassword() == null) {
+            throw new BizException("账号或密码错误");
+        }
         SysUser u = baseMapper.selectForLogin(req.getUsername());
         if (u == null || !passwordEncoder.matches(req.getPassword(), u.getPassword())) {
             // 原因: 不区分账号不存在与密码错误，避免登录接口被用于枚举注册账号
@@ -169,7 +173,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         vo.setRole(LoginUser.ROLE_USER);
     }
 
-    private static String emptyToNull(String s) {
+    private static @Nullable String emptyToNull(@Nullable String s) {
         return s == null || s.isBlank() ? null : s;
     }
 }

@@ -2,11 +2,12 @@ package com.yuzhua.security;
 
 import tools.jackson.databind.ObjectMapper;
 import com.yuzhua.common.Result;
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -86,7 +87,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    private String checkRole(Object handler, LoginUser user) {
+    private @Nullable String checkRole(Object handler, LoginUser user) {
         if (!(handler instanceof HandlerMethod hm)) {
             return null;
         }
@@ -106,7 +107,8 @@ public class AuthInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler,
+                                @Nullable Exception ex) {
         // 原因: Tomcat 线程池复用请求线程，必须清理 ThreadLocal 防止身份串用
         UserContext.clear();
     }

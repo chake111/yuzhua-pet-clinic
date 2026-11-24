@@ -5,6 +5,7 @@ import com.yuzhua.entity.DoctorSchedule;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.jspecify.annotations.Nullable;
 
 public interface DoctorScheduleMapper extends BaseMapper<DoctorSchedule> {
 
@@ -21,7 +22,7 @@ public interface DoctorScheduleMapper extends BaseMapper<DoctorSchedule> {
      * 当前读刚发出的排队序号，须与 {@link #tryOccupy} 同事务避免 REPEATABLE READ 读到递增前快照。
      */
     @Select("SELECT last_queue_no FROM doctor_schedule WHERE id = #{id} FOR UPDATE")
-    Integer selectLastQueueNoForUpdate(@Param("id") Long id);
+    @Nullable Integer selectLastQueueNoForUpdate(@Param("id") Long id);
 
     // 原因: LEAST 仅作防御性封顶，一次取消只退一次号由预约行锁内条件更新保证
     @Update("UPDATE doctor_schedule SET remain_num = LEAST(remain_num + 1, total_num) "
@@ -30,5 +31,5 @@ public interface DoctorScheduleMapper extends BaseMapper<DoctorSchedule> {
 
     /** 锁定排班行供校验删除/改总量或下单前确认排班仍存在；停诊/恢复仅写 status 不走此锁。 */
     @Select("SELECT * FROM doctor_schedule WHERE id = #{id} FOR UPDATE")
-    DoctorSchedule selectByIdForUpdate(@Param("id") Long id);
+    @Nullable DoctorSchedule selectByIdForUpdate(@Param("id") Long id);
 }

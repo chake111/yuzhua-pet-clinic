@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,7 +40,9 @@ public class AdminConsultController {
         return Result.ok(consultService.pageMine(query));
     }
 
+    @Operation(summary = "问诊会话详情（医生）")
     @GetMapping("/sessions/{id}")
+    @RequireRole(LoginUser.ROLE_DOCTOR)
     public Result<ConsultSessionVo> detail(@PathVariable Long id) {
         return Result.ok(consultService.detailMine(id));
     }
@@ -62,7 +65,7 @@ public class AdminConsultController {
     @Operation(summary = "结束问诊，可附一段问诊小结（线上只建议、确诊要面诊）")
     @PostMapping("/{id}/close")
     @RequireRole(LoginUser.ROLE_DOCTOR)
-    public Result<Void> close(@PathVariable Long id, @RequestBody(required = false) ConsultCloseForm form) {
+    public Result<Void> close(@PathVariable Long id, @RequestBody(required = false) @Nullable ConsultCloseForm form) {
         consultService.close(id, form == null ? null : form.getSummary());
         return Result.ok("已结束", null);
     }
@@ -95,7 +98,7 @@ public class AdminConsultController {
     @RequireRole(LoginUser.ROLE_ADMIN)
     public Result<Void> hideMessage(@PathVariable Long msgId,
                                     @RequestParam Integer hidden,
-                                    @RequestParam(required = false) String reason) {
+                                    @RequestParam(required = false) @Nullable String reason) {
         consultService.changeMessageHidden(msgId, hidden, reason);
         return Result.ok(hidden == 1 ? "已屏蔽" : "已恢复", null);
     }
@@ -105,7 +108,7 @@ public class AdminConsultController {
     @RequireRole(LoginUser.ROLE_ADMIN)
     public Result<Void> moderate(@PathVariable Long id,
                                  @RequestParam Integer moderateStatus,
-                                 @RequestParam(required = false) String reason) {
+                                 @RequestParam(required = false) @Nullable String reason) {
         consultService.moderate(id, moderateStatus, reason);
         return Result.ok(moderateStatus == 0 ? "已撤销处置" : "已处置", null);
     }

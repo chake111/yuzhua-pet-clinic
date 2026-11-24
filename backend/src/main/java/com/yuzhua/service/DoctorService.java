@@ -9,11 +9,26 @@ import com.yuzhua.common.BizException;
 import com.yuzhua.common.PageResult;
 import com.yuzhua.dto.DoctorForm;
 import com.yuzhua.dto.DoctorQuery;
-import com.yuzhua.entity.*;
-import com.yuzhua.mapper.*;
-import com.yuzhua.websocket.ConsultSocketRegistry;
+import com.yuzhua.entity.AdminUser;
+import com.yuzhua.entity.Appointment;
+import com.yuzhua.entity.ConsultSession;
+import com.yuzhua.entity.Department;
+import com.yuzhua.entity.Doctor;
+import com.yuzhua.entity.DoctorReview;
+import com.yuzhua.entity.DoctorSchedule;
+import com.yuzhua.entity.MedicalRecord;
+import com.yuzhua.mapper.AdminUserMapper;
+import com.yuzhua.mapper.AppointmentMapper;
+import com.yuzhua.mapper.ConsultSessionMapper;
+import com.yuzhua.mapper.DepartmentMapper;
+import com.yuzhua.mapper.DoctorMapper;
+import com.yuzhua.mapper.DoctorReviewMapper;
+import com.yuzhua.mapper.DoctorScheduleMapper;
+import com.yuzhua.mapper.MedicalRecordMapper;
+import com.yuzhua.consult.ws.DoctorPresenceGateway;
 import com.yuzhua.vo.DoctorVo;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -34,7 +49,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
     private final ConsultSessionMapper sessionMapper;
     private final DoctorReviewMapper reviewMapper;
     private final AdminUserMapper adminUserMapper;
-    private final ConsultSocketRegistry socketRegistry;
+    private final DoctorPresenceGateway socketRegistry;
 
     public PageResult<DoctorVo> pageVo(DoctorQuery q, boolean visibleOnly) {
         LambdaQueryWrapper<Doctor> qw = Wrappers.<Doctor>lambdaQuery()
@@ -189,7 +204,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         baseMapper.refreshAppointmentCount(doctorId);
     }
 
-    private void applySort(LambdaQueryWrapper<Doctor> qw, String sort) {
+    private void applySort(LambdaQueryWrapper<Doctor> qw, @Nullable String sort) {
         switch (sort == null ? "" : sort) {
             case "rating" -> qw.orderByDesc(Doctor::getRating).orderByDesc(Doctor::getReviewCount);
             case "appointment" -> qw.orderByDesc(Doctor::getAppointmentCount);
@@ -197,13 +212,13 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         }
     }
 
-    private void requireName(String name) {
+    private void requireName(@Nullable String name) {
         if (name == null || name.isBlank()) {
             throw new BizException("请填写医生姓名");
         }
     }
 
-    static void requireFee(BigDecimal fee) {
+    static void requireFee(@Nullable BigDecimal fee) {
         if (fee == null || fee.signum() < 0 || fee.compareTo(new BigDecimal("9999")) > 0
                 || fee.stripTrailingZeros().scale() > 2) {
             throw new BizException("问诊费须为 0～9999 元，最多两位小数");
@@ -211,7 +226,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
     }
 
     // 原因: 与删科共用科室行锁串行化校验与写入；若将来需锁多科室须按 ID 升序加锁
-    private void requireDepartment(Long departmentId) {
+    private void requireDepartment(@Nullable Long departmentId) {
         if (departmentId == null) {
             throw new BizException("请选择所属科室");
         }

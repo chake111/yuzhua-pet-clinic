@@ -1,6 +1,6 @@
 package com.yuzhua.security;
 
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;

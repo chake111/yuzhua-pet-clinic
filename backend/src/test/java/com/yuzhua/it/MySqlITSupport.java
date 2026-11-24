@@ -2,7 +2,7 @@ package com.yuzhua.it;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import com.yuzhua.dto.AppointmentForm;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.task.AppointmentSweepTask;

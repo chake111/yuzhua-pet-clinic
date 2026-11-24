@@ -1,12 +1,13 @@
 package com.yuzhua.dto;
 
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 @Data
 public class PageQuery {
 
-    private Integer pageNum = 1;
-    private Integer pageSize = 10;
+    private @Nullable Integer pageNum = 1;
+    private @Nullable Integer pageSize = 10;
 
     public Integer getPageNum() {
         return pageNum == null || pageNum < 1 ? 1 : pageNum;

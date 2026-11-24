@@ -1,6 +1,6 @@
 package com.yuzhua.task;
 
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import com.yuzhua.service.AppointmentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

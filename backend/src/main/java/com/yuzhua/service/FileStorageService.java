@@ -1,9 +1,10 @@
 package com.yuzhua.service;
 
 import com.yuzhua.common.BizException;
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -79,7 +80,7 @@ public class FileStorageService {
         }
     }
 
-    private String extractSafeExt(String originalName) {
+    private String extractSafeExt(@Nullable String originalName) {
         if (originalName == null) {
             throw new BizException("无法识别文件类型");
         }
