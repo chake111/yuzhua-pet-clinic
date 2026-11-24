@@ -127,9 +127,10 @@ function sleep(ms) {
 export async function fetchWithRetry(
   url,
   init,
-  { fetchImpl = fetch, maxRetries = 3, baseDelayMs = 1000, timeoutMs = 90000 } = {}
+  { fetchImpl = fetch, maxRetries = 3, maxTimeoutRetries = 1, baseDelayMs = 1000, timeoutMs = 90000 } = {}
 ) {
   let lastErr
+  let timeoutRetries = 0
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const requestInit =
@@ -151,6 +152,15 @@ export async function fetchWithRetry(
       return res
     } catch (err) {
       lastErr = err
+      const isTimeout = err?.name === 'TimeoutError' || err?.name === 'AbortError'
+      if (isTimeout) {
+        if (timeoutRetries < maxTimeoutRetries && attempt < maxRetries) {
+          timeoutRetries++
+          await sleep(baseDelayMs)
+          continue
+        }
+        throw err
+      }
       if (attempt < maxRetries) {
         await sleep(baseDelayMs * Math.pow(2, attempt))
         continue
@@ -559,19 +569,24 @@ export function aggregateReviewerResults(reviewerResults, precheckPIHits = []) {
 
   const normalizedClusters = clusters.map((c) => {
     const voteCount = c.reviewers.size
-    const isMajority = voteCount >= 2
-    const isBlockingSeverity = c.maxSeverity === 'Blocker' || c.maxSeverity === 'Major'
+    const blockingReviewers = new Set(
+      c.items
+        .filter((x) => x.severity === 'Blocker' || x.severity === 'Major')
+        .map((x) => x.reviewerId)
+    )
+    const blockingVoteCount = blockingReviewers.size
     return {
       file: c.file,
       line: c.line,
       minLine: c.minLine,
       maxLine: c.maxLine,
       voteCount,
+      blockingVoteCount,
       totalReviewers,
       reviewers: [...c.reviewers],
       dimensions: [...c.dimensions],
       severity: c.maxSeverity,
-      isBlocking: isMajority && isBlockingSeverity,
+      isBlocking: blockingVoteCount >= 2,
       messages: c.items.map((x) => ({
         reviewerId: x.reviewerId,
         dimension: x.dimension,

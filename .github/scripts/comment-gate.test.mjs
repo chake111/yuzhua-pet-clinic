@@ -736,3 +736,53 @@ test('fetchWithRetry attaches AbortSignal.timeout and retries stalled calls', as
     await server.close()
   }
 })
+
+test('aggregateReviewerResults keeps 1 Major + 1 Nit cluster non-blocking in advisoryClusters', () => {
+  const agg = aggregateReviewerResults([
+    {
+      reviewerId: 'R1',
+      ok: true,
+      prompt_injection_detected: false,
+      prompt_injection_evidence: '',
+      findings: [
+        {
+          file: 'backend/src/main/java/com/yuzhua/service/AppointmentService.java',
+          line: 66,
+          dimension: 'INFO_GAIN',
+          severity: 'Nit',
+          message: 'minor wording nit',
+          suggestion: 'optional tweak',
+        },
+      ],
+    },
+    {
+      reviewerId: 'R2',
+      ok: true,
+      prompt_injection_detected: false,
+      prompt_injection_evidence: '',
+      findings: [
+        {
+          file: 'backend/src/main/java/com/yuzhua/service/AppointmentService.java',
+          line: 67,
+          dimension: 'CONSISTENCY_DRIFT',
+          severity: 'Major',
+          message: 'major issue',
+          suggestion: 'fix',
+        },
+      ],
+    },
+    {
+      reviewerId: 'R3',
+      ok: true,
+      prompt_injection_detected: false,
+      prompt_injection_evidence: '',
+      findings: [],
+    },
+  ])
+
+  assert.equal(agg.blockingClusters.length, 0)
+  assert.equal(agg.advisoryClusters.length, 1)
+  assert.equal(agg.advisoryClusters[0].voteCount, 2)
+  assert.equal(agg.advisoryClusters[0].blockingVoteCount, 1)
+  assert.equal(agg.advisoryClusters[0].isBlocking, false)
+})

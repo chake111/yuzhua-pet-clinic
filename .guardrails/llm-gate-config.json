@@ -4,7 +4,7 @@
       "id": "R1",
       "provider": "deepseek",
       "base_url": "https://api.deepseek.com/v1",
-      "model_id": "deepseek-v4-pro",
+      "model_id": "deepseek-flash",
       "temperature": 0.1,
       "key_env": "LLM_GATE_KEY_1"
     },
@@ -20,7 +20,7 @@
       "id": "R3",
       "provider": "xiaomimimo",
       "base_url": "https://api.xiaomimimo.com/v1",
-      "model_id": "mimo-v2.6-pro",
+      "model_id": "mimo-v2.6-flash",
       "temperature": 0.1,
       "key_env": "LLM_GATE_KEY_3"
     }
