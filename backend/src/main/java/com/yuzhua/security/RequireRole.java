@@ -20,6 +20,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RequireRole {
 
-    /** 允许的角色，取值为 LoginUser.ROLE_ADMIN / ROLE_DOCTOR */
     String[] value();
 }

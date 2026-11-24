@@ -18,9 +18,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 
-/**
- * Web 层装配：鉴权拦截器、跨域、上传文件的静态访问。
- */
 @Configuration
 @RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
@@ -30,16 +27,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final AccountGuard accountGuard;
     private final ObjectMapper objectMapper;
 
-    // @Value 放不到 final 上：Lombok 的构造器不会带上这个注解，只能字段注入
+    // 原因: Lombok 构造器注入不传递字段上的 @Value，须保留字段注入
     @Value("${server.servlet.context-path:}")
     private String contextPath;
 
-    /**
-     * 免登录白名单。
-     *
-     * <p>公开展示接口集中在 {@code /client/catalog/**}，另外放行用户登录、注册及后台登录。
-     * 此配置按路径匹配；catalog 控制器通过只提供读取接口维持公开展示约定。
-     */
     private static final String[] PUBLIC_PATHS = {
             "/client/catalog/**",
             "/client/auth/login",
@@ -59,37 +50,23 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(PUBLIC_PATHS);
     }
 
-    /**
-     * 开发期直连后端（不经过 Vite 代理）时用到。生产环境由 nginx 同源转发，
-     * 这里 allowedOriginPatterns 而非 "*"，是为了允许带 credentials。
-     */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                // X-Trace-Id 要让浏览器里的前端也读得到（直连后端联调时用）。
-                // 走 Vite 代理或同源 nginx 时不受 CORS 限制，这里只补齐跨域场景。
+                // 原因: 跨域直连调试时暴露追踪号给浏览器脚本，同源 nginx 代理不受此限制
                 .exposedHeaders("Authorization", "X-Trace-Id")
                 .allowCredentials(true)
                 .maxAge(3600);
     }
 
-    /**
-     * 上传的图片以静态资源方式暴露，不经过 Controller 读流。
-     *
-     * 契约动机: urlPrefix 是浏览器看到的完整地址（含 context-path），而 Spring 的资源映射模式
-     * 在 context-path 之内匹配，注册前必须剥掉这一段、避免重复 /api——
-     * 否则服务地址变成 /api/api/uploads/**，库里存的 URL 全都打不开。
-     */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         Path uploadRoot = Paths.get(props.getUpload().getDir()).toAbsolutePath().normalize();
         String pattern = resourcePattern();
-        // 按路径特异度先后注册两段缓存策略：
-        // 1) /seed/** 为可按同名覆盖更新的种子图，公开缓存 1 天且不加 immutable
-        // 2) /** 为 FileStorageService 生成的不可变 UUID 用户上传图，公开缓存 1 年并标记 immutable
+        // 原因: 按路径特异度先后注册缓存策略，/seed/** 可覆盖更新故短缓存，UUID 上传图永久不可变
         registry.addResourceHandler(pattern + "/seed/**")
                 .addResourceLocations(toDirectoryLocation(uploadRoot.resolve("seed")))
                 .setCacheControl(CacheControl.maxAge(Duration.ofDays(1)).cachePublic());

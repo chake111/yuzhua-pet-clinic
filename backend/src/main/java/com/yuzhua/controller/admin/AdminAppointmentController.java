@@ -13,14 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * 后台预约订单：管理员看全院，医生账号只会拿到自己的接诊单（收窄在 Service 里做）。
- *
- * 接诊/结束是临床动作，按 R4 只允许医生账号（责任医生归属仍在服务层用 requireStaffMayTouch 校）；
- * 管理员保留查看与"代患者取消待接诊单"这类前台场景，不代替医生接诊或结束就诊。
- *
- * 类名加 Admin 前缀是为了不和 client 包下的 AppointmentController 撞 bean 名。
- */
 @Tag(name = "管理后台-预约订单")
 @RestController
 @RequestMapping("/admin/appointment")

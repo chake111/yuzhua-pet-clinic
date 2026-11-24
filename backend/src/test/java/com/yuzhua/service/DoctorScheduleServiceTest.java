@@ -554,15 +554,9 @@ class DoctorScheduleServiceTest {
             ScheduleForm f = form(i + 1, bounds[i][0], bounds[i][1]);
             int before = saveCalls;
             s.create(f);
-            if (saveCalls != before + 1) {
-                throw new AssertionError("create 应恰好落库一次");
-            }
-            if (!saved.getStartTime().equals(f.getStartTime())) {
-                throw new AssertionError("边界时间未保存");
-            }
-            if (s.batchCreate(batch(f)).created() != 1) {
-                throw new AssertionError("批量边界失败");
-            }
+            assertThat(saveCalls).as("create 应恰好落库一次").isEqualTo(before + 1);
+            assertThat(saved.getStartTime()).as("边界时间未保存").isEqualTo(f.getStartTime());
+            assertThat(s.batchCreate(batch(f)).created()).as("批量边界失败").isEqualTo(1);
             f.setStartTime(f.getStartTime().minusSeconds(1));
             reject(() -> s.create(f), "排班时间须在");
             reject(() -> s.batchCreate(batch(f)), "排班时间须在");
@@ -627,22 +621,16 @@ class DoctorScheduleServiceTest {
         for (long count : new long[]{0, 2}) {
             refs = count;
             s.update(9L, old);
-            if (saved.getStatus() != null) {
-                throw new AssertionError("编辑路径不应写 status，实际写了 " + saved.getStatus());
-            }
-            if (saved.getRemainNum() != 25 - count
-                    || !saved.getStartTime().equals(current.getStartTime())) {
-                throw new AssertionError("旧排班保存失败");
-            }
+            assertThat(saved.getStatus()).as("编辑路径不应写 status").isNull();
+            assertThat(saved.getRemainNum()).as("旧排班保存失败").isEqualTo(25 - count);
+            assertThat(saved.getStartTime()).as("旧排班保存失败").isEqualTo(current.getStartTime());
         }
         old.setStartTime(LocalTime.of(9, 0));
         old.setEndTime(LocalTime.of(11, 0));
         reject(() -> s.update(9L, old), "条预约记录");
         refs = 0;
         s.update(9L, old);
-        if (!saved.getStartTime().equals(LocalTime.of(9, 0))) {
-            throw new AssertionError("修正时间失败");
-        }
+        assertThat(saved.getStartTime()).as("修正时间失败").isEqualTo(LocalTime.of(9, 0));
         old.setEndTime(LocalTime.of(13, 0));
         reject(() -> s.update(9L, old), "排班时间须在");
         old.setPeriod(2);
@@ -674,19 +662,14 @@ class DoctorScheduleServiceTest {
         base.setTotalNum(25);
         ScheduleEditForm maintenance = edit(base);
         s.update(9L, maintenance);
-        if (saved.getTotalNum() != 25 || saved.getStatus() != null) {
-            throw new AssertionError("停诊医生调整号源失败");
-        }
+        assertThat(saved.getTotalNum()).as("停诊医生调整号源失败").isEqualTo(25);
+        assertThat(saved.getStatus()).as("停诊医生调整号源失败").isNull();
         // 状态只能由专用入口翻：行内停诊写一次，编辑路径沿路不碰这一列
         s.stopClinic(9L);
-        if (statusWrites != 1) {
-            throw new AssertionError("行内停诊失败");
-        }
+        assertThat(statusWrites).as("行内停诊失败").isEqualTo(1);
         current.setStatus(0);
         s.update(9L, maintenance);
-        if (saved.getStatus() != null) {
-            throw new AssertionError("编辑路径不应写 status");
-        }
+        assertThat(saved.getStatus()).as("编辑路径不应写 status").isNull();
 
         // 停诊中改容量可以，但恢复出诊只能走 resumeClinic，且要求医生仍在诊
         ScheduleForm restoreBase = form(1, "14:00", "16:00");
@@ -695,19 +678,13 @@ class DoctorScheduleServiceTest {
         reject(() -> s.resumeClinic(9L), "该医生处于停诊状态");
         reject(() -> s.create(form(1, "09:00", "11:00")), "该医生处于停诊状态");
         reject(() -> s.batchCreate(batch(form(1, "09:00", "11:00"))), "该医生处于停诊状态");
-        if (statusWrites != 1) {
-            throw new AssertionError("停诊医生被恢复排班");
-        }
+        assertThat(statusWrites).as("停诊医生被恢复排班").isEqualTo(1);
 
         doctorStatus = 1;
         s.update(9L, restore);
-        if (saved.getStatus() != null) {
-            throw new AssertionError("编辑路径不应写 status");
-        }
+        assertThat(saved.getStatus()).as("编辑路径不应写 status").isNull();
         s.resumeClinic(9L);
-        if (statusWrites != 2) {
-            throw new AssertionError("行内恢复失败");
-        }
+        assertThat(statusWrites).as("行内恢复失败").isEqualTo(2);
     }
 
     // ---------------------------------------------------------------- 内存替身 harness

@@ -52,10 +52,11 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final AccountGuard accountGuard;
 
+    /** 建连登记（同账号顶替旧连接）、标记医生上线并下发 READY；若握手携带 sessionId 则自动订阅。 */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         LoginUser user = user(session);
-        // 同一个账号可能有多处并发写（广播 + 回执），包一层串行化发送
+        // 原因: 同账号可能同时收到广播与回执写帧，用串行化包装避免 WebSocket 并发写异常
         Conn conn = new Conn(ConsultSocketRegistry.keyOf(user), user,
                 new ConcurrentWebSocketSessionDecorator(session, 5000, 256 * 1024));
         session.getAttributes().put(ATTR_CONN, conn);
@@ -76,6 +77,7 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         });
     }
 
+    /** 入站文本帧总入口：先经 AccountGuard 核验账号状态，再按 type 分发并维持 UserContext 边界。 */
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         Conn conn = conn(session);
@@ -111,7 +113,7 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
                     } catch (BizException e) {
                         chatFailed(conn, e.getMessage(), requestId);
                     } catch (RuntimeException e) {
-                        // 非预期异常同样要按 requestId 回执，否则前端只能等超时
+                        // 原因: 非预期异常同样须按 requestId 回执，防止前端一直等到发送超时
                         log.error("问诊消息保存失败 key={}", conn.getKey(), e);
                         chatFailed(conn, "消息未保存，请稍后重试", requestId);
                     }
@@ -123,14 +125,14 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         });
     }
 
+    /** 原子条件注销当前连接；仅当该医生无其余活动连接时才广播离线并更新在线状态。 */
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         Conn conn = conn(session);
         if (conn == null) {
             return;
         }
-        // 顶号时前者关闭，登记表里已经是新连接，这时不能改在线状态。
-        // close 内部是原子条件删除：即使关闭回调与新连接登记并发，也不会误删新连接。
+        // 原因: 顶号时旧连接晚到关闭回调，条件删除避免误删刚登记的新连接或误改医生在线态
         if (registry.close(conn.getKey(), conn) == null) {
             return;
         }
@@ -146,19 +148,6 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    // ---------------------------------------------------------------- 指令
-
-    /**
-     * 进房并补发最近消息。
-     *
-     * <p><strong>这里不写已读。</strong>进房只证明客户端连上了，不证明有人看见了内容：
-     * 页面刷新、断线重连、手机锁屏解锁都会重新 SUBSCRIBE，后台标签页也可能一直挂着连接。
-     * 原先 subscribe 直接 markRead，效果是"重连一次就把对侧消息全部标成已读"，
-     * 未读红点会在没有任何人查看的情况下消失。
-     *
-     * <p>已读只由上行 READ 帧触发（{@link #read}）；前端在页面可见且历史渲染完成后才发。
-     * REST 的 {@code POST /admin/consult/{id}/read} 保留，用于回归脚本驱动竞态用例。
-     */
     private void subscribe(Conn conn, Long sessionId) {
         if (sessionId == null) {
             err(conn, "缺少 sessionId");
@@ -178,9 +167,9 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
             err(conn, "缺少 sessionId");
             return;
         }
-        // 未进房时自动进一次：join 里会先校验当事人身份，不信任前端
+        // 原因: 未进房时自动 join 先做参与方权限校验，不信任客户端房间状态
         join(conn, sessionId);
-        // 未读不由"对方是否在线"决定：在线只代表推送此刻可能成功，丢帧时计数会永久漏记
+        // 原因: 未读计数不看对方是否在线，避免推送丢帧后红点永久漏记
         ConsultMessage msg = consultService.send(sessionId, msgType, content);
         broadcast(sessionId, envelope("MSG", Map.of("message", msg)), null);
         if (requestId != null) write(conn, sessionId, envelope("ACK", Map.of("sessionId", sessionId, "requestId", requestId, "message", msg)));
@@ -196,10 +185,6 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         broadcastRead(conn, sessionId, ids);
     }
 
-    /**
-     * 已读回执只携带本次事务实际由未读改为已读的消息ID（readMessageIds），
-     * 单帧最多200个、超过分帧；没有增量也发一帧空数组，保证请求有回执。
-     */
     private void broadcastRead(Conn conn, Long sessionId, List<Long> ids) {
         String role = conn.getUser().isDoctor() ? ConsultMessage.ROLE_DOCTOR : ConsultMessage.ROLE_USER;
         if (ids.isEmpty()) {
@@ -214,10 +199,6 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    /**
-     * 进房。身份与处置校验必须在登记房间之前，否则任何人都能订阅别人的会话；
-     * 已在房间里也要重新校验，权限收回后不能靠旧订阅继续收消息。
-     */
     private void join(Conn conn, Long sessionId) {
         consultService.requireMember(sessionId);
         if (conn.getRooms().contains(sessionId)) {
@@ -229,8 +210,6 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    // ---------------------------------------------------------------- 收发
-
     private void broadcast(Long roomId, Map<String, Object> payload, String exceptKey) {
         List<Conn> targets = registry.inRoom(roomId);
         for (Conn c : targets) {
@@ -240,12 +219,10 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    /** 业务帧：交给共用出口，发送前按会话校验接收方 */
     private void write(Conn conn, Long sessionId, Map<String, Object> payload) {
         consultPush.send(conn, sessionId, payload);
     }
 
-    /** 控制帧：只校验账号与令牌，不涉及会话内容 */
     private void writeControl(Conn conn, Map<String, Object> payload) {
         consultPush.sendControl(conn, payload);
     }
@@ -254,11 +231,6 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         writeControl(conn, envelope("ERROR", Map.of("msg", msg)));
     }
 
-    /**
-     * 发送失败回执。requestId 必须原样带回：前端靠它把这次失败对应到具体一条草稿，
-     * 缺失时只能等 10 秒超时，用户看到的是"点了发送没反应"。
-     * 业务拒绝与非预期异常走同一个出口，避免异常类型决定了回执长什么样。
-     */
     private void chatFailed(Conn conn, String msg, String requestId) {
         Map<String, Object> data = new HashMap<>();
         data.put("msg", msg == null || msg.isBlank() ? "消息未保存，请稍后重试" : msg);
@@ -280,9 +252,6 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    // ---------------------------------------------------------------- 上下文
-
-    /** WebSocket 回调线程没有拦截器写入的登录态，业务方法前后要自己管 ThreadLocal */
     private void runAs(LoginUser user, Runnable body) {
         UserContext.set(user);
         try {
@@ -297,7 +266,6 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    /** 出错回执可能落在被顶掉的旧连接上，按 key 回查当前连接 */
     private Conn connOf(LoginUser user) {
         Conn cur = registry.find(ConsultSocketRegistry.keyOf(user));
         return cur == null ? new Conn(ConsultSocketRegistry.keyOf(user), user, null) : cur;

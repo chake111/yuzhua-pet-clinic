@@ -10,9 +10,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * 后台认证。管理员与医生共用这一个入口，靠 role 区分能进哪些菜单。
- */
 @Tag(name = "后台-认证")
 @RestController
 @RequestMapping("/admin/auth")

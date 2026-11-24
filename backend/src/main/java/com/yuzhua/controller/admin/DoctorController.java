@@ -14,12 +14,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * 医生花名册管理。
- *
- * 列表用 DoctorVo（手机号被屏蔽），编辑表单用 GET /{id} 取原始实体，
- * 这样改资料时不会把手机号填丢。
- */
 @Tag(name = "管理后台-医生")
 @RestController
 @RequestMapping("/admin/doctor")

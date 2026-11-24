@@ -8,10 +8,6 @@ public interface DoctorMapper extends BaseMapper<Doctor> {
     @org.apache.ibatis.annotations.Update("UPDATE doctor SET appointment_count = appointment_count + 1 WHERE id = #{doctorId}")
     int incrementAppointmentCount(@org.apache.ibatis.annotations.Param("doctorId") Long doctorId);
 
-    /**
-     * 重算某位医生的评分和评价数。接诊量在完成预约时递增。
-     * 单独走 SQL 聚合，避免把全部评价捞进内存。
-     */
     @org.apache.ibatis.annotations.Update("""
             UPDATE doctor d SET
               d.review_count = (SELECT COUNT(*) FROM doctor_review r

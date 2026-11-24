@@ -15,12 +15,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * 用户端预约：下单 → 模拟支付 → 查看 / 取消，以及回看这次问诊的病历。
- *
- * 所有接口只认登录态里的 userId，前端传 userId 一律无效；
- * 下单金额同样由服务端按医生挂号费回填，不接受入参。
- */
 @Tag(name = "用户端-预约问诊")
 @RestController
 @RequestMapping("/client/appointment")
@@ -65,7 +59,6 @@ public class AppointmentController {
         return Result.ok(appointmentService.detail(id));
     }
 
-    /** 一张预约最多一份病历；医生还没写时 data 整个省略，前端按"无病历"渲染 */
     @Operation(summary = "这次预约的病历（医生未写则为空）")
     @GetMapping("/{id}/record")
     public Result<MedicalRecord> record(@PathVariable Long id) {

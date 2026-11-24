@@ -52,7 +52,7 @@ public class WsHandshakeInterceptor implements HandshakeInterceptor {
             return false;
         }
         if (!user.isClient() && !user.isDoctor()) {
-            // 管理员不参与问诊会话，握手阶段就挡掉，不用等连上再踢
+            // 原因: 管理员不参与问诊会话，握手阶段直接拒绝而非建连后再踢出
             response.setStatusCode(HttpStatus.FORBIDDEN);
             return false;
         }
@@ -71,7 +71,7 @@ public class WsHandshakeInterceptor implements HandshakeInterceptor {
     @Override
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                WebSocketHandler wsHandler, Exception exception) {
-        // 101 升级由 Spring 收尾，这里没有要清理的状态
+        // 原因: 101 升级由 Spring 收尾，握手拦截器无额外状态需要清理
     }
 
     private static String first(List<String> values) {

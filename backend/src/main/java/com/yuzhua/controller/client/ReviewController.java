@@ -13,10 +13,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 用户端评价。医生列表/详情的评价展示走公开的 /client/catalog/**，
- * 这里只有写入口——提交后由服务端重算该医生的评分聚合。
- */
 @Tag(name = "用户端-医生评价")
 @RestController
 @RequestMapping("/client/review")

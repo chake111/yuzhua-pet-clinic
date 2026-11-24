@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ConsultDeliveryGuard {
 
-    /** 一帧的投递结论：放行、账号失效（关闭连接）、会话准入失败（只丢这一帧） */
     public enum Decision {
         OK,
         ACCOUNT_INVALID,

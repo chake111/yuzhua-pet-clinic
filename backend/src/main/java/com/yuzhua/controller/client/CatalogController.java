@@ -24,12 +24,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * 公开浏览区：不登录也能看科室、医生、号源、公告。
- *
- * 整个前缀挂在 WebMvcConfig 的白名单里，所以这里新增接口必须是只读的——
- * 任何写操作放到别的路径下，否则会连带被放行。
- */
 @Tag(name = "用户端-公开浏览")
 @RestController
 @RequestMapping("/client/catalog")

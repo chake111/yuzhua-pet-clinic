@@ -13,9 +13,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 用户端病历本。只读——病历由接诊医生书写，宠物主人没有改的诊断权限。
- */
 @Tag(name = "用户端-我的病历")
 @RestController
 @RequestMapping("/client/record")

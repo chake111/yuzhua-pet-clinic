@@ -23,20 +23,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
-/**
- * 后台的图文问诊接口，与用户端 {@code /client/consult/**} 是同一套 Service，只是入口不同。
- * 接诊/结束也在这里——会话本身就是状态机，不再挂在预约单的工作台上。
- *
- * 医生账号属于后台登录体系（typ=ADMIN），访问不了 /client/**，所以在这里重开一组。
- *
- * 角色按方法拆开，类上兜底 DOCTOR（新增方法漏标注解时默认只给医生，不会放行给管理员）：
- * - 医生动作（接诊/结束/已读/未读数/我接诊的列表）锁 ROLE_DOCTOR，管理员不参与对话；
- * - 管理员可在后台「问诊记录」里**只读 + 处置**：/page 与 /{id}/messages 对 ADMIN 放行（审计视图，
- *   被屏蔽行不过滤），另有 /message/{msgId}/hidden 与 /{id}/moderate 两个处置口（显式 ADMIN）——
- *   处置只改标志位，不提供发言与标记已读。
- */
 @Tag(name = "管理后台-图文问诊")
 @RestController
 @RequestMapping("/admin/consult")
@@ -88,8 +74,7 @@ public class AdminConsultController {
         return Result.ok(consultService.historyForViewer(id, query));
     }
 
-    // 前端已读全走 WS READ 帧；这个 REST 入口留给 tools/audit_regression.mjs
-    // 的并发对偶测试（发送/已读、已读/屏蔽两组竞态从这里驱动）
+    // 原因: 前端已读走 WS READ 帧，保留此 REST 入口供并发回归脚本驱动竞态校验
     @Operation(summary = "标记已读（医生）")
     @PostMapping("/{id}/read")
     @RequireRole(LoginUser.ROLE_DOCTOR)
