@@ -10,13 +10,6 @@ import { dayLabel, money, toDate, today } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 import LoadFailure from '@/components/LoadFailure.vue'
 
-/**
- * 预约列表。医生账号只能看到自己名下的单（后端按 doctorId 限定），
- * 所以医生列表的筛选项只对管理员显示。
- *
- * 医生看到的是按天分组的接诊清单，默认落在今天；管理员保留跨医生的表格检索。
- * 桌面与窄屏共用同一份信息，不靠横向滚动藏起日期和状态。
- */
 const store = useAdminStore()
 const route = useRoute()
 const router = useRouter()
@@ -79,7 +72,7 @@ function applyQuery(query) {
   else router.push(location)
 }
 function navigate(page = 1) {
-  // 地址中保存的是已应用条件；翻页不提交表单里的草稿。
+  // 原因: 地址中保存已应用查询条件，翻页不提交表单草稿
   applyQuery({ ...route.query, page: String(page) })
 }
 function search() {
@@ -90,7 +83,7 @@ function search() {
 }
 function reset() {
   Object.assign(q, { status: null, payStatus: null, doctorId: null })
-  // 医生的默认视图是今天，重置回默认而不是退到全部日期。
+  // 原因: 医生默认视图为今日接诊清单，重置时回到今天而非全量日期
   range.value = store.isDoctor ? [today(), today()] : []
   search()
 }
@@ -133,7 +126,6 @@ const emptyText = computed(() => store.isDoctor && isTodayOnly()
   : '没有符合条件的预约单')
 
 const dateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-/** 空态里的下一步：今天没单时最常看的是本周剩余时段。 */
 function showWeek() {
   const end = new Date()
   end.setDate(end.getDate() + 6)
@@ -141,10 +133,7 @@ function showWeek() {
   search()
 }
 
-/**
- * 单个请求执行期间锁住整行：接诊和结束都是一次性状态迁移，
- * 连点两下会拿到"状态已变化"的报错。确认弹窗不计入锁定时间。
- */
+// 原因: 接诊与结束为一次性状态迁移，单行执行期间加锁防连点触发状态冲突报错
 async function run(row, action) {
   if (actingId.value) return
   actingId.value = row.id
@@ -191,7 +180,7 @@ onMounted(() => {
     load()
     return
   }
-  // 医生从菜单直接进入时没有日期条件，默认落到今天；地址仍保存这份条件，便于分享和刷新。
+  // 原因: 医生首次进入无日期参数时默认落到今日，并将条件写入地址栏便于分享与刷新
   if (!route.query.day && !(route.query.start && route.query.end)) {
     router.replace({
       path: '/admin/appointments',
@@ -224,7 +213,6 @@ onMounted(() => {
 
     <LoadFailure v-if="failed" @retry="load" />
 
-    <!-- 医生：按天分组的接诊清单，关键动作直接落在行尾 -->
     <div v-else-if="store.isDoctor" class="pc-card appt-card" :aria-busy="loading">
       <div class="list-head">
         <h2>接诊清单</h2>
@@ -248,7 +236,7 @@ onMounted(() => {
                 <b class="pet">{{ row.petName }}</b>
                 <span class="pc-muted">{{ row.petSpecies }}<template v-if="row.petBreed"> · {{ row.petBreed }}</template></span>
                 <StatusChip :tone="tagType(APPT_STATUS, row.status)">{{ text(APPT_STATUS, row.status) }}</StatusChip>
-                <!-- 已支付是默认态，只在未支付/已退款时占位，避免整列绿色胶囊抢注意力 -->
+                <!-- 原因: 已支付是默认态，仅在未支付或已退款时渲染胶囊以突出异常状态 -->
                 <StatusChip v-if="row.payStatus !== 1" :tone="tagType(PAY_STATUS, row.payStatus)">{{ text(PAY_STATUS, row.payStatus) }}</StatusChip>
               </div>
               <div class="meta">
@@ -283,7 +271,6 @@ onMounted(() => {
                      @current-change="navigate" />
     </div>
 
-    <!-- 管理员：保留跨医生检索表格 -->
     <div v-else class="pc-card pc-scroll-x">
       <div class="admin-list-summary"><b>预约列表</b><span>共 {{ total }} 条</span></div>
       <el-table :data="rows" v-loading="loading" row-key="id" empty-text="没有符合条件的预约单">

@@ -5,10 +5,6 @@ import { createPet, updatePet } from '@/api/user'
 import { PET_GENDER, SPECIES, VACCINE, options } from '@/utils/dict'
 import ImageUpload from '@/components/ImageUpload.vue'
 
-/**
- * 宠物档案表单。预约页和「我的宠物」共用一个弹窗，
- * 免得两处字段口径漂移。传 pet 表示编辑，不传是新建。
- */
 const props = defineProps({ modelValue: Boolean, pet: Object })
 const emit = defineEmits(['update:modelValue', 'saved'])
 
@@ -22,7 +18,7 @@ const form = reactive(blank())
 const ref0 = ref(null)
 const busy = ref(false)
 
-// 只提交档案字段；id/userId/系统时间由服务端维护，前端不再回传
+// 原因: 仅提交可编辑档案字段，不回传 id、userId 与系统维护时间
 const EDITABLE = [
   'name', 'species', 'breed', 'gender', 'birthday', 'ageMonth', 'weight', 'color',
   'isNeutered', 'vaccineStatus', 'dewormFlag', 'avatar', 'allergy', 'medicalHistory', 'remark'
@@ -38,7 +34,6 @@ const rules = {
 watch(() => props.modelValue, (open) => {
   if (!open) return
   Object.assign(form, blank(), props.pet || {})
-  // 后端存的是 yyyy-MM-dd，date-picker 直接对齐，不必再转换
   ref0.value?.clearValidate()
 })
 
@@ -48,7 +43,7 @@ async function submit() {
   try {
     if (!(await ref0.value.validate().catch(() => false))) return
     const payload = Object.fromEntries(EDITABLE.map(key => [key, form[key]]))
-    // 显式 null 表示清空；省略该键才表示保持原值
+    // 原因: 后端约定显式 null 表示清空字段，省略键才表示保持原值
     payload.birthday = payload.birthday || null
     payload.weight = payload.weight ?? null
     props.pet?.id ? await updatePet(props.pet.id, payload) : await createPet(payload)
@@ -56,7 +51,7 @@ async function submit() {
     emit('saved')
     emit('update:modelValue', false)
   } catch {
-    // 请求层已提示原因，保留当前输入供重试。
+    // 原因: 请求层已提示失败原因，保留表单输入供重试
   } finally {
     busy.value = false
   }

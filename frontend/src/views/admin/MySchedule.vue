@@ -7,10 +7,6 @@ import { groupSlotsByDate, localNow } from '@/utils/schedule'
 import StatusChip from '@/components/StatusChip.vue'
 import LoadFailure from '@/components/LoadFailure.vue'
 
-/**
- * 医生只读的"我的排班"：后端对医生账号按本人作用域返回（入参 doctorId 无效），
- * 排班的增删改仍归管理员，这里不提供任何写操作。
- */
 const rows = ref([])
 const total = ref(0)
 const loading = ref(false)

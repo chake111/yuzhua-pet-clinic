@@ -10,18 +10,12 @@ import { toDateTime } from '@/utils/format'
 import { openImageViewer } from '@/utils/imageViewer'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 管理员问诊记录：只读 + 处置视图。
- * 可查看全部会话与历史消息（合规追溯），可屏蔽违规消息、处置无效/违规会话；
- * 不参与对话——发言、已读、未读仍只在患者与接诊医生之间，处置只改标志位。
- * 被处置的会话与消息对参与方视同不存在；本页是审计视图，被屏蔽内容仍可见。
- */
 const store = useAdminStore()
 const rows = ref([])
 const total = ref(0)
 const loading = ref(false)
 const q = reactive({ pageNum: 1, pageSize: 20, status: null, moderateStatus: null })
-// 查询时提交筛选快照，翻页和操作后的刷新沿用已提交条件。
+// 原因: 翻页与操作刷新沿用已提交筛选快照，避免未点击查询的表单草稿生效
 let applied = { ...q }
 
 const open = ref(false)
@@ -53,7 +47,6 @@ function search() {
   load()
 }
 
-/** 审计视图的图片也走全站查看器：遮罩、失败态、键盘操作与用户端保持一致 */
 function openViewer(m) {
   openImageViewer(m.content, 0, { title: `会话 #${m.sessionId ?? sess.value?.id ?? ''} 图片` })
 }
@@ -69,7 +62,7 @@ async function openRoom(row) {
     if (sess.value?.id !== row.id) return
     msgTotal.value = page.total
     msgHasMore.value = page.records.length < page.total
-    // 接口按新→旧返回，反转成时间正序阅读
+    // 原因: 后端按 id 倒序返回消息，需反转为时间正序展示
     msgs.value = page.records.slice().reverse()
   } finally {
     msgLoading.value = false
@@ -93,7 +86,6 @@ async function loadEarlier() {
 const roleName = (m) =>
   m.senderRole === 'DOCTOR' ? '医生' : m.senderRole === 'SYSTEM' ? '系统' : '患者'
 
-/** 屏蔽 / 恢复一条消息：屏蔽必须填原因（≤255），恢复只需确认 */
 async function toggleHidden(m, hidden) {
   const label = hidden === 1 ? '屏蔽' : '恢复'
   if (hidden === 1) {
@@ -117,7 +109,6 @@ async function toggleHidden(m, hidden) {
   load()
 }
 
-/** 会话级处置：1 无效关闭 / 2 违规屏蔽（必填原因，非 0 连带关闭）/ 0 撤销 */
 async function moderate(row, next) {
   if (next === 0) {
     const ok = await ElMessageBox.confirm('撤销后该会话重新对患者与医生可见（已关闭的会话保持关闭）。', '撤销处置', {

@@ -8,15 +8,11 @@ import { DEWORM, PET_GENDER, SPECIES, VACCINE, options, tagType, text } from '@/
 import { toDate } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 后台宠物档案：按宠物名或主人昵称/手机号检索，纠正明显错误（编辑）、处理重复录入（删除）。
- * 与用户端的区别是不校验归属；字段校验仍走服务端同一套规则。
- */
 const rows = ref([])
 const total = ref(0)
 const loading = ref(false)
 const q = reactive({ pageNum: 1, pageSize: 20, keyword: '' })
-// 查询时提交筛选快照，翻页和操作后的刷新沿用已提交条件。
+// 原因: 翻页与操作刷新沿用已提交筛选快照，避免未点查询的草稿生效
 let applied = { ...q }
 
 const open = ref(false)
@@ -24,7 +20,7 @@ const editing = ref(null)
 const busy = ref(false)
 const form = ref({})
 
-// 只提交档案字段；主人信息、id/系统时间由服务端维护
+// 原因: 仅提交可编辑档案字段，不回传主人信息、id 与系统维护时间
 const EDITABLE = [
   'name', 'species', 'breed', 'gender', 'birthday', 'ageMonth', 'weight', 'color',
   'isNeutered', 'vaccineStatus', 'dewormFlag', 'avatar', 'allergy', 'medicalHistory', 'remark'
@@ -62,7 +58,7 @@ async function submit() {
   if (!form.value.species) return ElMessage.warning('请选择物种')
   const payload = Object.fromEntries(EDITABLE.map(key => [key, form.value[key]]))
   payload.name = form.value.name.trim()
-  // 显式 null 表示清空；省略该键才表示保持原值
+  // 原因: 后端约定显式 null 表示清空字段，省略键才表示保持原值
   payload.birthday = payload.birthday || null
   payload.weight = payload.weight ?? null
   busy.value = true

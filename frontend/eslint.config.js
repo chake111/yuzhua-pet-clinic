@@ -1,8 +1,7 @@
-// 前端静态检查：Vue 3 + 浏览器环境，只开"会真出错"的规则，不引入格式化口径。
-// 运行：npm run lint（加 --fix 可自动修可修项）
 import js from '@eslint/js'
 import pluginVue from 'eslint-plugin-vue'
 import globals from 'globals'
+import commentGuard from './tools/eslint-plugin-comment-guard.mjs'
 
 // 禁止全量导入 Element Plus / 图标库，防止首屏关键路径包体回退。
 // 在 ESLint no-restricted-imports 中限制 importNames: ['default'] 会同时阻断默认导入与 `import * as` 命名空间导入。
@@ -111,6 +110,26 @@ export default [
           ]
         }
       ]
+    }
+  },
+  {
+    files: ['src/**/*.{js,ts,vue}'],
+    plugins: { 'comment-guard': commentGuard },
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+    rules: {
+      'comment-guard/src-comments': 'error',
+      complexity: ['error', 15],
+      'max-lines-per-function': ['error', { max: 60, skipBlankLines: true, skipComments: true }],
+      'max-depth': ['error', 3],
+      'max-params': ['error', 5]
+    }
+  },
+  {
+    files: ['tests/**/*.{js,mjs,ts}'],
+    plugins: { 'comment-guard': commentGuard },
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+    rules: {
+      'comment-guard/test-guard': 'error'
     }
   },
   {

@@ -10,10 +10,6 @@ import { APPT_STATUS, CONSULT_TYPE, PAY_STATUS, PERIOD, tagType, text } from '@/
 import { canPay, money, toDate, toDateTime } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 我的预约。状态标签页切换 + 分页；待支付的单子带倒计时，
- * 到点后后端清扫任务会取消订单并退回号源，前端只需把按钮收起。
- */
 const router = useRouter()
 const route = useRoute()
 const tab = ref(['pending', 'accepted', 'finished', 'closed'].includes(route.query.tab) ? route.query.tab : 'all')
@@ -28,8 +24,6 @@ const now = ref(Date.now())
 let timer = null
 let expiryRefresh = 0
 
-/* 标签文案取自 utils/dict.js，改口径只改那一处；
-   状态集合仍是这 4 个（未到诊不单开标签页） */
 const TAB_STATUSES = [
   { key: 'pending', status: 0 },
   { key: 'accepted', status: 1 },
@@ -78,7 +72,7 @@ async function pay(row) {
     ElMessage.success('支付成功')
     await load()
   } catch {
-    // 请求层已提示失败，保留当前列表供重试。
+    // 原因: 请求层已提示失败原因，此处保留当前列表供重试
   } finally {
     payingId.value = null
   }

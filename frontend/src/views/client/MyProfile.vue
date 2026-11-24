@@ -8,10 +8,6 @@ import { toDate } from '@/utils/format'
 import ChangePasswordForm from '@/components/ChangePasswordForm.vue'
 import ImageUpload from '@/components/ImageUpload.vue'
 
-/**
- * 账号设置。资料修改与改密分开两张表单——
- * 改密要校验原密码，混在一起容易误提交。
- */
 const store = useUserStore()
 const saving = ref(false)
 
@@ -26,11 +22,13 @@ const rules = {
 }
 const ref0 = ref(null)
 
+const PROFILE_FIELDS = ['avatar', 'phone', 'email', 'city', 'address']
+
 function fill(u) {
-  Object.assign(form, {
-    nickname: u?.nickname || u?.name || '', avatar: u?.avatar || '', phone: u?.phone || '',
-    email: u?.email || '', gender: u?.gender ?? 0, city: u?.city || '', address: u?.address || ''
-  })
+  const data = u || {}
+  const patch = { nickname: data.nickname || data.name || '', gender: data.gender ?? 0 }
+  for (const key of PROFILE_FIELDS) patch[key] = data[key] || ''
+  Object.assign(form, patch)
 }
 
 async function save() {

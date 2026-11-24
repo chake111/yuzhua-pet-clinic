@@ -2,13 +2,6 @@
 import { computed } from 'vue'
 import { resolveDeptIcon } from '@/utils/deptIcons'
 
-/**
- * 科室图标。name 吃 deptIcons.js 里的键名，也兼容旧数据里的 emoji 和图片 URL。
- *
- * 图标是插画式的：实心色块 + 同色深一档描边 + 小面积高光，颜色已经写好在线稿里，
- * 不跟随 currentColor。高对比模式下系统会强制用自己的调色板，彩色会全部失效，
- * 所以这里显式降级成单色描边，保证图形仍然可读。
- */
 const props = defineProps({
   name: { type: String, default: '' },
   size: { type: [Number, String], default: 32 }

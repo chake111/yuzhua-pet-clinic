@@ -11,7 +11,6 @@ import ImageGallery from '@/components/ImageGallery.vue'
 import StatusChip from '@/components/StatusChip.vue'
 import LoadFailure from '@/components/LoadFailure.vue'
 
-/** 后台预约单详情。管理员只读查看（R4：不出现接诊/结束/写病历入口），医生在这里完成临床动作。 */
 const route = useRoute()
 const router = useRouter()
 const store = useAdminStore()
@@ -20,7 +19,7 @@ const row = ref(null)
 const record = ref(null)
 const loading = ref(true)
 const failed = ref(false)
-// 允许从评价管理等列表页跳进来，返回时回到来源页而不是固定回预约列表。
+// 原因: 允许从评价管理页跳转进入，返回时优先回到来源页而非固定跳回预约列表
 const returnTo = computed(() => typeof route.query.returnTo === 'string' && /^\/admin\/(?:appointments|reviews)(?:\?|$)/.test(route.query.returnTo) ? route.query.returnTo : '/admin/appointments')
 const backLabel = computed(() => returnTo.value.startsWith('/admin/reviews') ? '返回评价管理' : '返回预约列表')
 

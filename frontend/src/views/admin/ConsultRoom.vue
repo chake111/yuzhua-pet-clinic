@@ -9,10 +9,6 @@ import { maskPhone } from '@/utils/format'
 import ConsultPanel from '@/components/ConsultPanel.vue'
 import ImageGallery from '@/components/ImageGallery.vue'
 
-/**
- * 医生侧聊天室。详情接口校验接诊医生身份。接诊/结束也在这里，
- * 结束时可写一段问诊小结（线上只建议、确诊要面诊）。
- */
 const route = useRoute()
 const router = useRouter()
 const id = Number(route.params.id)
@@ -33,7 +29,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeLayout)
   window.visualViewport?.removeEventListener('resize', resizeLayout)
 })
-/** 接诊/结束这类动作后让面板重挂一次，把系统消息重新从库里拉回来 */
+// 原因: 接诊/结束动作后递增 key 强制面板重挂，从库中拉取最新系统消息
 const panelKey = ref(0)
 
 const closed = computed(() => session.value?.status === 2)

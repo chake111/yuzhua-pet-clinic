@@ -5,20 +5,11 @@ import { Close, Loading, PictureFilled, Plus } from '@element-plus/icons-vue'
 import { upload } from '@/api/http'
 import { openImageViewer } from '@/utils/imageViewer'
 
-/**
- * 图片上传，v-model 绑定的是后端约定的「逗号分隔 URL」字符串，
- * 页面里不用再做 join/split。
- */
 const props = defineProps({
   modelValue: { type: String, default: '' },
   max: { type: Number, default: 6 },
   label: { type: String, default: '已上传的图片' },
-  /**
-   * 后台页面必须传 'admin'：/common/upload 不在 /admin 前缀下。
-   *
-   * 契约动机: 显式身份用来选对令牌——该接口两种有效登录令牌都收，http.js 靠 URL 前缀猜身份的
-   * 逻辑在这里失效，只能由调用方声明 kind，避免误用用户端身份；用户端令牌缺失或失效时还会导致上传失败。
-   */
+  // 原因: /common/upload 不在 /admin 前缀下且同时接受双端 token，后台必须显式传入 'admin'
   kind: { type: String, default: 'client' }
 })
 const emit = defineEmits(['update:modelValue'])
@@ -44,13 +35,12 @@ async function change(e) {
       write([...urls.value, url])
     }
   } catch {
-    // 请求层已提示失败原因；此前成功的图片已逐张写入表单。
+    // 原因: 请求层已提示失败原因，此处仅中止后续上传并保留已写入表单的图片
   } finally {
     busy.value = false
   }
 }
 
-/** 点缩略图放大核对；删图按钮是它的兄弟节点，两个动作不冲突 */
 const preview = (url) => openImageViewer(urls.value, urls.value.indexOf(url), { title: props.label })
 
 const remove = (url) => write(urls.value.filter((u) => u !== url))

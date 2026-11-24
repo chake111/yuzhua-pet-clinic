@@ -1,14 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
-/**
- * 首屏关键路径（/、/login、/admin/login）专用轻量内联 SVG 图标。
- *
- * 为什么不直接从 @element-plus/icons-vue 导入：
- * 该包的 dist/index.mjs 是单文件桶模块，一旦入口 chunk 导入其中任意一个图标，
- * Rollup 按模块粒度分包时会把全站所有被引用到的图标（44 KB raw）一并划入入口 chunk。
- * 首屏只用这 11 个固定路径，直接内联可使首屏彻底脱离 @element-plus/icons-vue。
- */
+// 原因: @element-plus/icons-vue 为单文件桶模块，首屏内联 11 个固定路径以避免全站图标打入入口 chunk
 const ICON_PATHS = {
   HomeFilled: [
     'M512 128 128 447.936V896h255.936V640H640v256h255.936V447.936z'

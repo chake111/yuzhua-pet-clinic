@@ -1,17 +1,8 @@
 /**
- * HTTP 失败的决策函数：只回答"该提示什么、该重新登录、还是什么都不做"。
+ * HTTP 失败的决策函数：决定提示错误、强制重登或静默忽略。
  *
- * 刻意不依赖 Vue、Element Plus 或浏览器全局对象，便于直接跑单元测试。
- * 业务 401 无论请求是否静默，都必须清理登录态并跳转——静默只抑制消息提示，
- * 不能把已失效的会话留在页面上继续轮询。
- *
- * @param {object} input
- * @param {boolean} input.business true=应用业务响应（body.code），false=HTTP/网络层错误
- * @param {number} [input.code] 业务码
- * @param {string} [input.msg] 业务提示
- * @param {boolean} [input.timeout] 是否超时
- * @param {boolean} [input.silent] 是否静默（如未读轮询）
- * @returns {{type: 'reauth'}|{type: 'silent'}|{type: 'notify', message: string}}
+ * 业务 401 无视 silent 必须返回 reauth 清空登录态并跳转，防止失效会话继续后台轮询；
+ * 非 401 且 silent=true 返回 silent，其余按业务错误或网络/超时返回 notify。
  */
 export function httpFailureAction({ business, code, msg, timeout = false, silent = false }) {
   if (business && code === 401) {

@@ -5,10 +5,6 @@ import { changePassword } from '@/api/admin'
 import { useAdminStore } from '@/stores/admin'
 import ChangePasswordForm from '@/components/ChangePasswordForm.vue'
 
-/**
- * 后台账号页。管理员和医生的账号由运维在数据库里建（sql/02_data.sql 种子），
- * 系统里没有后台账号的注册与资料编辑入口，所以这一页只读 + 改密。
- */
 const store = useAdminStore()
 const router = useRouter()
 const me = ref(null)

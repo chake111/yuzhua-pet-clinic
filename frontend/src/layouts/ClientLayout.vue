@@ -7,10 +7,6 @@ import EntryIcon from '@/components/EntryIcon.vue'
 import { consultUnread } from '@/api/user'
 import { useUserStore } from '@/stores/client'
 
-/**
- * 用户端外壳。整体是一个居中的窄栏（.pc-narrow），底部四个 tab——
- * 预约场景绝大多数在手机上来完成，宽屏上也保持 760px 读得更舒服。
- */
 const store = useUserStore()
 const route = useRoute()
 const router = useRouter()
@@ -30,7 +26,6 @@ const tabs = [
 
 watch(() => store.user?.avatar, () => { avatarError.value = false })
 
-// 从已完成的路由确定位置，兼容返回、深链接和登录重定向。
 const activeTab = computed(() => {
   const path = route.path
   if (path === '/' || /^\/notices?(\/|$)/.test(path)) return 0
@@ -48,7 +43,7 @@ async function pollUnread() {
   try {
     unread.value = (await consultUnread()) || 0
   } catch {
-    // 会话过期由 axios 拦截器统一处理，这里不打扰用户
+    // 原因: 401 重登由 http 请求层统一处理，轮询角标忽略异常避免打扰用户
   }
 }
 
@@ -63,7 +58,7 @@ watch(() => store.logged, (on) => {
   loop(on)
 }, { immediate: true })
 
-// 聊天页读过的消息要立刻反映到角标上，返回外壳时主动刷一次
+// 原因: 聊天页已读状态变更需立刻同步到底栏未读角标
 watch(() => route.path, (p) => {
   menuOpen.value = false
   if (p.startsWith('/consult') || p.startsWith('/me')) pollUnread()

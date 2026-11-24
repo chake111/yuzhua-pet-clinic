@@ -7,10 +7,6 @@ import { appointmentDetail, submitReview } from '@/api/user'
 import { toDate } from '@/utils/format'
 import ImageUpload from '@/components/ImageUpload.vue'
 
-/**
- * 就诊评价。一张单只能评一次，后端用 is_reviewed 兜底，
- * 页面这里只做重复提交的即时反馈。
- */
 const route = useRoute()
 const router = useRouter()
 const orderId = Number(route.params.orderId)
@@ -46,7 +42,7 @@ async function submit() {
     ElMessage.success('评价已提交')
     router.replace(`/order/${orderId}`)
   } catch {
-    // 提交失败保留评价内容与评分。
+    // 原因: 请求层已提示失败原因，此处保留评价内容与评分供重试
   } finally {
     busy.value = false
   }

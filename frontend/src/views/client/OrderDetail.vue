@@ -12,12 +12,6 @@ import {
 import { APPT_STATUS, CONSULT_TYPE, PERIOD, tagType, text } from '@/utils/dict'
 import { canPay, money, toDate, toDateTime } from '@/utils/format'
 
-/**
- * 预约详情。按"什么时候发生什么"排成一条行程轴：
- * 首屏是日期、时段、当前状态与排队号，下面用细线分节核对医生、宠物、病情和费用。
- * 状态机有支付这一条正交轴（未支付 / 已支付 / 已退款），
- * 行程轴与底部操作都按两条轴的组合取值，不能只看 status。
- */
 const route = useRoute()
 const router = useRouter()
 const id = Number(route.params.id)
@@ -40,8 +34,6 @@ const statusText = computed(() => {
   if (needPay.value) return overdue.value ? '支付已超时' : '待支付'
   return text(APPT_STATUS, order.value?.status)
 })
-/* 支付超时、取消、未到诊都是"这张单子的结论"，都从首屏主角的位置说话；
-   这条 computed 依赖 cancelByLabel，所以放在它后面 */
 const verdict = computed(() => {
   if (overdue.value) return { text: '支付已超时', tone: 'danger', note: '已过支付时限' }
   if (order.value?.status === 3) return { text: '已取消', tone: 'terminated', note: cancelByLabel.value }
@@ -49,7 +41,7 @@ const verdict = computed(() => {
   return null
 })
 const statusTone = computed(() => {
-  // 超时是失败态的过渡：仍停在待接诊，但已经不能再支付，用危险色而不是待办橙
+  // 原因: 支付超时仍停在待接诊态但已不可支付，需用 danger 色区别于正常待办
   if (needPay.value) return overdue.value ? 'danger' : 'warning'
   return tagType(APPT_STATUS, order.value?.status)
 })
@@ -66,7 +58,6 @@ const slotRange = computed(() => {
   return s && e ? `${s}–${e}` : ''
 })
 
-/* 首屏大日期不用完整时间串：年单独一行，月和日放开，周几跟在后面 */
 const dateParts = computed(() => {
   const raw = toDate(order.value?.appointmentDate)
   if (!raw) return { year: '', md: '—', week: '' }
@@ -76,7 +67,6 @@ const dateParts = computed(() => {
   return { year: y, md: `${m}.${d}`, week }
 })
 
-/* 支付倒计时只在待支付时计算；deadline 早于当前时间或缺失都按不可支付处理 */
 const leftSeconds = computed(() => {
   if (!needPay.value || !order.value?.payDeadline) return 0
   const end = new Date(String(order.value.payDeadline).replace(' ', 'T')).getTime()
@@ -89,21 +79,16 @@ const countdown = computed(() => {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 })
 
-/**
- * 行程轴。正常单子固定四段（支付 → 待接诊 → 就诊中 → 已完成），
- * 取消与未到诊是终态，只保留实际发生过的节点，避免把"已完成"画成一个还能到达的未来。
- */
 const rail = computed(() => {
   const o = order.value
   if (!o) return []
-  /* 超时未支付只发生过"下单"和"超时"，后面三段不会再到达 */
+  // 原因: 终态仅保留已发生节点，防止将已超时/已取消订单渲染出不可达的后续步骤
   if (overdue.value) {
     return [
       { label: '已下单', state: 'done' },
       { label: '支付超时', state: 'bad' }
     ]
   }
-  /* 取消单先说取消，再说退款：退款是取消的结果，不能排在取消之前 */
   if (o.status === 3 || o.status === 4) {
     const first = o.payStatus === 1 || o.payStatus === 2
       ? { label: '已支付', state: 'done' }
@@ -146,32 +131,34 @@ const cancelByLabel = computed(() => {
   return '预约已取消'
 })
 
-/* 一段说明只承担一件事：待支付的倒计时、取消或未到诊的原因、到院提醒 */
+function paymentNotice(o) {
+  if (missingDeadline.value) {
+    return { tone: 'warning', lead: '暂时无法支付', body: '没有获取到支付截止时间，请稍后刷新重试。' }
+  }
+  if (overdue.value) {
+    return { tone: 'danger', body: '系统正在取消这笔预约并退回号源，本页会自动刷新为最新状态。' }
+  }
+  return {
+    tone: 'warning',
+    lead: `请在 ${toDateTime(o.payDeadline)} 前完成支付`,
+    body: '超时后系统会自动取消预约并退回号源。'
+  }
+}
+
+function cancelNotice(o) {
+  const parts = []
+  if (o.cancelTime) parts.push(`取消于 ${toDateTime(o.cancelTime)}。`)
+  if (o.payStatus === 2) parts.push(`已支付的 ${money(o.amount)} 已原路退回。`)
+  if (o.cancelReason) parts.push(`原因：${o.cancelReason}`)
+  return { tone: 'terminated', body: parts.join('') }
+}
+
 const notice = computed(() => {
   const o = order.value
   if (!o) return null
-  if (needPay.value) {
-    if (missingDeadline.value) {
-      return { tone: 'warning', lead: '暂时无法支付', body: '没有获取到支付截止时间，请稍后刷新重试。' }
-    }
-    if (overdue.value) {
-      return {
-        tone: 'danger',
-        body: '系统正在取消这笔预约并退回号源，本页会自动刷新为最新状态。'
-      }
-    }
-    return {
-      tone: 'warning',
-      lead: `请在 ${toDateTime(o.payDeadline)} 前完成支付`,
-      body: '超时后系统会自动取消预约并退回号源。'
-    }
-  }
+  if (needPay.value) return paymentNotice(o)
   if (o.status === 0) {
-    return {
-      tone: 'quiet',
-      body: '到院后请按排队号就诊。',
-      action: { label: '改期或取消', run: cancel }
-    }
+    return { tone: 'quiet', body: '到院后请按排队号就诊。', action: { label: '改期或取消', run: cancel } }
   }
   if (o.status === 1) {
     return {
@@ -181,24 +168,11 @@ const notice = computed(() => {
     }
   }
   if (o.status === 2 && o.isReviewed !== 1) {
-    return {
-      tone: 'quiet',
-      lead: '本次就诊已完成',
-      body: '给这次就诊写个评价，帮助其他宠物主人了解这位医生。'
-    }
+    return { tone: 'quiet', lead: '本次就诊已完成', body: '给这次就诊写个评价，帮助其他宠物主人了解这位医生。' }
   }
-  if (o.status === 3) {
-    const parts = []
-    if (o.cancelTime) parts.push(`取消于 ${toDateTime(o.cancelTime)}。`)
-    if (o.payStatus === 2) parts.push(`已支付的 ${money(o.amount)} 已原路退回。`)
-    if (o.cancelReason) parts.push(`原因：${o.cancelReason}`)
-    return { tone: 'terminated', body: parts.join('') }
-  }
+  if (o.status === 3) return cancelNotice(o)
   if (o.status === 4) {
-    return {
-      tone: 'terminated',
-      body: '系统没有记录到诊。需要继续就诊时，可以重新预约。'
-    }
+    return { tone: 'terminated', body: '系统没有记录到诊。需要继续就诊时，可以重新预约。' }
   }
   return null
 })
@@ -226,10 +200,10 @@ const ops = computed(() => {
       })
     }
   } else if (o.status === 1) {
-    // 就诊中的主动作已经放在状态说明里，不再在页尾重复一次
+    // 原因: 就诊中的进入就诊室动作已放在上方 notice 说明条内，页尾不重复展示
     if (o.recordId) list.push({ label: '查看病历', kind: 'secondary', run: () => go(`/record/${o.recordId}`) })
   } else if (o.status === 2) {
-    // 病历卡已经把诊断和入口摆在页面上，这里不重复"查看病历"
+    // 原因: 病历卡片已提供查看病历入口，页尾动作区仅保留主操作评价/再次预约
     if (o.isReviewed !== 1) {
       list.push({ label: '评价本次就诊', kind: 'primary', run: () => go(`/review/${o.id}`) })
     } else {
@@ -246,7 +220,7 @@ async function load() {
   failed.value = false
   try {
     order.value = await appointmentDetail(id)
-    // 医生没写病历时接口 data 为空，按「无病历」渲染
+    // 原因: 医生尚未写病历时接口返回空 data，降级为 null 渲染空病历状态
     record.value = (await appointmentRecord(id).catch(() => null)) || null
   } catch {
     failed.value = true
@@ -263,7 +237,7 @@ async function pay() {
     ElMessage.success('支付成功，预约已生效')
     await load()
   } catch {
-    // 请求层已提示失败，保留当前订单供重试。
+    // 原因: 请求层已提示失败原因，此处保留当前订单状态供重试
   } finally {
     action.value = ''
   }
@@ -287,7 +261,7 @@ async function cancel() {
     ElMessage.success('预约已取消，号源已退回')
     await load()
   } catch {
-    // 请求失败保留当前预约和操作入口。
+    // 原因: 请求层已提示失败原因，此处保留当前预约状态与操作入口
   } finally {
     action.value = ''
   }

@@ -7,10 +7,6 @@ import { Search } from '@element-plus/icons-vue'
 import { departments, doctors } from '@/api/user'
 import DoctorCard from '@/components/DoctorCard.vue'
 
-/**
- * 找医生：科室 + 关键词 + 排序三个筛选条件，任一变化都回到第一页。
- * 未登录也能浏览（需求 G3），点进详情选号时才要登录。
- */
 const route = useRoute()
 const router = useRouter()
 const list = ref([])
@@ -48,7 +44,6 @@ function reset() {
 }
 
 function patchUrl() {
-  // 把筛选写进地址栏，刷新和分享都还能回到同一屏
   return router.replace({
     query: { keyword: q.keyword || undefined, departmentId: q.departmentId || undefined, sort: q.sort || undefined, page: q.pageNum > 1 ? q.pageNum : undefined }
   })

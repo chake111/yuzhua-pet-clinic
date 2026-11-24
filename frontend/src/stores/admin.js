@@ -5,10 +5,6 @@ import { createSession } from '@/stores/session'
 
 const USER_KEY = 'yuzhua_admin_user'
 
-/**
- * 后台登录态。医生和管理员同属一套账号体系，共用这里的 token，
- * 但菜单与页面要分开：isDoctor 决定是否走接诊工作台，isAdmin 才给全量管理项。
- */
 export const useAdminStore = defineStore('admin', () => {
   const { token, user, apply, refresh, logout } = createSession({
     kind: 'admin', userKey: USER_KEY, fetchProfile: adminProfile

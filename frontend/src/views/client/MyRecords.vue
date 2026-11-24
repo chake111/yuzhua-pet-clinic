@@ -6,7 +6,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { recordPage } from '@/api/user'
 import { toDate } from '@/utils/format'
 
-/** 我的病历：按就诊日期倒序，点行进病历详情。 */
 const router = useRouter()
 const route = useRoute()
 const rows = ref([])

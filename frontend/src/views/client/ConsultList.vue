@@ -9,7 +9,6 @@ import { SESSION_STATUS, tagType, text } from '@/utils/dict'
 import { since } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 
-/** 我的图文问诊。免费咨询，在医生主页点「图文问诊」直接建会话，不经过订单。 */
 const router = useRouter()
 const rows = ref([])
 const failed = ref(false)

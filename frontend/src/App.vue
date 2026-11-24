@@ -7,6 +7,6 @@ const ImageViewerHost = defineAsyncComponent(() => import('@/components/ImageVie
 
 <template>
   <router-view />
-  <!-- 图片查看器挂在路由之外并按需异步加载：不占首屏包，切页面也不会把正在看的图关掉 -->
+  <!-- 原因: 图片查看器挂在路由外并异步按需加载，避免占首屏包且切页时不中断预览 -->
   <ImageViewerHost v-if="imageViewer.open" />
 </template>

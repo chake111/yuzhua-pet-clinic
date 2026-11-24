@@ -9,7 +9,7 @@ import router from './router'
 const PRELOAD_RELOAD_KEY = 'yuzhua_preload_reload_at'
 const PRELOAD_RELOAD_WINDOW_MS = 30_000
 
-// 滚动发版后旧页触发懒加载 chunk 404 时执行受 30 秒防循环保护的单次刷新自愈
+// 原因: 滚动发版后旧页触发懒加载 chunk 404 时执行受 30 秒防循环保护的单次刷新自愈
 window.addEventListener('vite:preloadError', (event) => {
   try {
     const now = Date.now()
@@ -20,7 +20,7 @@ window.addEventListener('vite:preloadError', (event) => {
       window.location.reload()
     }
   } catch {
-    // 隐私模式或受限存储环境无法持久化防循环标记，放行错误避免无限刷新
+    // 原因: 隐私模式或受限存储环境无法持久化防循环标记，放行错误避免无限刷新
   }
 })
 
