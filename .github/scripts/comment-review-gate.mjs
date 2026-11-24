@@ -1162,9 +1162,11 @@ function collectRepoRetainedComments(repoDir) {
     let comments = []
     if (abs.endsWith('.vue')) {
       const sfc = splitVueSfc(raw)
-      for (const blk of sfc.scripts) comments.push(...scanCodeLexical(blk.text, blk.startLine).comments)
+      for (const blk of sfc.scripts) {
+        comments.push(...scanCodeLexical(blk.text, blk.startLine, { allowRegex: true }).comments)
+      }
     } else {
-      comments = scanCodeLexical(raw, 1).comments
+      comments = scanCodeLexical(raw, 1, { allowRegex: !abs.endsWith('.java') }).comments
     }
     for (const c of comments) {
       const from = Math.max(1, c.startLine - 4)

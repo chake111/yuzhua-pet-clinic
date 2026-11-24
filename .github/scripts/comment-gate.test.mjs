@@ -681,6 +681,27 @@ test('Vue SFC full-template splitter & lexical scanner ignore string literals', 
   )
   assert.equal(sfc.templates.length, 1)
   assert.ok(sfc.templates[0].text.includes('后置注释'))
-  const scan = scanCodeLexical(sfc.scripts[0].text, sfc.scripts[0].startLine)
+  const scan = scanCodeLexical(sfc.scripts[0].text, sfc.scripts[0].startLine, { allowRegex: true })
   assert.equal(scan.comments.length, 0)
+})
+
+test('scanCodeLexical handles JS RegExp literals with \\/ without false comment detection', () => {
+  const jsCode = [
+    "const isImage = computed(() => /^(https?:)?\\/|^\\/|^data:image\\//.test(props.name || ''))",
+    "const routes = [",
+    "  { re: /^\\/admin\\/workbench\\//, label: 'wb' },",
+    "  { re: /^\\/admin\\/record\\//, label: 'rec' },",
+    "  { re: /[a/b]\\//i, label: 'cls' }",
+    "]",
+    "const ratio = a / b // trailing comment",
+    "return /\\//.test(s)",
+  ].join('\n')
+
+  const res = scanCodeLexical(jsCode, 1, { allowRegex: true })
+  assert.equal(res.comments.length, 1)
+  assert.equal(res.comments[0].kind, 'trailing_line')
+  assert.equal(res.comments[0].startLine, 7)
+
+  const javaRes = scanCodeLexical('double x = a / b;\ndouble y = c / d;', 1, { allowRegex: false })
+  assert.equal(javaRes.comments.length, 0)
 })

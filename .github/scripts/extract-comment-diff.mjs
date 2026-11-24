@@ -88,18 +88,19 @@ function scanTemplateHtmlComments(text, baseLine) {
 }
 
 function extractFileComments(relPath, content) {
+  const allowRegex = !relPath.endsWith('.java')
   if (relPath.endsWith('.vue')) {
     const sfc = splitVueSfc(content)
     const comments = []
     for (const blk of sfc.scripts) {
-      comments.push(...scanCodeLexical(blk.text, blk.startLine).comments)
+      comments.push(...scanCodeLexical(blk.text, blk.startLine, { allowRegex: true }).comments)
     }
     for (const tpl of sfc.templates) {
       comments.push(...scanTemplateHtmlComments(tpl.text, tpl.startLine))
     }
     return comments.sort((a, b) => a.startLine - b.startLine)
   }
-  return scanCodeLexical(content, 1).comments
+  return scanCodeLexical(content, 1, { allowRegex }).comments
 }
 
 /**
