@@ -8,7 +8,7 @@
     "endLine": 123,
     "kind": "whole_line",
     "commentText": "// 原因: 必须用 READ_COMMITTED，排班锁串行化后事务内要读到前一个请求刚提交的同键预约",
-    "codeContext": "L121: TransactionTemplate tx = new TransactionTemplate(txManager);\nL122: // 原因: 必须用 READ_COMMITTED，排班锁串行化后事务内要读到前一个请求刚提交的同键预约\nL123: tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);\nL124: return tx.execute(status -> doCreate(req, key, userId));"
+    "codeContext": "L121: TransactionTemplate tx = new TransactionTemplate(txManager);\nL122: // 原因: 必须用 READ_COMMITTED，排班锁串行化后事务内要读到前一个请求刚提交的同键预约\nL123: tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);\nL124: return tx.execute(status -> doCreate(req, key, userId));\nL156: private AppointmentVo doCreate(AppointmentForm req, String key, Long userId) {\nL161:     DoctorSchedule schedule = scheduleMapper.selectByIdForUpdate(req.getScheduleId());\nL162:     Appointment existing = key == null ? null : baseMapper.selectByUserAndIdemKey(userId, key);\nL163:     if (existing != null) return replayOf(existing, req);\nL164: }"
   },
   {
     "id": "GD-02",
@@ -19,7 +19,7 @@
     "endLine": 131,
     "kind": "whole_line",
     "commentText": "// 原因: 须在 TransactionTemplate 事务回滚退号后再回读，否则会读到未提交状态或自调用绕过代理",
-    "codeContext": "L127: } catch (DuplicateKeyException e) {\nL128:     if (key == null) throw e;\nL131:     // 原因: 须在 TransactionTemplate 事务回滚退号后再回读，否则会读到未提交状态或自调用绕过代理\nL132:     Appointment existing = readIdemRowWithRetry(userId, key);\nL133:     if (existing == null) throw e;\nL134:     return replayOf(existing, req);\nL135: }"
+    "codeContext": "L125: try {\nL126:     return tx.execute(status -> doCreate(req, key, userId));\nL127: } catch (DuplicateKeyException e) {\nL128:     if (key == null) throw e;\nL131:     // 原因: 须在 TransactionTemplate 事务回滚退号后再回读，否则会读到未提交状态或自调用绕过代理\nL132:     Appointment existing = readIdemRowWithRetry(userId, key);\nL133:     if (existing == null) throw e;\nL134:     return replayOf(existing, req);\nL135: }"
   },
   {
     "id": "GD-03",
@@ -29,8 +29,8 @@
     "startLine": 66,
     "endLine": 67,
     "kind": "whole_line",
-    "commentText": "// 原因: 毫秒时间戳后再补 8 位随机数，防止 100 并发抢号撞 uk_order_no 误触发幂等回读",
-    "codeContext": "L66: // 原因: 毫秒时间戳后再补 8 位随机数，防止 100 并发抢号撞 uk_order_no 误触发幂等回读\nL67: private static final DateTimeFormatter NO_STAMP = DateTimeFormatter.ofPattern(\"yyyyMMddHHmmssSSS\");\nL68: private String nextOrderNo() {\nL69:     int rand = ThreadLocalRandom.current().nextInt(100_000_000);\nL70:     return \"PC\" + LocalDateTime.now().format(NO_STAMP) + String.format(\"%08d\", rand);\nL71: }"
+    "commentText": "// 原因: 毫秒时间戳后再补 8 位随机数，降低同毫秒并发撞 uk_order_no 的概率（最终由唯一索引兜底）",
+    "codeContext": "L66: // 原因: 毫秒时间戳后再补 8 位随机数，降低同毫秒并发撞 uk_order_no 的概率（最终由唯一索引兜底）\nL67: private static final DateTimeFormatter NO_STAMP = DateTimeFormatter.ofPattern(\"yyyyMMddHHmmssSSS\");\nL68: private String nextOrderNo() {\nL69:     int rand = ThreadLocalRandom.current().nextInt(100_000_000);\nL70:     return \"PC\" + LocalDateTime.now().format(NO_STAMP) + String.format(\"%08d\", rand);\nL71: }"
   },
   {
     "id": "GD-04",
@@ -194,8 +194,8 @@
     "startLine": 105,
     "endLine": 106,
     "kind": "whole_line",
-    "commentText": "// 原因: 用 location.replace 整页跳转登录页，顺手清空内存 Pinia 登录态避免残留",
-    "codeContext": "L104: const target = kind === 'admin' ? '/admin/login' : '/login'\nL105: if (location.pathname !== target) {\nL106:   // 原因: 用 location.replace 整页跳转登录页，顺手清空内存 Pinia 登录态避免残留\nL107:   location.replace(`${target}?redirect=${encodeURIComponent(location.pathname + location.search)}`)\nL108: }"
+    "commentText": "// 原因: 仅在当前不在登录页时用 location.replace 整页跳转（防死循环），重载页面清掉内存态且不留历史记录",
+    "codeContext": "L104: const target = kind === 'admin' ? '/admin/login' : '/login'\nL105: if (location.pathname !== target) {\nL106:   // 原因: 仅在当前不在登录页时用 location.replace 整页跳转（防死循环），重载页面清掉内存态且不留历史记录\nL107:   location.replace(`${target}?redirect=${encodeURIComponent(location.pathname + location.search)}`)\nL108: }"
   },
   {
     "id": "GD-19",
