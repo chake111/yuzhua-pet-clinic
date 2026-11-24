@@ -145,11 +145,29 @@ export function splitVueSfc(source) {
   return { scripts, templates }
 }
 
+const REGEX_PRECEDING_KEYWORDS = new Set([
+  'return',
+  'throw',
+  'case',
+  'delete',
+  'void',
+  'typeof',
+  'in',
+  'instanceof',
+  'new',
+  'of',
+  'await',
+  'yield',
+  'else',
+  'do',
+])
+
 /**
  * Lexical scanner for Java/JS/TS code that accurately separates string literals,
- * line comments (whole-line vs trailing), non-doc block comments, and doc blocks.
+ * JS/TS RegExp literals (when allowRegex=true), line comments (whole-line vs trailing),
+ * non-doc block comments, and doc blocks.
  */
-export function scanCodeLexical(text, baseLine = 1) {
+export function scanCodeLexical(text, baseLine = 1, { allowRegex = false } = {}) {
   let i = 0
   let line = baseLine
   const lineHasCode = new Set()
@@ -160,7 +178,10 @@ export function scanCodeLexical(text, baseLine = 1) {
   let inDouble = false
   let inBacktick = false
   let inTextBlock = false
+  let inRegex = false
+  let inRegexClass = false
   let lineContentBeforeComment = false
+  let canStartRegex = true
 
   const linesArr = text.split(/\r?\n/)
   const getIndent = (ln) => {
@@ -177,6 +198,7 @@ export function scanCodeLexical(text, baseLine = 1) {
       lineHasCode.add(line)
       if (c === '"' && n === '"' && text[i + 2] === '"') {
         inTextBlock = false
+        canStartRegex = false
         i += 3
         continue
       }
@@ -194,7 +216,10 @@ export function scanCodeLexical(text, baseLine = 1) {
         i += 2
         continue
       }
-      if (c === "'") inSingle = false
+      if (c === "'") {
+        inSingle = false
+        canStartRegex = false
+      }
       if (c === '\n') {
         line++
         inSingle = false
@@ -210,7 +235,10 @@ export function scanCodeLexical(text, baseLine = 1) {
         i += 2
         continue
       }
-      if (c === '"') inDouble = false
+      if (c === '"') {
+        inDouble = false
+        canStartRegex = false
+      }
       if (c === '\n') {
         line++
         inDouble = false
@@ -226,9 +254,49 @@ export function scanCodeLexical(text, baseLine = 1) {
         i += 2
         continue
       }
-      if (c === '`') inBacktick = false
+      if (c === '`') {
+        inBacktick = false
+        canStartRegex = false
+      }
       if (c === '\n') {
         line++
+      }
+      i++
+      continue
+    }
+
+    if (inRegex) {
+      lineHasCode.add(line)
+      if (c === '\\') {
+        i += n && n !== '\n' ? 2 : 1
+        continue
+      }
+      if (c === '[') {
+        inRegexClass = true
+        i++
+        continue
+      }
+      if (c === ']') {
+        inRegexClass = false
+        i++
+        continue
+      }
+      if (c === '/' && !inRegexClass) {
+        inRegex = false
+        inRegexClass = false
+        i++
+        while (i < text.length && /[a-zA-Z]/.test(text[i])) i++
+        canStartRegex = false
+        lineContentBeforeComment = true
+        continue
+      }
+      if (c === '\n') {
+        inRegex = false
+        inRegexClass = false
+        line++
+        lineContentBeforeComment = false
+        i++
+        continue
       }
       i++
       continue
@@ -295,6 +363,15 @@ export function scanCodeLexical(text, baseLine = 1) {
       continue
     }
 
+    if (allowRegex && c === '/' && canStartRegex) {
+      inRegex = true
+      inRegexClass = false
+      lineHasCode.add(line)
+      lineContentBeforeComment = true
+      i++
+      continue
+    }
+
     lineHasCode.add(line)
     lineContentBeforeComment = true
     if (c === '"' && n === '"' && text[i + 2] === '"') {
@@ -302,9 +379,49 @@ export function scanCodeLexical(text, baseLine = 1) {
       i += 3
       continue
     }
-    if (c === "'") inSingle = true
-    else if (c === '"') inDouble = true
-    else if (c === '`') inBacktick = true
+    if (c === "'") {
+      inSingle = true
+      i++
+      continue
+    }
+    if (c === '"') {
+      inDouble = true
+      i++
+      continue
+    }
+    if (c === '`') {
+      inBacktick = true
+      i++
+      continue
+    }
+    if ((c === '+' && n === '+') || (c === '-' && n === '-')) {
+      canStartRegex = false
+      i += 2
+      continue
+    }
+    if (c === '=' && n === '>') {
+      canStartRegex = true
+      i += 2
+      continue
+    }
+    if (/[A-Za-z_$]/.test(c)) {
+      const start = i
+      while (i < text.length && /[A-Za-z0-9_$]/.test(text[i])) i++
+      const word = text.slice(start, i)
+      canStartRegex = REGEX_PRECEDING_KEYWORDS.has(word)
+      continue
+    }
+    if (/[0-9]/.test(c)) {
+      canStartRegex = false
+      i++
+      continue
+    }
+    if (c === ')' || c === ']' || c === '}' || c === '.') {
+      canStartRegex = false
+      i++
+      continue
+    }
+    canStartRegex = true
     i++
   }
 
@@ -687,7 +804,7 @@ export function runAudit({ repoDir = '.', strict = false } = {}) {
     if (isVue) {
       const sfc = splitVueSfc(raw)
       for (const blk of sfc.scripts) {
-        const res = scanCodeLexical(blk.text, blk.startLine)
+        const res = scanCodeLexical(blk.text, blk.startLine, { allowRegex: true })
         mergedComments.push(...res.comments)
         totalCodeLines += res.codeLines
         totalCommentOnlyLines += res.commentOnlyLines
@@ -698,7 +815,7 @@ export function runAudit({ repoDir = '.', strict = false } = {}) {
       }
       scriptCombined = raw
     } else {
-      const res = scanCodeLexical(raw, 1)
+      const res = scanCodeLexical(raw, 1, { allowRegex: true })
       mergedComments = res.comments
       totalCodeLines = res.codeLines
       totalCommentOnlyLines = res.commentOnlyLines
