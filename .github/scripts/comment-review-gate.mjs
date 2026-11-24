@@ -50,8 +50,9 @@ const PRECHECK_PI_PATTERNS = [
   /\[SYSTEM\s*(?:PROMPT|OVERRIDE|INSTRUCTION)\]/i,
   /output\s+(?:only\s+)?\{\s*"prompt_injection_detected"\s*:\s*false/i,
   /(?:force|return|mark|set)\s+(?:verdict|status|result)\s*(?:=|:|as|to)?\s*"?PASS"?/i,
-  /(?:忽略|无视|覆盖)(?:以上|前面|所有|系统)(?:指令|规则|提示|准则)/,
-  /(?:直接|必须|一律)(?:放行|通过|输出\s*PASS|标为\s*PASS)/,
+  /(?:忽略|无视|覆盖)(?:以上|前面|所有|系统).*?(?:指令|规则|提示词?|准则)/,
+  /(?:直接|必须|一律)\s*(?:输出|标为|判为|返回)\s*PASS\b/i,
+  /(?:评审|门禁|审核|审查|PR|本注释|此修改|本次修改|verdict|findings).{0,24}(?:直接|必须|一律)(?:放行|通过)|(?:直接|必须|一律)(?:放行|通过).{0,16}(?:评审|门禁|审核|审查|PR|此修改|本修改|本注释)/i,
   /(?:print|leak|exfiltrate|echo)\s+.*?(?:LLM_GATE_KEY|GITHUB_TOKEN|process\.env|secrets\.)/i,
 ]
 
@@ -84,7 +85,7 @@ export function sanitizeOutputText(text) {
     .replace(/'/g, '&#39;')
 }
 
-export function buildBatches(items, { maxFiles = 8, maxItems = 40 } = {}) {
+export function buildBatches(items, { maxFiles = 8, maxItems = 15 } = {}) {
   const batches = []
   let current = []
   let currentFiles = new Set()
@@ -732,7 +733,7 @@ export async function runReviewGate({
   schemaFallbackCache = new Set(),
 }) {
   const precheckPIHits = detectPromptInjectionPrecheck(items)
-  const batches = buildBatches(items, { maxFiles: 8, maxItems: 40 })
+  const batches = buildBatches(items, { maxFiles: 8, maxItems: 15 })
 
   // Run each reviewer independently across all batches, keeping total concurrency <= 3
   const tasks = []
