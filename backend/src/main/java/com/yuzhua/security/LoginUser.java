@@ -14,37 +14,34 @@ import java.time.Instant;
 @AllArgsConstructor
 public class LoginUser {
 
-    /** 用户端（宠物主人） */
     public static final String TYP_CLIENT = "CLIENT";
-    /** 后台（管理员 / 医生） */
     public static final String TYP_ADMIN = "ADMIN";
 
     public static final String ROLE_ADMIN = "ADMIN";
     public static final String ROLE_DOCTOR = "DOCTOR";
     public static final String ROLE_USER = "USER";
 
-    /** sys_user.id 或 admin_user.id，两套体系各自独立编号，故必须配合 typ 使用 */
     private Long id;
     private String username;
     private String name;
     private String avatar;
     private String typ;
     private String role;
-    /** typ=ADMIN 且 role=DOCTOR 时指向 doctor.id，接诊工作台据此过滤数据 */
     private Long doctorId;
-    /** 签发时的账号令牌版本，与库中当前值比对，用于改密后撤销旧令牌 */
     private Integer tokenVersion;
-    /** 已验证令牌的到期时间，供长连接每帧校验。 */
     private Instant expiresAt;
 
+    /** 判定当前登录态是否为后台管理员角色（须同时满足 typ=ADMIN 与 role=ADMIN）。 */
     public boolean isAdmin() {
         return TYP_ADMIN.equals(typ) && ROLE_ADMIN.equals(role);
     }
 
+    /** 判定当前登录态是否为后台接诊医生角色（须同时满足 typ=ADMIN 与 role=DOCTOR）。 */
     public boolean isDoctor() {
         return TYP_ADMIN.equals(typ) && ROLE_DOCTOR.equals(role);
     }
 
+    /** 判定当前登录态是否属于用户端登录体系（typ=CLIENT）。 */
     public boolean isClient() {
         return TYP_CLIENT.equals(typ);
     }

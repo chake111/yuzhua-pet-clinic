@@ -36,18 +36,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * 病历/处方。一张预约对应一份病历，由接诊医生在问诊过程中或结束时填写。
- *
- * 写完仍可修订（复诊补充），但只能由签约医生本人改，
- * 而且状态白名单之外的单一律不能写病历——待接诊、已取消、未到诊都不行（R7），
- * 不然能给没来看过的宠物开处方。
- */
 @Service
 @RequiredArgsConstructor
 public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, MedicalRecord> {
 
-    // 同预约单号：并发首次保存会撞 uk_record_no，秒级精度不够
+    // 原因: 并发首次建档会撞 uk_record_no，秒级时间戳精度不足须到毫秒加随机
     private static final DateTimeFormatter NO_STAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
     private final AppointmentService appointmentService;
@@ -55,15 +48,12 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
     private final PetMapper petMapper;
     private final DepartmentMapper departmentMapper;
 
-    /** 医生开病历：没有就新增，有就修订 */
+    /** 先锁预约行再查改病历，仅接诊医生可写且仅允许已接诊/已完成状态（R7），防止并发双写或未到院开方。 */
     @Transactional
     public MedicalRecord saveOrUpdateForAppointment(Long appointmentId, MedicalRecordForm req) {
-        // 先锁预约行再判状态与归属：下面的"查有没有—没有就插"必须在这把锁之内，
-        // 否则两个并发首次保存会各自查空、各插一份（跟踪表 I09/M2）
+        // 原因: 查空后插入必须在预约行锁内串行化，避免并发首次保存写出同预约双份病历
         Appointment a = requireStaffAppointmentLocked(appointmentId);
-        // R7：状态判定用白名单而不是黑名单。待接诊（还没看）、已取消（没来看）、
-        // 未到诊（爽约）都不该有病历；黑名单写法漏一个状态就多开一个口子（跟踪表 I05/M1）。
-        // 结束就诊前不强制已有病历，所以已完成仍可事后补写。
+        // 原因: R7 状态用白名单仅放行已接诊与已完成，避免黑名单漏态导致未就诊开处方
         if (a.getStatus() != Appointment.ST_ACCEPTED && a.getStatus() != Appointment.ST_FINISHED) {
             throw new BizException("仅已接诊或已完成的预约可填写病历");
         }
@@ -108,7 +98,6 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         return r;
     }
 
-    /** 用户端我的病历：只出与自己宠物相关的 */
     public PageResult<MedicalRecordVo> pageMine(PageQuery q) {
         LambdaQueryWrapper<MedicalRecord> qw = Wrappers.<MedicalRecord>lambdaQuery()
                 .eq(MedicalRecord::getUserId, UserContext.requireId())
@@ -118,7 +107,6 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         return PageResult.of(page, fillNames(page.getRecords()));
     }
 
-    /** 后台 / 医生工作台的病历列表：医生账号只能翻到自己写的 */
     public PageResult<MedicalRecordVo> pageForStaff(RecordQuery q) {
         LoginUser u = UserContext.require();
         Long doctorId = u.isDoctor() ? UserContext.requireDoctorId() : q.getDoctorId();
@@ -135,11 +123,8 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         return PageResult.of(page, fillNames(page.getRecords()));
     }
 
-    /**
-     * 列表批量补名字。逐行 selectById 会打出 N+1，这里每类 id 去重后各查一次。
-     */
     private List<MedicalRecordVo> fillNames(List<MedicalRecord> rows) {
-        // 宠物展示信息走历史查询（含已删档案）：删档案不该让旧病历显示不出宠物
+        // 原因: 宠物档案逻辑删除后历史病历仍须展示宠物信息，故走历史查询而非普通 selectBatchIds
         Map<Long, PetDisplayVo> pets = BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
                 BatchLookup.ids(rows, MedicalRecord::getPetId), PetDisplayVo::getId);
         Map<Long, Doctor> doctors = BatchLookup.mapByIds(doctorMapper::selectBatchIds,
@@ -167,7 +152,6 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         }).toList();
     }
 
-    /** 详情：把宠物、医生、科室名字拼上，打印病历单时不再二次查询 */
     public MedicalRecordVo detail(Long id) {
         MedicalRecord r = require(id);
         LoginUser u = UserContext.require();
@@ -179,7 +163,7 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         }
         MedicalRecordVo vo = new MedicalRecordVo();
         BeanUtils.copyProperties(r, vo);
-        // 与列表同走历史查询入口（含已删档案），详情不再单独按普通查询取宠物
+        // 原因: 详情与列表同走含已删档案的历史查询口径，避免已删宠物档案无法展示
         PetDisplayVo pet = BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
                 BatchLookup.ids(List.of(r), MedicalRecord::getPetId), PetDisplayVo::getId).get(r.getPetId());
         if (pet != null) {
@@ -198,35 +182,27 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         return vo;
     }
 
-    /** 某张预约单上的病历，前端判断"要不要显示写病历按钮"；没有则返回 null */
     public MedicalRecord ofAppointment(Long appointmentId) {
         return getOne(Wrappers.<MedicalRecord>lambdaQuery()
                 .eq(MedicalRecord::getAppointmentId, appointmentId), false);
     }
 
-    /** 后台按预约单取病历 */
     public MedicalRecord ofAppointmentForStaff(Long appointmentId) {
         requireStaffAppointment(appointmentId);
         return ofAppointment(appointmentId);
     }
 
-    /** 用户端按自己的预约单取病历 */
     public MedicalRecord ofAppointmentForOwner(Long appointmentId) {
         appointmentService.requireMine(appointmentId);
         return ofAppointment(appointmentId);
     }
 
-    /** 预约单存在、且当前后台账号有权在其上读写病历 */
     private Appointment requireStaffAppointment(Long appointmentId) {
         Appointment a = appointmentService.requireExists(appointmentId);
         requireMayTouch(a);
         return a;
     }
 
-    /**
-     * 同上，但先锁住预约行：写入路径（新增/修订病历）必须用它，
-     * 并且比读路径多收敛一层——读病历管理员可以，写病历只放医生账号（R4）。
-     */
     private Appointment requireStaffAppointmentLocked(Long appointmentId) {
         Appointment a = appointmentService.lockForWrite(appointmentId);
         LoginUser u = UserContext.require();

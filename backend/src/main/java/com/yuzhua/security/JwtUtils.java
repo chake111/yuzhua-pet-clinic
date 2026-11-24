@@ -30,25 +30,15 @@ public class JwtUtils {
     private static final String CLAIM_NAME = "name";
     private static final String CLAIM_AVATAR = "avatar";
     private static final String CLAIM_DOCTOR_ID = "doctorId";
-    /** 账号令牌版本。改密后递增，旧令牌因版本落后被 AccountGuard 拒绝 */
     private static final String CLAIM_VER = "ver";
 
-    /**
-     * 曾经写死在仓库里的密钥。配置里再出现这些值，说明部署仍在用公开密钥——签名可被任意伪造，
-     * 比"没配"更危险，所以启动阶段直接失败而不是告警。
-     */
+    // 原因: 历史示例密钥已公开，配置命中时在启动自检阶段直接失败阻断启动
     private static final Set<String> RETIRED_DEFAULTS = Set.of(
             "pet-clinic-hs256-secret-please-change-in-production-2026",
             "pet-clinic-default-dev-secret-key-change-me");
 
     private final AppProperties props;
 
-    /**
-     * 启动自检：空、过短、历史默认值一律拒绝。
-     *
-     * <p>放在构造之后的第一个生命周期回调里，任何一次启动都会执行——包括集成测试和
-     * 误把 application.yml 提交成示例配置的部署。
-     */
     @PostConstruct
     void validateSecret() {
         String secret = props.getJwt().getSecret();
@@ -75,6 +65,7 @@ public class JwtUtils {
         return Keys.hmacShaKeyFor(raw);
     }
 
+    /** 按账号身份与令牌版本签发 HMAC-SHA JWT；过期时间取自 yuzhua.jwt.expire-seconds。 */
     public String create(LoginUser u) {
         Instant now = Instant.now();
         var builder = Jwts.builder()
@@ -91,7 +82,7 @@ public class JwtUtils {
         if (u.getDoctorId() != null) {
             builder.claim(CLAIM_DOCTOR_ID, u.getDoctorId());
         }
-        // 没有版本的令牌无法证明未被撤销，AccountGuard 一律拒绝
+        // 原因: 缺版本的令牌无法证明未被撤销，AccountGuard 一律按失效拒绝
         if (u.getTokenVersion() != null) {
             builder.claim(CLAIM_VER, u.getTokenVersion());
         }

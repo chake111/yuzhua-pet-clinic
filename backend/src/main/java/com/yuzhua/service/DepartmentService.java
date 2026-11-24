@@ -25,9 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * 科室。
- */
 @Service
 @RequiredArgsConstructor
 public class DepartmentService extends ServiceImpl<DepartmentMapper, Department> {
@@ -37,7 +34,6 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
     private final MedicalRecordMapper recordMapper;
     private final DoctorReviewMapper reviewMapper;
 
-    /** 用户端科室导航：只给启用的，按后台配的 sort 排 */
     public List<Department> listEnabled() {
         return list(Wrappers.<Department>lambdaQuery()
                 .eq(Department::getStatus, 1)
@@ -53,6 +49,7 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         return PageResult.of(page(new Page<>(query.getPageNum(), query.getPageSize()), qw));
     }
 
+    /** 校验编码唯一后新建科室；默认排序 99、默认状态启用。 */
     @Transactional
     public Department create(DepartmentForm form) {
         requireName(form.getName());
@@ -74,6 +71,7 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         return d;
     }
 
+    /** 校验科室存在与编码唯一后更新科室配置。 */
     @Transactional
     public void update(Long id, DepartmentForm form) {
         Department d = require(id);
@@ -99,17 +97,12 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
     }
 
     /**
-     * 删除前必须确认没有医生挂靠：appointment 里有 department_id 冗余列，
-     * 真删掉科室会让历史预约记录显示成"未知科室"。
-     *
-     * <p>与 {@code DoctorService} 的写入共用同一把科室行锁：先锁定读目标行，再在锁内
-     * 统计引用。否则"删除方数完 0 名医生"与"新增方确认科室存在"可能同时通过，
-     * 留下指向已删科室的医生。事务用 READ_COMMITTED：等到锁之后执行的普通查询
-     * 必须看到等待期间已提交的引用，不能沿用旧快照。
+     * 在 READ_COMMITTED 与科室行锁内校验无医生挂靠及历史业务引用后逻辑删除科室。
+     * 与 DoctorService 写入共用科室行锁，防止删科与转科并发产生悬空归属。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void remove(Long id) {
-        // 锁定读。这里的判空同时承担"科室存在"校验，不能用快照读替代
+        // 原因: 必须走锁定读校验存在并串行化 DoctorService 写入，避免快照读并发产生悬空医生
         if (baseMapper.selectByIdForUpdate(id) == null) {
             throw BizException.notFound("科室");
         }
@@ -148,14 +141,12 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         }
     }
 
-    /** 编码是唯一键的一部分，空值既会撞库也会让后续补录分不清科室 */
     private void requireCode(String code) {
         if (code == null || code.isBlank()) {
             throw new BizException("请填写科室编码");
         }
     }
 
-    /** 状态只允许 0 停用 / 1 启用；缺省状态由各写入入口决定是否放行 */
     private void requireStatus(Integer status) {
         if (status == null || (status != 0 && status != 1)) {
             throw new BizException("状态只能是停用或启用");

@@ -19,16 +19,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
-/**
- * 用户端图文问诊的 HTTP 半边。
- *
- * 图文问诊免费、不占号源、不建订单：从医生主页直接发起（见 POST /sessions）。
- * 收发消息走 WebSocket（/api/ws/consult），这里只提供 WebSocket 不方便做的事：
- * 会话列表、未读红点、以及翻历史消息。历史一律以库为准，
- * 所以即使掉线错过了推送，重新进房也能补齐。
- */
 @Tag(name = "用户端-图文问诊")
 @RestController
 @RequestMapping("/client/consult")

@@ -23,9 +23,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 医生（院内员工花名册）。单家医院自用，所以没有入驻审核，只有"停诊/正常"开关。
- */
 @Service
 @RequiredArgsConstructor
 public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
@@ -39,10 +36,6 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
     private final AdminUserMapper adminUserMapper;
     private final ConsultSocketRegistry socketRegistry;
 
-    /**
-     * 医生分页。用户端与后台共用一套筛选条件，差别只在 visibleOnly：
-     * 用户端传 true 时强制只出正常出诊的医生，后台停诊的也要能列出来。
-     */
     public PageResult<DoctorVo> pageVo(DoctorQuery q, boolean visibleOnly) {
         LambdaQueryWrapper<Doctor> qw = Wrappers.<Doctor>lambdaQuery()
                 .eq(q.getDepartmentId() != null, Doctor::getDepartmentId, q.getDepartmentId())
@@ -69,7 +62,6 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         return toVo(d, departmentNames(List.of(d)));
     }
 
-    /** 用户端医生卡片的精简版：只保留公开字段，供首页/搜索结果用 */
     public List<DoctorVo> listTopVisible(int limit) {
         List<Doctor> list = list(Wrappers.<Doctor>lambdaQuery()
                 .eq(Doctor::getStatus, 1)
@@ -88,6 +80,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         return d;
     }
 
+    /** 在 READ_COMMITTED 下持目标科室行锁校验科室存在后创建医生，防止与删科并发形成悬空归属。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public Doctor create(DoctorForm form) {
         requireName(form.getName());
@@ -160,10 +153,6 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         applyStatus(id, status);
     }
 
-    /**
-     * 状态写入的唯一出口：编辑弹窗与停诊/恢复按钮共用。
-     * 恢复出诊时只有仍挂着活动连接才记为在线，避免医生早已断线却显示在线。
-     */
     private void applyStatus(Long id, Integer status) {
         requireStatus(status);
         update(Wrappers.<Doctor>lambdaUpdate()
@@ -178,6 +167,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         }
     }
 
+    /** 校验医生不存在关联排班、业务记录与后台账号后才允许删除。 */
     @Transactional
     public void remove(Long id) {
         require(id);
@@ -192,6 +182,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         removeById(id);
     }
 
+    /** 事务内重算医生评分、评价数与已完成接诊数。 */
     @Transactional
     public void refreshStats(Long doctorId) {
         baseMapper.refreshStats(doctorId);
@@ -219,14 +210,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         }
     }
 
-    /**
-     * 确认目标科室存在，并持有它的行锁直到事务结束。
-     *
-     * <p>必须用锁定读而不是 {@code selectById}：删除科室的路径会先拿同一把锁再统计医生，
-     * 两边串行化之后，"新增/转科"与"删除"的检查才不会同时通过。
-     * 只有一个目标科室参与加锁；若将来需要同时锁多个科室，按 ID 升序加锁以避免死锁。
-     * 调用方必须处在事务中，否则语句一结束锁就释放，起不到互斥作用。
-     */
+    // 原因: 与删科共用科室行锁串行化校验与写入；若将来需锁多科室须按 ID 升序加锁
     private void requireDepartment(Long departmentId) {
         if (departmentId == null) {
             throw new BizException("请选择所属科室");
@@ -236,7 +220,6 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         }
     }
 
-    /** 一次把本页涉及的科室查出来做字典，避免每行一次查询 */
     private Map<Long, Department> departmentNames(List<Doctor> doctors) {
         return BatchLookup.mapByIds(departmentMapper::selectBatchIds,
                 BatchLookup.ids(doctors, Doctor::getDepartmentId), Department::getId);

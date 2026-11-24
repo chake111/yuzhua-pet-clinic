@@ -5,9 +5,6 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/**
- * 用户端注册 / 登录入参。
- */
 public class AuthDto {
 
     @Data

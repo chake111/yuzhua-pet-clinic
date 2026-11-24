@@ -21,10 +21,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 
-/**
- * 排班与号源池管理。读接口医生账号也能调（接诊工作台要看自己的号），
- * 增删改一律只给管理员。
- */
 @Tag(name = "管理后台-排班号源")
 @RestController
 @RequestMapping("/admin/schedule")
@@ -43,7 +39,7 @@ public class ScheduleController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end,
             @RequestParam(required = false) Integer status,
             PageQuery query) {
-        // 医生只看自己的排班：忽略入参 doctorId，防止改参数翻别人的班表
+        // 原因: 医生仅可查看本人排班，忽略传入 doctorId 防止越权查询他人班表
         Long scopedDoctorId = UserContext.require().isDoctor() ? UserContext.requireDoctorId() : doctorId;
         return Result.ok(scheduleService.pageAdmin(scopedDoctorId, start, end, status, query));
     }

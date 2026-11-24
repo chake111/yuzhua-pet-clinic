@@ -18,9 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * 公告与养宠科普。status：0 草稿 / 1 已发布 / 2 下架，只有 1 对用户端可见。
- */
 @Service
 @RequiredArgsConstructor
 public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
@@ -29,7 +26,6 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
     public static final int ST_PUBLISHED = 1;
     public static final int ST_OFFLINE = 2;
 
-    /** 列表页不返回正文，一篇科普几千字，乘上每页条数就是白扔的流量 */
     public PageResult<Notice> pagePublished(PageQuery q, Integer type, String keyword) {
         LambdaQueryWrapper<Notice> qw = publishedQuery(type, keyword)
                 .select(Notice::getId, Notice::getTitle, Notice::getCover, Notice::getSummary,
@@ -37,7 +33,6 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         return PageResult.of(page(new Page<>(q.getPageNum(), q.getPageSize()), qw));
     }
 
-    /** 首页那种"最新几条公告" */
     public List<Notice> listLatest(int limit) {
         return list(publishedQuery(null, null)
                 .select(Notice::getId, Notice::getTitle, Notice::getSummary, Notice::getType,
@@ -45,7 +40,6 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
                 .last("LIMIT " + Math.max(1, Math.min(limit, 20))));
     }
 
-    /** 用户端详情：只允许看已发布的，顺带累加阅读量 */
     public Notice readDetail(Long id) {
         Notice n = getById(id);
         if (n == null || !Integer.valueOf(ST_PUBLISHED).equals(n.getStatus())) {
@@ -78,6 +72,7 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         return n;
     }
 
+    /** 事务内新建公告；仅当初始状态为已发布时记录发布人与发布时间。 */
     @Transactional
     public Notice create(NoticeForm form) {
         requireTitle(form.getTitle());
@@ -100,6 +95,7 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         return n;
     }
 
+    /** 事务内更新公告，首次发布才补写发布人/时间，阅读量由更新策略保留。 */
     @Transactional
     public void update(Long id, NoticeForm form) {
         Notice cur = require(id);
@@ -115,7 +111,7 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         row.setTopFlag(form.getTopFlag() == null ? cur.getTopFlag() : form.getTopFlag());
         row.setStatus(status);
         validate(row);
-        // 首次发布才留发布人/时间；重新发布不刷新，阅读量不在表单里、由更新策略保留
+        // 原因: 仅首次发布写入发布人与发布时间，重新发布保持原有首次发布时间与累计阅读量
         if (status == ST_PUBLISHED && cur.getPublishTime() == null) {
             row.setPublishTime(LocalDateTime.now());
             row.setPublishBy(UserContext.requireId());

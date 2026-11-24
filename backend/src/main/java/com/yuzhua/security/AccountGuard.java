@@ -26,6 +26,7 @@ public class AccountGuard {
     private final SysUserMapper sysUserMapper;
     private final AdminUserMapper adminUserMapper;
 
+    /** 校验令牌未过期、账号启用、后台角色与医生绑定未变化，且令牌版本与库中当前版本一致。 */
     public boolean active(LoginUser u) {
         if (u.getTyp() == null || u.getId() == null || u.getExpiresAt() == null
                 || !Instant.now().isBefore(u.getExpiresAt())) {
@@ -40,14 +41,13 @@ public class AccountGuard {
             return false;
         }
         AdminUser db = adminUserMapper.selectById(u.getId());
-        // 角色或医生绑定变化后，旧令牌必须重新登录才能使用新的身份。
+        // 原因: 角色或医生绑定变化后旧令牌须失效，避免沿用旧身份访问后台数据
         return db != null && Integer.valueOf(1).equals(db.getStatus())
                 && Objects.equals(db.getRole(), u.getRole())
                 && Objects.equals(db.getDoctorId(), u.getDoctorId())
                 && versionMatches(db.getTokenVersion(), u.getTokenVersion());
     }
 
-    /** 库里的版本非空且与令牌声明一致才放行；任一为空都当作已撤销 */
     private static boolean versionMatches(Integer dbVersion, Integer tokenVersion) {
         return dbVersion != null && tokenVersion != null && dbVersion.equals(tokenVersion);
     }

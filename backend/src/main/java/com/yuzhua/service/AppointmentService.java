@@ -35,42 +35,15 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
-/**
- * 预约订单：本系统的核心状态机。只面向到院门诊——图文问诊免费、不建订单，
- * 会话直接在 consult_session 上建（见 ConsultService）。
- *
- * 状态：0 待接诊 -> 1 已接诊 -> 2 已完成；只有 0 可取消 -> 3 已取消（R5）；过期未支付 -> 3（系统）；
- * 已支付却过就诊日仍未接诊 -> 4 未到诊（R3，已接诊不改判、未到诊不退号不退款）。
- *
- * 号源守恒是这里最要紧的不变量：doctor_schedule.remain_num 减一 与 appointment 落库
- * 必须在同一个事务里，取消/退款时的加回也一样。扣号走 tryOccupy 的单条 UPDATE，
- * 由 InnoDB 行锁 + 影响行数判定成败，所以不引入 Redis 也不会超卖。
- *
- * 契约动机: 扣号建单一致性——两步不在同一事务就会留下"扣了号没单、有单没扣号"的半截状态；
- * 重复退号防护——退号挂在条件更新的影响行数上，取消与超时清扫两条入口各只可能改到一次行。
- *
- * 排队序号与容量是两件事：remain_num 表示还能约几个，last_queue_no 表示这个排班发到过几号。
- * 取消只把前者加回去，后者不回退，所以同一个号不会发给两个人，代价是序号允许有空缺。
- *
- * 并发保护只有一条路径：改一张已有预约的状态，必须先 selectByIdForUpdate 锁住它，
- * 在锁内重判归属与当前状态，再带条件更新，最后才退号。锁外读到的对象只能用来预检，
- * 不能作为放行依据——两条并发取消各自读到"待接诊"就会各退一次号。
- * 锁顺序固定为：处理已有预约时先锁 appointment 再更新 doctor_schedule；
- * 下单只锁 doctor_schedule 再插入 appointment。没有反向顺序，因此不会成环。
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointment> {
 
-    // 到毫秒再补 8 位随机：同一毫秒内仍可能有多笔下单同时落库，4 位随机（1 万种）
-    // 在 100 并发的抢号场景下会撞 uk_order_no，重复键被转成 400"数据已存在"，
-    // 让"恰好 N 单成功"这类断言变得 flaky。8 位随机把碰撞概率压到可忽略；
-    // PC + 17 位时间 + 8 位随机 = 27 字符，order_no VARCHAR(32) 放得下。
+    // 原因: 毫秒时间戳后补 8 位随机，将百并发抢号下撞 uk_order_no 的概率压到可忽略（总长 27 字符）
     private static final DateTimeFormatter NO_STAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
-    // 客户端生成的不透明键：只允许 URL/头值安全的可打印字符，长度 8–64 与列宽对齐。
-    // 收紧格式是为了让"脏键"在下单入口就报 400，而不是落库后因截断/排序规则差异产生诡异重放。
+    // 原因: 收紧幂等键为 8-64 位 URL 安全字符，入口即拒脏键避免落库截断或排序规则差异导致异常重放
     private static final Pattern IDEM_KEY = Pattern.compile("[A-Za-z0-9._:-]{8,64}");
 
     private final PetService petService;
@@ -84,32 +57,13 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     private final AppProperties props;
     private final PlatformTransactionManager txManager;
 
-    // ---------------------------------------------------------------- 下单
-
-    /** 无幂等键的旧入口，行为与改造前一致 */
     public AppointmentVo create(AppointmentForm req) {
         return create(req, null);
     }
 
-    /**
-     * 带幂等键的下单。
-     *
-     * <p>幂等键只解决"客户端重试不要多落单"：事务外先按 (userId, key) 回读一次，
-     * 命中就原样返回；事务内拿到排班行锁后再查一次，作为并发同键的权威判定。
-     * 锁外的预查只是重试快路径——它让"时段已过期/已停诊/排班已删"的重试仍能拿到原单，
-     * 而不是先被校验拦下报错。
-     *
-     * <p>并发同键的第二个请求即使换了参数，也会先在排班锁内回读原单；参数校验失败时再回读一次，
-     * 避免把并发首单尚未提交的窗口误报成坏请求。
-     *
-     * <p>这里不能用 @Transactional 包整个方法：同类内 create(req) 自调用不走代理，
-     * 而且唯一键冲突必须先随事务回滚（扣号与 last_queue_no 一起退回）之后，
-     * 才能在事务外重新读到冲突方已提交的原单。事务边界交给 TransactionTemplate。
-     */
     public AppointmentVo create(AppointmentForm req, String idemKey) {
         String key = normalizeIdemKey(idemKey);
-        // 键非空才需要当前用户；无键路径仍由 petService.requireOwned 做登录与归属校验，
-        // 保持原有调用顺序与 401/404 语义不变。
+        // 原因: 仅键非空时提前取当前用户，无键路径延续 petService.requireOwned 的 401/404 校验顺序
         Long userId = key == null ? null : UserContext.requireId();
         if (key != null) {
             Appointment existing = baseMapper.selectByUserAndIdemKey(userId, key);
@@ -118,9 +72,9 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
             }
         }
 
+        // 原因: 须在事务外捕获唯一键冲突并回滚扣号后才能读到并发首单，不能在类内套 @Transactional
         TransactionTemplate tx = new TransactionTemplate(txManager);
-        // READ_COMMITTED：排班锁串行化下单后，这里必须看得见前一个请求刚提交的预约，
-        // 否则锁内幂等回读与"同宠物同时段"校验都会读到旧快照。
+        // 原因: READ_COMMITTED 使排班行锁串行化后能读到刚提交的同键预约与同宠物占座记录
         tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         try {
             return tx.execute(status -> doCreate(req, key, userId));
@@ -128,18 +82,16 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
             if (key == null) {
                 throw e;
             }
-            // 事务已经回滚（扣号与 last_queue_no 一并退回），此时才读得到冲突方提交的原单。
+            // 原因: 事务已回滚扣号与计数，此时重读确认是同键并发冲突还是 uk_order_no 碰撞
             Appointment existing = readIdemRowWithRetry(userId, key);
             if (existing == null) {
-                // 撞的是 uk_order_no（27 位随机串重复），与幂等键无关，按原语义抛出
                 throw e;
             }
             log.warn("下单唯一键冲突命中幂等键，回读原单：user={} key={} appointment={}",
                     userId, key, existing.getId());
             return replayOf(existing, req);
         } catch (BizException e) {
-            // 参数校验失败也可能是并发首单尚未提交：再回读一次，命中同键原单就按幂等返回；
-            // 仍然没有说明这次确实是坏请求，原样抛出。
+            // 原因: 参数校验失败也可能是并发首单尚未提交，再回读确认后决定重放或抛原异常
             if (key != null) {
                 Appointment existing = readIdemRowWithRetry(userId, key);
                 if (existing != null) {
@@ -152,17 +104,9 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
     }
 
-    /** 下单主体。key 为 null 时与改造前完全一致。 */
     private AppointmentVo doCreate(AppointmentForm req, String key, Long userId) {
-        // 先把排班行锁住并做幂等回读，再校验宠物/医生/症状：并发同键的第二个请求即使换了
-        // 非法 petId/doctorId，也应在参数校验之前收敛到首个已提交的原单。
-        // 锁外的快照读会给出可触发的交错：用户读到旧医生/旧日期 → 管理员锁行、确认"还没有预约引用"、
-        // 改归属并提交 → 用户扣号成功，却把先前读到的旧信息写进预约，快照与归属再次分叉（I10 的另一半）。
-        // 同一条锁读也挡住"给刚被删掉的排班继续扣号"：删行是物理 DELETE，读不到就是不存在。
-        // 锁顺序仍是"下单只锁排班、再插预约"，与取消路径（先锁预约再退号）同向，不会成环。
+        // 原因: 先锁排班行并做幂等回读，确保并发同键请求即使换了非法参数也先收敛到首单，且与取消路径同向不成环
         DoctorSchedule sch = scheduleMapper.selectByIdForUpdate(req.getScheduleId());
-        // 拿到排班行锁后先做幂等回读：并发同键的请求都在这把锁上排队，
-        // 第一个提交后，后面每个都会在这里看到原单，不会重复扣号。
         if (key != null) {
             Appointment existing = baseMapper.selectByUserAndIdemKey(userId, key);
             if (existing != null) {
@@ -171,6 +115,23 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
 
         Pet pet = petService.requireOwned(req.getPetId());
+        Doctor doctor = validateCreateTarget(req, sch, pet);
+        Appointment a = buildNewAppointment(req, key, pet, doctor, sch);
+        // 原因: 扣号放在写单之前，影响行数为 0 说明最后一个号已被抢走
+        if (scheduleMapper.tryOccupy(sch.getId()) == 0) {
+            throw new BizException("该时段号源已约满，请换个时间");
+        }
+        // 原因: 队列序号取自占号时递增的当前读，避免 REPEATABLE READ 快照读到旧号
+        Integer queueNo = scheduleMapper.selectLastQueueNoForUpdate(sch.getId());
+        if (queueNo == null) {
+            throw new BizException("号源状态异常，请稍后重试");
+        }
+        a.setQueueNo(queueNo);
+        save(a);
+        return detailOf(a, false);
+    }
+
+    private Doctor validateCreateTarget(AppointmentForm req, DoctorSchedule sch, Pet pet) {
         Doctor doctor = doctorMapper.selectById(req.getDoctorId());
         if (doctor == null) {
             throw BizException.notFound("医生");
@@ -191,15 +152,17 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
             throw new BizException("该时段已停诊，请换个时间");
         }
         requireNotPast(sch);
-
-        // 排班锁串行化下单；READ_COMMITTED 保证这里看见前一个请求刚提交的预约。
         if (count(Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getPetId, pet.getId())
                 .eq(Appointment::getScheduleId, sch.getId())
                 .ne(Appointment::getStatus, Appointment.ST_CANCELLED)) > 0) {
             throw new BizException("该宠物已预约此时段，请在我的预约中查看");
         }
+        return doctor;
+    }
 
+    private Appointment buildNewAppointment(AppointmentForm req, String key, Pet pet,
+                                            Doctor doctor, DoctorSchedule sch) {
         Appointment a = new Appointment();
         a.setOrderNo(nextOrderNo());
         a.setIdemKey(key);
@@ -220,26 +183,10 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         a.setPayStatus(Appointment.PAY_NONE);
         a.setStatus(Appointment.ST_PENDING);
         a.setIsReviewed(0);
-        // 扣号放在写单之前：影响行数为 0 说明别人刚抢走最后一个号
-        if (scheduleMapper.tryOccupy(sch.getId()) == 0) {
-            throw new BizException("该时段号源已约满，请换个时间");
-        }
-        // 序号来自占号时一并递增的计数器，不再由「总量 - 余量」推算：取消把余量退回去，
-        // 推算值就会回退成已经发过的号。当前读也不能省——selectById 走事务快照，
-        // 在 REPEATABLE READ 下可能读到递增前的值。预约落库失败会整体回滚，
-        // 容量和计数器一起退回，不会留下只扣一半的状态。
-        Integer queueNo = scheduleMapper.selectLastQueueNoForUpdate(sch.getId());
-        if (queueNo == null) {
-            throw new BizException("号源状态异常，请稍后重试");
-        }
-        a.setQueueNo(queueNo);
-        save(a);
-        return detailOf(a, false);
+        return a;
     }
 
-    // ---------------------------------------------------------------- 支付 / 取消
-
-    /** 模拟支付：更新状态 */
+    /** 锁预约行并校验超时与状态后完成模拟支付，条件更新防重复扣款/写时间。 */
     @Transactional
     public AppointmentVo pay(Long id) {
         Appointment a = lockOwned(id);
@@ -252,7 +199,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         if (isPayExpired(a)) {
             throw new BizException("订单已超过 " + props.getPayTimeoutMinutes() + " 分钟未支付，请重新预约");
         }
-        // 同一时刻只取一次：写库与回填响应必须一致，否则响应里的 payTime 会和库里有毫秒级偏差。
+        // 原因: 取一次当前时刻用于落库与响应回填，保持 payTime 一致
         LocalDateTime now = LocalDateTime.now();
         if (baseMapper.update(null, Wrappers.<Appointment>lambdaUpdate()
                 .set(Appointment::getPayStatus, Appointment.PAY_PAID)
@@ -269,13 +216,13 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return detailOf(a, false);
     }
 
-    /** 用户取消。已支付的单子把号源退回池子，支付状态改成已退款 */
+    /** 用户取消本人待接诊预约：先锁预约再条件更新并退号，已支付订单标记已退款（VisitOverdueException 不回滚）。 */
     @Transactional(noRollbackFor = VisitOverdueException.class)
     public void cancelByUser(Long id, String reason) {
         cancelLocked(lockOwned(id), blankToNull(reason), "USER");
     }
 
-    /** 医生/管理员替患者取消（到院爽约、临时停诊等） */
+    /** 医生或管理员取消待接诊预约：先锁预约校验权限再退号退款（VisitOverdueException 不回滚）。 */
     @Transactional(noRollbackFor = VisitOverdueException.class)
     public void cancelByStaff(Long id, String reason) {
         Appointment a = lockForUpdate(id);
@@ -283,15 +230,6 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         cancelLocked(a, blankToNull(reason), UserContext.require().isDoctor() ? "DOCTOR" : "ADMIN");
     }
 
-    /**
-     * 取消的唯一出口（R5：只有待接诊可以取消）。入参必须是刚锁到的行，不是快照。
-     * 用户、责任医生、管理员三条入口都走这里，收紧一处即三处同时生效。
-     * 已接诊不经这个接口退款退号，本轮也不新增"接诊后异常退款"流程——
-     * 真发生纠纷时由线下处理，不留一条自动退钱的口子。
-     *
-     * 退号挂在条件更新的影响行数上：改到 1 行才 release，
-     * 所以"一次取消只退一次号"来自这里只可能改到一次，而不是靠 release 里的 LEAST 封顶。
-     */
     private void cancelLocked(Appointment a, String reason, String by) {
         requireVisitNotOverdue(a);
         if (a.getStatus() == Appointment.ST_CANCELLED) {
@@ -316,8 +254,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
     }
 
-    // ---------------------------------------------------------------- 接诊 / 完成
-
+    /** 医生接诊：锁行校验归属、未过就诊日、已支付且待接诊后推进至已接诊（VisitOverdueException 不回滚）。 */
     @Transactional(noRollbackFor = VisitOverdueException.class)
     public void accept(Long id) {
         Appointment a = lockForUpdate(id);
@@ -338,7 +275,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
     }
 
-    /** 结束就诊。病历是独立接口，医生可以在结束前或结束后补写，所以这里不强制病历已存在 */
+    /** 医生结束就诊并递增接诊量；允许结束后补写病历，不强制病历已存在。 */
     @Transactional
     public void finish(Long id) {
         Appointment a = lockForUpdate(id);
@@ -356,9 +293,6 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         doctorMapper.incrementAppointmentCount(a.getDoctorId());
     }
 
-    // ---------------------------------------------------------------- 查询
-
-    /** 我的预约（用户端） */
     public PageResult<AppointmentVo> pageMine(Integer status, PageQuery q) {
         LambdaQueryWrapper<Appointment> qw = Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getUserId, UserContext.requireId())
@@ -367,7 +301,6 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return voPage(page(new Page<>(q.getPageNum(), q.getPageSize()), qw), false);
     }
 
-    /** 后台用户详情用：某用户的最近预约（带患者侧信息，与工作台同一口径） */
     public List<AppointmentVo> listByUserForAdmin(Long userId, int limit) {
         List<Appointment> rows = list(Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getUserId, userId)
@@ -376,10 +309,6 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return buildVos(rows, true);
     }
 
-    /**
-     * 后台/医生工作台的订单列表。医生账号只能看到自己的单，
-     * 入参 doctorId 对医生账号无效——否则改个 query 参数就能翻别人的接诊单。
-     */
     public PageResult<AppointmentVo> pageForStaff(AppointmentQuery q) {
         LoginUser u = UserContext.require();
         Long doctorId = u.isDoctor() ? UserContext.requireDoctorId() : q.getDoctorId();
@@ -402,7 +331,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         Appointment a = requireExists(id);
         LoginUser u = UserContext.require();
         if (u.isClient()) {
-            // 和 pay/cancel 走同一套口径：别人的单一律"不存在"，不给出可枚举的探测信号
+            // 原因: 越权查他人预约返回 404 不存在，避免泄露可枚举的订单存在信号
             if (!a.getUserId().equals(u.getId())) {
                 throw BizException.notFound("预约记录");
             }
@@ -430,7 +359,6 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return a;
     }
 
-    /** 锁内重读。状态判定一律以返回的对象为准，查不到就是不存在或已逻辑删除。 */
     private Appointment lockForUpdate(Long id) {
         Appointment a = baseMapper.selectByIdForUpdate(id);
         if (a == null) {
@@ -439,18 +367,12 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return a;
     }
 
-    /**
-     * 给下游写入（病历首次落库等）复用的锁：先锁预约行，再按返回值判状态与归属。
-     * 病历"先查有没有、没有再插"这两步之间必须持有这把行锁，否则两个并发请求
-     * 会各自查空、各自插入，留下同一预约两份有效病历（跟踪表 I09/M2）。
-     * 锁顺序仍是"预约在前"，与取消、退号同向，不会成环。
-     */
+    /** 先锁预约行，供病历首次落库等下游写入在同一临界区内判空与插库（锁顺序：预约在前）。 */
     @Transactional
     public Appointment lockForWrite(Long id) {
         return lockForUpdate(id);
     }
 
-    /** 用户端入口用：先锁行，再按归属判"不存在"，不给可枚举的探测信号。 */
     private Appointment lockOwned(Long id) {
         Appointment a = lockForUpdate(id);
         if (!a.getUserId().equals(UserContext.requireId())) {
@@ -459,34 +381,20 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return a;
     }
 
-    /** 提交评价成功后回写"已评价"，避免一单多评 */
     public void markReviewed(Long appointmentId) {
         update(Wrappers.<Appointment>lambdaUpdate()
                 .set(Appointment::getIsReviewed, 1)
                 .eq(Appointment::getId, appointmentId));
     }
 
-    // ---------------------------------------------------------------- 定时清扫
-    //
-    // 清扫的循环放在 AppointmentSweepTask 里，一张单一个事务（task 通过注入的 service 代理
-    // 调用，事务边界才生效；同类内互相调用 @Transactional 方法不会开新事务）。
-    // 这不是风格问题：整批共用一个事务时，清扫会一边持有已处理单的排班行锁、
-    // 一边继续去锁下一张预约，与"用户取消先锁预约再退号"的顺序相反，
-    // 实测就是死锁 1213（.tmp/t2c/t4-01/backend-8082.log，用户取消对外变成 500）。
-    // 逐单事务后每个事务最多同时持有一张预约行 + 一行排班，锁顺序全程一致。
-
-    /** 超时未支付的候选 id。只取 id、按 id 稳定排序，判定留到锁内重做。 */
     public List<Long> unpaidOverdueIds() {
         return baseMapper.selectUnpaidOverdueIds(
                 LocalDateTime.now().minusMinutes(props.getPayTimeoutMinutes()));
     }
 
     /**
-     * 取消一张超时未支付的单。调用方必须已经在事务外确认过它过期，这里只负责锁内复核：
-     * 扫到取消之间它可能已被用户取消、已被支付、或刚好没到期，不复核就会重复退号。
-     *
-     * @param id 待复核的预约 ID
-     * @return 本次取消成功时为 true；预约不存在、非待接诊、非未支付或尚未超时时为 false
+     * 逐单独立事务取消超时未支付预约并退号（防整批共事务与用户取消锁顺序成环死锁）；
+     * 锁内复核状态与超时线，仅确实执行取消时返回 true。
      */
     @Transactional
     public boolean expireOne(Long id) {
@@ -500,18 +408,13 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return true;
     }
 
-    /** 过就诊日仍挂在待接诊且已支付的候选 id（R3：已接诊与未支付都不在此列） */
     public List<Long> staleVisitIds() {
         return baseMapper.selectStaleVisitIds();
     }
 
     /**
-     * 把一张"已支付却过就诊日仍未接诊"的单记为未到诊（R3）。号源不回滚——那个号确实被占掉了，
-     * 钱也不退，这是需求里写明的爽约口径，不是漏了退款。
-     * 已接诊保持原状（医生可继续结束），未支付交给超时取消；候选 SQL 与这里的锁内判定是同一口径，
-     * 两个定时任务的先后顺序因此不会改变终态。
-     *
-     * @return true 表示本次真的改了状态
+     * 锁内复核后将过就诊日仍待接诊的已支付订单记为未到诊（R3，不退号不退款）。
+     * 仅本次实际改写状态时返回 true。
      */
     @Transactional
     public boolean markMissedOne(Long id) {
@@ -529,9 +432,6 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
                 .eq(Appointment::getPayStatus, Appointment.PAY_PAID)) > 0;
     }
 
-    // ---------------------------------------------------------------- 内部
-
-    /** null 或全空白视为未传键；trim 后必须匹配 [A-Za-z0-9._:-]{8,64} */
     private static String normalizeIdemKey(String idemKey) {
         if (idemKey == null || idemKey.isBlank()) {
             return null;
@@ -543,13 +443,8 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return key;
     }
 
-    /**
-     * 幂等键命中后返回原单。参数不同（换宠物/换时段）不报错：键表达的是"这是同一次下单重试"，
-     * 以首次落库的结果为准更安全——报错会让客户端拿着同一个键永远无法收敛。
-     * 但要把分歧记进 WARN，便于排查客户端是否错误复用了键。
-     */
     private AppointmentVo replayOf(Appointment existing, AppointmentForm req) {
-        // 回读查询本身已按 user_id 过滤；再断言一次归属，防止将来有人复用到别的入口时绕过用户维度。
+        // 原因: 再校验归属防止未来复用此重放逻辑时越权返回他人订单
         if (!Objects.equals(existing.getUserId(), UserContext.requireId())) {
             throw BizException.notFound("预约记录");
         }
@@ -562,13 +457,6 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return detailOf(existing, false);
     }
 
-    /**
-     * 幂等回读的重试版。两处调用：唯一键冲突后、参数校验失败后。
-     *
-     * <p>InnoDB 的唯一键检查会等冲突事务结束：对方提交才报重复键，对方回滚则本条插入直接成功，
-     * 所以冲突后正常能立即读到原单。参数校验失败时，并发的首个请求也可能尚未提交，同样给两次短重试。
-     * 仍读不到时由调用方按原异常抛出。
-     */
     private Appointment readIdemRowWithRetry(Long userId, String key) {
         Appointment existing = baseMapper.selectByUserAndIdemKey(userId, key);
         for (int attempt = 0; existing == null && attempt < 2; attempt++) {
@@ -595,12 +483,6 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
     }
 
-    /**
-     * 临床动作（接诊、结束）的准入：必须是医生账号，而且只能动自己的单（R4）。
-     *
-     * 控制器上的 @RequireRole(DOCTOR) 是第一道，这条是第二道——RequireRole 的约定是 fail-open
-     * （漏标即放行），所以不能只靠注解。管理员在这里仍被挡住，但可查、可代患者取消待接诊单。
-     */
     private void requireDoctorMayTouch(Appointment a) {
         LoginUser u = UserContext.require();
         if (!u.isDoctor()) {
@@ -626,11 +508,6 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
     }
 
-    /**
-     * 到期判定只此一处：createTime + 超时分钟数 <= 当前时刻。
-     * 支付和超时清扫比的是同一条线，刚越过这条线的支付即使抢到锁也照样失败，
-     * 不会留下"号已被清扫退回、钱却记成已支付"的单。
-     */
     private boolean isPayExpired(Appointment a) {
         if (a.getCreateTime() == null) {
             return false;
@@ -652,31 +529,32 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return PageResult.of(page, buildVos(page.getRecords(), withPatient));
     }
 
-    /**
-     * 批量补名字。一行订单要牵出宠物/医生/科室/下单人四张表，
-     * 逐行查就是 N+1，所以先把 id 收齐、一次查回来做字典。
-     */
     private List<AppointmentVo> buildVos(List<Appointment> rows, boolean withPatient) {
         if (rows.isEmpty()) {
             return List.of();
         }
-        // 宠物展示信息走历史查询（含已删档案）：删档案不该让旧单据显示不出宠物
+        VoLookup lookup = loadVoLookup(rows, withPatient);
+        List<AppointmentVo> out = new ArrayList<>(rows.size());
+        for (Appointment a : rows) {
+            out.add(toVo(a, lookup, withPatient));
+        }
+        return out;
+    }
+
+    private VoLookup loadVoLookup(List<Appointment> rows, boolean withPatient) {
+        // 原因: 宠物档案逻辑删除后旧单据仍需展示宠物信息，走历史查询而非普通 selectBatchIds
         Map<Long, PetDisplayVo> pets = BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
                 BatchLookup.ids(rows, Appointment::getPetId), PetDisplayVo::getId);
-
         Map<Long, Doctor> doctors = BatchLookup.mapByIds(doctorMapper::selectBatchIds,
                 BatchLookup.ids(rows, Appointment::getDoctorId), Doctor::getId);
-
         Set<Long> deptIds = new HashSet<>(BatchLookup.ids(doctors.values(), Doctor::getDepartmentId));
         deptIds.addAll(BatchLookup.ids(rows, Appointment::getDepartmentId));
         Map<Long, Department> depts = BatchLookup.mapByIds(departmentMapper::selectBatchIds,
                 deptIds, Department::getId);
-
         Map<Long, SysUser> users = withPatient
                 ? BatchLookup.mapByIds(sysUserMapper::selectBatchIds,
                 BatchLookup.ids(rows, Appointment::getUserId), SysUser::getId)
                 : Map.of();
-
         Set<Long> orderIds = BatchLookup.ids(rows, Appointment::getId);
         Map<Long, Long> sessionIds = new HashMap<>();
         sessionMapper.selectList(Wrappers.<ConsultSession>lambdaQuery()
@@ -686,41 +564,49 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         recordMapper.selectList(Wrappers.<MedicalRecord>lambdaQuery()
                         .in(MedicalRecord::getAppointmentId, orderIds))
                 .forEach(r -> recordIds.putIfAbsent(r.getAppointmentId(), r.getId()));
+        return new VoLookup(pets, doctors, depts, users, sessionIds, recordIds);
+    }
 
-        List<AppointmentVo> out = new ArrayList<>(rows.size());
-        for (Appointment a : rows) {
-            AppointmentVo vo = new AppointmentVo();
-            BeanUtils.copyProperties(a, vo);
-            if (a.getCreateTime() != null) {
-                vo.setPayDeadline(a.getCreateTime().plusMinutes(props.getPayTimeoutMinutes()));
-            }
-            PetDisplayVo pet = pets.get(a.getPetId());
-            if (pet != null) {
-                vo.setPetName(pet.getName());
-                vo.setPetSpecies(pet.getSpecies());
-                vo.setPetBreed(pet.getBreed());
-                vo.setPetAvatar(pet.getAvatar());
-            }
-            Doctor d = doctors.get(a.getDoctorId());
-            if (d != null) {
-                vo.setDoctorName(d.getName());
-                vo.setDoctorTitle(d.getTitle());
-                vo.setDoctorAvatar(d.getAvatar());
-            }
-            Department dept = depts.get(a.getDepartmentId());
-            vo.setDepartmentName(dept == null ? null : dept.getName());
-            if (withPatient) {
-                SysUser u = users.get(a.getUserId());
-                if (u != null) {
-                    vo.setUserNickname(u.getNickname());
-                    vo.setUserPhone(u.getPhone());
-                }
-            }
-            vo.setSessionId(sessionIds.get(a.getId()));
-            vo.setRecordId(recordIds.get(a.getId()));
-            out.add(vo);
+    private AppointmentVo toVo(Appointment a, VoLookup lookup, boolean withPatient) {
+        AppointmentVo vo = new AppointmentVo();
+        BeanUtils.copyProperties(a, vo);
+        if (a.getCreateTime() != null) {
+            vo.setPayDeadline(a.getCreateTime().plusMinutes(props.getPayTimeoutMinutes()));
         }
-        return out;
+        PetDisplayVo pet = lookup.pets().get(a.getPetId());
+        if (pet != null) {
+            vo.setPetName(pet.getName());
+            vo.setPetSpecies(pet.getSpecies());
+            vo.setPetBreed(pet.getBreed());
+            vo.setPetAvatar(pet.getAvatar());
+        }
+        Doctor d = lookup.doctors().get(a.getDoctorId());
+        if (d != null) {
+            vo.setDoctorName(d.getName());
+            vo.setDoctorTitle(d.getTitle());
+            vo.setDoctorAvatar(d.getAvatar());
+        }
+        Department dept = lookup.depts().get(a.getDepartmentId());
+        vo.setDepartmentName(dept == null ? null : dept.getName());
+        if (withPatient) {
+            SysUser u = lookup.users().get(a.getUserId());
+            if (u != null) {
+                vo.setUserNickname(u.getNickname());
+                vo.setUserPhone(u.getPhone());
+            }
+        }
+        vo.setSessionId(lookup.sessionIds().get(a.getId()));
+        vo.setRecordId(lookup.recordIds().get(a.getId()));
+        return vo;
+    }
+
+    private record VoLookup(
+            Map<Long, PetDisplayVo> pets,
+            Map<Long, Doctor> doctors,
+            Map<Long, Department> depts,
+            Map<Long, SysUser> users,
+            Map<Long, Long> sessionIds,
+            Map<Long, Long> recordIds) {
     }
 
     private static String blankToNull(String s) {

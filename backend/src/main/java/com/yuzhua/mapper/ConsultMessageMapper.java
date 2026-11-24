@@ -43,10 +43,7 @@ public interface ConsultMessageMapper extends BaseMapper<ConsultMessage> {
     List<Long> unreadPeerIdsForUpdate(@Param("sessionId") Long sessionId,
                                       @Param("myRole") String myRole);
 
-    /**
-     * 按精确ID更新已读：ID 集合来自同一事务的 SELECT，并发新插入的消息不会被顺带更新。
-     * 调用方保证 ids 非空（空列表不落这条 UPDATE，避免 IN ()）。
-     */
+    // 原因: ID 集合来自同一事务的 FOR UPDATE 查询，调用方须确保非空避免 IN () 语法错误
     @Update("""
             <script>
             UPDATE consult_message SET is_read = 1

@@ -97,10 +97,6 @@ public class ConsultPush {
         }
     }
 
-    /**
-     * @param requireNormalModeration true=业务帧，会话处置状态必须正常；
-     *                                false=处置通知，只验证账号与原参与方身份
-     */
     private void deliver(Conn conn, Long sessionId, Map<String, Object> payload, boolean requireNormalModeration) {
         if (conn.getWs() == null) {
             return;
@@ -127,7 +123,6 @@ public class ConsultPush {
         }
     }
 
-    /** 失效账号直接关闭；连接注销与医生在线状态沿用 afterConnectionClosed 的现有关闭回调 */
     private void closeForAccount(Conn conn) {
         try {
             conn.getWs().close(CloseStatus.POLICY_VIOLATION.withReason("account disabled"));

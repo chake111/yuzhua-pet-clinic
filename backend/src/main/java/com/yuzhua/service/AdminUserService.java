@@ -21,12 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-/**
- * 后台账号（ADMIN 管理员 / DOCTOR 医生）。
- *
- * 医生不单独建登录体系，而是通过 doctorId 绑定到 doctor 行，
- * 这样接诊工作台可以用 doctorId 一行过滤出"我的"数据。
- */
 @Service
 @RequiredArgsConstructor
 public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
@@ -114,10 +108,6 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
         return a.getDoctorId() == null ? null : doctorMapper.selectById(a.getDoctorId());
     }
 
-    /**
-     * 医生账号的头像以医生档案为准：admin_user 只承担登录身份，
-     * doctor.avatar 才是医生在用户端露出的那张脸，两处各存一份必然对不上。
-     */
     private static String avatarOf(AdminUser a, Doctor d) {
         if (a.getAvatar() != null && !a.getAvatar().isBlank()) {
             return a.getAvatar();

@@ -3,9 +3,6 @@ package com.yuzhua.dto;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/**
- * 取消预约。理由可空（用户手滑取消了也要能退），但落库前会去掉空白。
- */
 @Data
 public class CancelForm {
 

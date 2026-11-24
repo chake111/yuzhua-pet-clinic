@@ -13,9 +13,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
-/**
- * 双端共用接口。目前只有图片上传，需登录但不区分用户端/后台。
- */
 @Tag(name = "公共-上传")
 @RestController
 @RequestMapping("/common/upload")

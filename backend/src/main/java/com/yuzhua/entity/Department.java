@@ -5,9 +5,6 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * 科室。对应表 department。
- */
 @Data
 @TableName("department")
 public class Department {
@@ -17,7 +14,6 @@ public class Department {
 
     private String name;
     private String code;
-    /** 图标键名，见前端 utils/deptIcons.js；历史数据可能是 emoji 或图片 URL */
     private String icon;
     private String description;
     private Integer sort;

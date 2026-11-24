@@ -8,14 +8,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-/**
- * 预约订单。对应表 appointment。
- *
- * 状态机：
- *   0 待接诊 --医生接诊--> 1 已接诊 --结束问诊--> 2 已完成
- *   0/1 --用户或医生取消--> 3 已取消（号源回滚）
- *   0   --超时未到-------> 4 未到诊
- */
 @Data
 @TableName("appointment")
 public class Appointment {
@@ -38,10 +30,6 @@ public class Appointment {
 
     private String orderNo;
 
-    /**
-     * 下单幂等键。只在按 (user_id, idem_key) 回读原单时取用；
-     * select = false 让常规查询不带这一列，也不进 VO（内部重试标识，对前端无意义）。
-     */
     @TableField(select = false)
     private String idemKey;
 
@@ -51,7 +39,6 @@ public class Appointment {
     private Long departmentId;
     private Long scheduleId;
 
-    /** 1 在线图文问诊 2 到院门诊 */
     private Integer consultType;
     private LocalDate appointmentDate;
     private Integer period;
@@ -60,7 +47,6 @@ public class Appointment {
     private Integer queueNo;
 
     private String symptom;
-    /** 逗号分隔 URL */
     private String images;
 
     private BigDecimal amount;
@@ -73,7 +59,6 @@ public class Appointment {
     private LocalDateTime finishTime;
     private String cancelReason;
     private LocalDateTime cancelTime;
-    /** USER / DOCTOR / ADMIN / SYSTEM */
     private String cancelBy;
     private Integer isReviewed;
 
