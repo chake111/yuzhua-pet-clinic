@@ -58,7 +58,7 @@ async function pay() {
     await payAppointment(current.value.id, { silent: true })
     success.value = true
   } catch (cause) {
-    // A lost response can follow a successful payment; read back before offering retry.
+    // 原因: 支付请求响应丢失时后端可能已入账，提供重试前先回查订单真实支付状态
     try {
       current.value = await appointmentDetail(current.value.id, { silent: true })
       success.value = current.value?.payStatus === 1

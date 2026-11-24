@@ -2,11 +2,6 @@
 import { Plus, Select } from '@element-plus/icons-vue'
 import { PET_GENDER, text } from '@/utils/dict'
 
-/**
- * 宠物单选卡片（预约「就诊宠物」/ 图文问诊「问诊宠物」共用）：
- * 只负责选择与展示。列表加载、新增宠物弹窗和业务提交留在页面。
- * radio 组名两页不同，必须由页面传入 radioName，避免同页多实例互串。
- */
 defineProps({
   pets: { type: Array, required: true },
   modelValue: { type: Number, default: null },
@@ -23,7 +18,6 @@ function ageText(p) {
 </script>
 
 <script>
-/** 宠物列表加载后的选中规则：keep 且原选还在就保留；否则只有单只时自动选中，其余清空 */
 export function pickAfterLoad(list, currentId, keep) {
   if (keep && list.some((p) => p.id === currentId)) return currentId
   return list.length === 1 ? list[0].id : null

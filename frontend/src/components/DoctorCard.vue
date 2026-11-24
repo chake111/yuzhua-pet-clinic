@@ -5,7 +5,6 @@ import EntryIcon from '@/components/EntryIcon.vue'
 import { money } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 
-/** 医生卡片，首页推荐和找医生列表共用一张皮，改样式只改这里。 */
 const props = defineProps({
   doctor: { type: Object, required: true },
   to: { type: [String, Object], default: '' }

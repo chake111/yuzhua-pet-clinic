@@ -12,12 +12,6 @@ import { consultUnread } from '@/api/admin'
 import { useAdminStore } from '@/stores/admin'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 后台外壳：左侧菜单 + 顶部账号区。
- *
- * 管理员和医生共用这套界面，但菜单按角色裁剪——
- * 医生看到的是接诊工作台，全院口径的管理项（排班、医生、科室、公告）不给他。
- */
 const store = useAdminStore()
 const route = useRoute()
 const router = useRouter()
@@ -68,7 +62,7 @@ async function poll() {
   try {
     unread.value = (await consultUnread()) || 0
   } catch {
-    /* 静默：角标不是关键路径 */
+    // 原因: 轮询角标非关键路径，失败静默忽略以免频繁弹窗
   }
 }
 
@@ -80,7 +74,7 @@ watch(() => store.role, () => {
 
 onBeforeUnmount(() => clearInterval(timer))
 
-/** 顶栏头像与姓名以服务端为准：localStorage 里的快照可能还是改资料前的那份 */
+// 原因: localStorage 缓存可能滞后于资料修改，挂载后以服务端最新数据为准
 onMounted(() => { store.refresh().catch(() => {}) })
 
 async function logout() {

@@ -11,11 +11,6 @@ import { groupSlotsByDate, localNow } from '@/utils/schedule'
 import ImageGallery from '@/components/ImageGallery.vue'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 医生详情：资料 + 近期号源 + 就诊评价。
- * 号源先选日期再看当天时段，和挂号页共用同一套日期条；点有号的时段直接带号进预约页。
- * 底部两个入口是分开的：到院挂号（占号源、要支付）和图文问诊（免费直建会话）。
- */
 const route = useRoute()
 const router = useRouter()
 const store = useUserStore()
@@ -32,13 +27,11 @@ const reviewPage = ref(1)
 const loadingSlots = ref(false)
 const days = 7
 
-/** 按就诊日期归组，日期条一天一格 */
 const grouped = computed(() => groupSlotsByDate(slots.value))
 const specialty = computed(() =>
   (doctor.value?.specialty || '').split(',').map((s) => s.trim()).filter(Boolean)
 )
 
-/** 日期块上的余号数合计，比每格都写一遍「有号」更能帮用户挑日子 */
 function dayRemain(g) {
   return g.list.reduce((n, s) => n + (bookable(s) ? s.remainNum : 0), 0)
 }
@@ -46,13 +39,12 @@ function dayRemain(g) {
 const selectedDate = ref('')
 const currentDay = computed(() => grouped.value.find((g) => g.date === selectedDate.value) || null)
 
-/** 当前日期里最近一个可约时段：底部「立即挂号」和它的高亮一一对应，点了就带这个号进预约页 */
 function firstBookable(list) {
   return (list || []).find(bookable) || null
 }
 const nextSlot = computed(() => firstBookable(currentDay.value?.list))
 
-// nowTick 驱动 bookable 重新求值：页面跨过结束时间后 60 秒内自动禁用已结束时段
+// 原因: nowTick 每分钟刷新一次以驱动 bookable 自动禁用跨过结束时间的时段
 const nowTick = ref('')
 let nowTimer = null
 const clockNow = () => {
@@ -77,7 +69,6 @@ function slotState(s) {
   return `余 ${s.remainNum} / ${s.totalNum}`
 }
 
-/** 默认落在最近一个有号的日期；换号源后若已选日期还在就保持不动 */
 function pickDate() {
   if (grouped.value.some((g) => g.date === selectedDate.value)) return
   const first = grouped.value.find(dayHasBookable) || grouped.value[0]
@@ -93,7 +84,6 @@ function goBook(s) {
   router.push(`/book/${id}?scheduleId=${s.id}`)
 }
 
-/** 底部主操作优先落到当前日期最近的号；整天无号时进预约页自己挑 */
 function goBookNext() {
   if (nextSlot.value) return goBook(nextSlot.value)
   router.push(`/book/${id}`)

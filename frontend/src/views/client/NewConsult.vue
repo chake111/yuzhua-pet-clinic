@@ -9,10 +9,6 @@ import PetForm from '@/components/PetForm.vue'
 import PetPicker, { pickAfterLoad } from '@/components/PetPicker.vue'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 发起图文问诊：选宠物 + 描述症状，提交直接建会话并进聊天室。
- * 免费、不限量、不占号源——所以这里不选时段、不走支付，也不生成订单。
- */
 const route = useRoute()
 const router = useRouter()
 const doctorId = Number(route.params.doctorId)
@@ -40,7 +36,7 @@ async function submit() {
     ElMessage.success('已发起，等待医生接诊')
     router.replace(`/consult/${s.id}`)
   } catch {
-    // 保留输入，错误提示由请求层显示。
+    // 原因: 请求层已提示失败原因，此处保留表单输入供重试
   } finally {
     busy.value = false
   }

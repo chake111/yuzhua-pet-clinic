@@ -11,7 +11,6 @@ import StatusChip from '@/components/StatusChip.vue'
 import DeptIcon from '@/components/DeptIcon.vue'
 import { DEPT_ICONS } from '@/utils/deptIcons'
 
-/** 科室管理。icon 存图标键名（如 stethoscope），用户端首页与后台列表共用 DeptIcon 渲染。 */
 const rows = ref([])
 const total = ref(0)
 const loading = ref(false)

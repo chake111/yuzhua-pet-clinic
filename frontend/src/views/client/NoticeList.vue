@@ -9,7 +9,6 @@ import { NOTICE_TYPE, options, text } from '@/utils/dict'
 import { toDate } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 
-/** 公告与养宠科普列表，类型筛选 + 标题搜索。 */
 const router = useRouter()
 const route = useRoute()
 const rows = ref([])

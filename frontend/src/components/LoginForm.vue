@@ -3,15 +3,7 @@ import { reactive, ref, watch } from 'vue'
 import EntryIcon from '@/components/EntryIcon.vue'
 import LoginScene from '@/components/LoginScene.vue'
 
-/**
- * 登录表单（用户端、后台登录页共用）：统一输入、校验、loading、
- * Enter 提交（中文输入法组合期忽略）。登录请求 login、欢迎语与成功跳转
- * onSuccess（拿到 store.login 的返回值，role 分流在页面回调里做）都由页面传入；
- * 表单下方链接区走默认插槽，两端切换入口走 #switch 插槽。不碰 Store。
- *
- * 采用原生表单元素 + Element Plus 同名样式类，彻底脱离 el-form / el-input 的
- * async-validator 与 Popper 运行时依赖，同时像素级复用 LoginScene 与 main.css 样式契约。
- */
+// 原因: 使用原生表单控件配合 Element Plus 同名类名，避免将 el-form 依赖打入首屏入口包
 const props = defineProps({
   login: { type: Function, required: true },
   onSuccess: { type: Function, required: true },
@@ -79,7 +71,7 @@ async function submit() {
     const vo = await props.login(form.value)
     props.onSuccess(vo)
   } catch {
-    /* 失败原因请求层已提示 */
+    // 原因: 请求层已统一提示失败原因，此处保留表单输入并由 finally 复位 loading
   } finally {
     busy.value = false
   }

@@ -1,9 +1,3 @@
-/**
- * 与数据库注释一一对应的枚举文案。
- * 集中放这里，是为了让"改口径"只改一处；tag 决定状态胶囊的语义色，
- * 取值对齐 docs/design.md 的 status-chip：ongoing 蓝 / success 绿 / warning 橙 /
- * danger 红 / terminated 灰。品牌红（Rausch）不在这套语义里，它只表示"动作"。
- */
 export const APPT_STATUS = {
   0: { text: '待接诊', tag: 'warning' },
   1: { text: '就诊中', tag: 'ongoing' },
@@ -28,14 +22,12 @@ export const SESSION_STATUS = {
   2: { text: '已结束', tag: 'terminated' }
 }
 
-/** 管理员处置（与 SESSION_STATUS 正交的治理轴；非 0 时参与方不可见该会话） */
 export const MODERATE_STATUS = {
   0: { text: '未处置', tag: 'success' },
   1: { text: '无效关闭', tag: 'warning' },
   2: { text: '违规屏蔽', tag: 'danger' }
 }
 
-/** 单条消息的屏蔽状态（管理员审计视图标注用） */
 export const CONSULT_MSG_STATUS = {
   0: { text: '正常', tag: 'success' },
   1: { text: '已屏蔽', tag: 'danger' }
@@ -68,11 +60,9 @@ export const NOTICE_STATUS = {
 export const ACCOUNT_STATUS = { 0: { text: '禁用', tag: 'danger' }, 1: { text: '正常', tag: 'success' } }
 export const CANCEL_BY = { USER: '用户取消', DOCTOR: '医生取消', ADMIN: '管理员取消', SYSTEM: '系统超时取消' }
 
-/** 预约状态的可选项，下拉框直接用它，避免每个页面各写一份 */
 export const options = (map) =>
   Object.entries(map).map(([k, v]) => ({ value: Number(k), label: typeof v === 'string' ? v : v.text }))
 
 export const text = (map, key, fallback = '—') => map[key]?.text ?? map[key] ?? fallback
 
-/** 取枚举里配好的状态色 tone，省去页面里按文案反推；没配 tag 的当内容标签处理 */
 export const tagType = (map, key) => map[key]?.tag ?? 'plain'

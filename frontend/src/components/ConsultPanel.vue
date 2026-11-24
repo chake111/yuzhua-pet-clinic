@@ -11,12 +11,6 @@ import { closeImageViewerFor, openImageViewer } from '@/utils/imageViewer'
 import { ConsultSocket } from '@/utils/consultSocket'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 图文问诊聊天面板，用户端与医生工作台共用。
- *
- * 消息只走 WebSocket 收发，历史一律以库为准：首次和重连从 HISTORY 恢复最近 20 条，
- * 更早历史走 REST beforeId 游标，不再使用总条数和递增页码。
- */
 const emit = defineEmits(['statusChanged', 'presenceChanged'])
 
 const props = defineProps({
@@ -25,7 +19,6 @@ const props = defineProps({
   closed: { type: Boolean, default: false },
   peerLabel: { type: String, default: '医生' },
   previewOwner: { type: Symbol, default: null },
-  /** 患者侧「去预约挂号」用：建议到院卡片要跳去这位医生的挂号页 */
   doctorId: { type: Number, default: null }
 })
 
@@ -34,7 +27,7 @@ const hasMore = ref(false)
 const historyReady = ref(false)
 let epoch = 0
 let pendingMessages = []
-// 只记下服务端明确确认的消息ID；不能把较小ID推断成已读。
+// 原因: 仅记录服务端精确确认的消息 ID，不可将较小 ID 推断为已读
 const confirmedReadIds = new Set()
 const moreLabel = computed(() => `加载更早的消息（已载入 ${rows.value.length} 条）`)
 const rows = ref([])
@@ -59,35 +52,16 @@ const previewOwner = props.previewOwner || Symbol('consult-preview')
 const router = useRouter()
 let sock = null
 
-/**
- * 页面是否真的在看这个会话。
- *
- * 已读是"有人看见了"的事实，不是"连接建立了"或"有一帧到了"。后台标签页、
- * 手机切走后连接照样开着、消息照样落进 rows，这时标已读等于替用户替他把消息读了。
- * 所以发 READ 帧前必须同时满足：页面可见 + 历史已渲染。连接没打开时 sock.read()
- * 自己就返回 false（见 ConsultSocket#read），这里不重复判断连接状态。
- */
 const pageVisible = ref(true)
 
-/** 取当前页面可见性。测试与 SSR 里没有 document，按"可见"处理，与浏览器前台行为一致 */
 function readVisibility() {
   const doc = globalThis.document
+  // 原因: 测试与 SSR 环境无 document 时按前台可见处理
   return doc ? doc.visibilityState !== 'hidden' : true
 }
 
-/**
- * 发一次已读。前置门是"页面可见 ∧ 历史已渲染"。
- *
- * <p>为什么不需要补发队列：断线与重连退避期间 `historyReady` 已被清成 false，
- * 这个门会直接挡掉调用，`ConsultSocket#read()` 根本不会被调用——不存在
- * "发出去了但被丢掉"的帧。真正的发帧时刻是 HISTORY 渲染完成（`onFrame` 里同样调这里），
- * 而服务端每次 SUBSCRIBE 都会回 HISTORY，所以重连后一定会补上。
- *
- * <p>（曾尝试过在 `onState('open')` 里 flush 一个 pending 标记，但真实时序是
- * `close → connect → open → HISTORY`，`'connect'` 走断开分支会清掉标记，
- * 那段代码永远跑不到。删掉比留着好排查。）
- */
 function markReadIfSeen() {
+  // 原因: 后台标签页或断线重连 HISTORY 未渲染前不可发送 READ，避免替用户误标已读
   if (!pageVisible.value || !historyReady.value) return
   sock?.read()
 }
@@ -95,18 +69,15 @@ function markReadIfSeen() {
 const myRole = computed(() => (props.kind === 'admin' ? 'DOCTOR' : 'USER'))
 const isMine = (m) => m.senderRole === myRole.value
 
-/** 只认服务端精确确认过的ID：不在集合内的消息（含恢复的被屏蔽消息）一律不算已读 */
 function isConfirmedRead(m) {
   return m.senderRole === myRole.value && confirmedReadIds.has(m.id)
 }
 
-/** 同一天连续的消息只在第一条上标日期，界面更干净 */
 function showDate(i) {
   const cur = toDate(rows.value[i]?.createTime)
   return i === 0 || toDate(rows.value[i - 1]?.createTime) !== cur
 }
 
-/** 已载入消息里的图片。点开一张就能左右翻完整场问诊的患部照片 */
 const shots = computed(() => rows.value.filter((m) => m.msgType === 'IMAGE'))
 const shotUrls = computed(() => shots.value.map((m) => m.content))
 const shotCaptions = computed(() =>
@@ -127,7 +98,6 @@ async function scrollBottom() {
   if (box.value) box.value.scrollTop = box.value.scrollHeight
 }
 
-/** 按 id 去重合并、正序展示；isRead 只能前进（READ 已到本地就不再被旧快照回退成未读） */
 function mergeMessages(messages) {
   const byId = new Map(rows.value.map((m) => [m.id, m]))
   for (const m of messages) {
@@ -143,125 +113,153 @@ function push(msg) {
   scrollBottom()
 }
 
+function enqueueOrPush(msg) {
+  if (!historyReady.value) {
+    pendingMessages.push(msg)
+    return false
+  }
+  push(msg)
+  return true
+}
+
+function restoreScrollAnchor(oldHeight, oldTop) {
+  if (box.value) {
+    box.value.scrollTop = oldTop + box.value.scrollHeight - oldHeight
+  }
+}
+
 async function loadEarlier() {
-  if (loadingMore.value || !historyReady.value || !hasMore.value || !rows.value.length) return
+  const ready = !loadingMore.value && historyReady.value && hasMore.value && rows.value.length > 0
+  if (!ready) return
   const version = epoch
   const sid = props.sessionId
-  const beforeId = rows.value[0].id
   const api = props.kind === 'admin' ? adminMessages : consultMessages
   loadingMore.value = true
   try {
-    const page = await api(sid, { pageNum: 1, pageSize: PAGE, beforeId })
+    const page = await api(sid, { pageNum: 1, pageSize: PAGE, beforeId: rows.value[0].id })
     if (version !== epoch || sid !== props.sessionId) return
     const oldHeight = box.value?.scrollHeight || 0
     const oldTop = box.value?.scrollTop || 0
     mergeMessages(page.records)
     hasMore.value = page.records.length < page.total
     await nextTick()
-    if (version === epoch && box.value) {
-      box.value.scrollTop = oldTop + box.value.scrollHeight - oldHeight
-    }
+    if (version === epoch) restoreScrollAnchor(oldHeight, oldTop)
   } catch {
-    // HTTP 封装已经显示错误；保留游标和 hasMore，允许重试。
+    // 原因: 请求层已弹出失败提示；保留游标与 hasMore 以便用户重试
   } finally {
     if (version === epoch) loadingMore.value = false
   }
 }
 
-function onFrame(f) {
-  if (f.sessionId != null && f.sessionId !== props.sessionId) return
-  if (f.type === 'HISTORY') {
-    const messages = f.messages || []
-    // 已读状态只前进：换出旧窗口前记下本地已确认的已读，避免旧快照把 READ 退回未读
-    const confirmedRead = new Map([...rows.value, ...pendingMessages]
-      .filter((m) => m.isRead).map((m) => [m.id, m.isRead]))
-    rows.value = []
-    mergeMessages(messages)
-    mergeMessages(pendingMessages)
-    pendingMessages = []
-    if (confirmedRead.size) {
-      for (const m of rows.value) {
-        const r = confirmedRead.get(m.id)
-        if (r && !m.isRead) m.isRead = r
-      }
-    }
-    hasMore.value = messages.length === PAGE
-    historyReady.value = true
-    scrollBottom()
-    // 进房/重连只补历史；已读由这里按"页面是否可见"决定，不再由服务端在 SUBSCRIBE 时代办
-    markReadIfSeen()
-  } else if (f.type === 'MSG') {
-    if (!f.message || f.message.sessionId !== props.sessionId) return
-    if (!historyReady.value) pendingMessages.push(f.message)
-    else push(f.message)
-    if (f.message.senderRole !== myRole.value) markReadIfSeen()
-  } else if (f.type === 'PRESENCE') {
-    online.value = !!f.doctorOnline
-  } else if (f.type === 'READ') {
-    const peerRole = myRole.value === 'USER' ? 'DOCTOR' : 'USER'
-    if (f.sessionId !== props.sessionId || f.role !== peerRole ||
-        !Array.isArray(f.readMessageIds) || f.readMessageIds.length > 200 ||
-        !f.readMessageIds.every((id) => Number.isSafeInteger(id) && id > 0)) return
-    for (const id of f.readMessageIds) confirmedReadIds.add(id)
-    for (const m of [...rows.value, ...pendingMessages]) {
-      if (isConfirmedRead(m)) m.isRead = 1
-    }
-  } else if (f.type === 'SESSION') {
-    // REST 侧接诊/结束在事务提交后推来的帧：系统消息按 ID 走同一条合并路径（不重复），
-    // 会话状态/小结由父组件 load() 刷新——发送区关闭与小结横幅都来自父组件的会话数据
-    if (f.status === 2) serverClosed.value = true
-    if (f.message?.id != null) {
-      if (!historyReady.value) pendingMessages.push(f.message)
-      else push(f.message)
-    }
-    emit('statusChanged', f)
-  } else if (f.type === 'MESSAGE_VISIBILITY') {
-    if (f.hidden === 1) {
-      closeImageViewerFor(previewOwner)
-      hiddenIds.add(f.messageId)
-      rows.value = rows.value.filter(m => m.id !== f.messageId)
-      pendingMessages = pendingMessages.filter(m => m.id !== f.messageId)
-    } else {
-      hiddenIds.delete(f.messageId)
-      if (!f.message || f.message.sessionId !== props.sessionId) return
-      if (!historyReady.value) pendingMessages.push(f.message)
-      else {
-        push(f.message)
-        if (f.message.senderRole !== myRole.value) markReadIfSeen()
-      }
-    }
-  } else if (f.type === 'MODERATION') {
-    if (f.moderateStatus !== 0) {
-      serverClosed.value = true
-      rows.value = []
-      stop()
-    }
-    emit('statusChanged', f)
-  } else if (f.type === 'ERROR') {
-    if (!historyReady.value) {
-      // HISTORY 初始化失败：socket 已不可用，进入终止态并停掉重连，提示整页刷新
-      stop()
-      state.value = 'sync-failed'
-      ElMessage.error(f.msg || '会话同步失败，请刷新页面重试')
-    } else {
-      // 业务层失败（如会话已结束仍发消息）只提示，连接本身没坏，不改连接状态
-      ElMessage.error(f.msg || '发送失败')
-    }
+function restoreConfirmedReads(confirmedRead) {
+  if (!confirmedRead.size) return
+  for (const m of rows.value) {
+    const r = confirmedRead.get(m.id)
+    if (r && !m.isRead) m.isRead = r
   }
 }
 
+function handleHistoryFrame(f) {
+  const messages = f.messages || []
+  // 原因: 已读状态只前进，重连换出旧窗口前保留本地已确认记录，防旧快照回退
+  const confirmedRead = new Map(
+    [...rows.value, ...pendingMessages].filter((m) => m.isRead).map((m) => [m.id, m.isRead])
+  )
+  rows.value = []
+  mergeMessages(messages)
+  mergeMessages(pendingMessages)
+  pendingMessages = []
+  restoreConfirmedReads(confirmedRead)
+  hasMore.value = messages.length === PAGE
+  historyReady.value = true
+  scrollBottom()
+  // 原因: 服务端在 SUBSCRIBE 仅补发历史，已读回执需在渲染后按页面可见性决定是否触发
+  markReadIfSeen()
+}
+
+function handleMsgFrame(f) {
+  if (!f.message || f.message.sessionId !== props.sessionId) return
+  enqueueOrPush(f.message)
+  if (f.message.senderRole !== myRole.value) markReadIfSeen()
+}
+
+function handleReadFrame(f) {
+  const peerRole = myRole.value === 'USER' ? 'DOCTOR' : 'USER'
+  const validIds = Array.isArray(f.readMessageIds)
+    && f.readMessageIds.length <= 200
+    && f.readMessageIds.every((id) => Number.isSafeInteger(id) && id > 0)
+  if (f.sessionId !== props.sessionId || f.role !== peerRole || !validIds) return
+  for (const id of f.readMessageIds) confirmedReadIds.add(id)
+  for (const m of [...rows.value, ...pendingMessages]) {
+    if (isConfirmedRead(m)) m.isRead = 1
+  }
+}
+
+function handleSessionFrame(f) {
+  if (f.status === 2) serverClosed.value = true
+  if (f.message?.id != null) enqueueOrPush(f.message)
+  emit('statusChanged', f)
+}
+
+function handleMessageVisibilityFrame(f) {
+  if (f.hidden === 1) {
+    closeImageViewerFor(previewOwner)
+    hiddenIds.add(f.messageId)
+    rows.value = rows.value.filter(m => m.id !== f.messageId)
+    pendingMessages = pendingMessages.filter(m => m.id !== f.messageId)
+    return
+  }
+  hiddenIds.delete(f.messageId)
+  if (!f.message || f.message.sessionId !== props.sessionId) return
+  if (enqueueOrPush(f.message) && f.message.senderRole !== myRole.value) {
+    markReadIfSeen()
+  }
+}
+
+function handleModerationFrame(f) {
+  if (f.moderateStatus !== 0) {
+    serverClosed.value = true
+    rows.value = []
+    stop()
+  }
+  emit('statusChanged', f)
+}
+
+function handleErrorFrame(f) {
+  if (!historyReady.value) {
+    // 原因: HISTORY 初始化失败后连接已不可用，进入终止态并停掉重连
+    stop()
+    state.value = 'sync-failed'
+    ElMessage.error(f.msg || '会话同步失败，请刷新页面重试')
+    return
+  }
+  ElMessage.error(f.msg || '发送失败')
+}
+
+const FRAME_HANDLERS = {
+  HISTORY: handleHistoryFrame,
+  MSG: handleMsgFrame,
+  PRESENCE: (f) => { online.value = !!f.doctorOnline },
+  READ: handleReadFrame,
+  SESSION: handleSessionFrame,
+  MESSAGE_VISIBILITY: handleMessageVisibilityFrame,
+  MODERATION: handleModerationFrame,
+  ERROR: handleErrorFrame
+}
+
+function onFrame(f) {
+  if (f.sessionId != null && f.sessionId !== props.sessionId) return
+  FRAME_HANDLERS[f.type]?.(f)
+}
+
 function onState(s) {
-  // 'error' 不当成连接状态：ws.onerror 可能在没有紧接 close 的情况下单独触发，
-  // 此时连接实际还开着。若把它写成 state，模板会常驻"连接或消息处理失败"横幅、
-  // 在线状态也一直为空，而聊天其实可用；若再顺手清 historyReady，就再也不会收到
-  // 新的 HISTORY（没断就不会重连），markReadIfSeen 永久提前返回，未读再也清不掉。
+  // 原因: ws.onerror 可能无后续 close 而单独触发，连接仍可用；改写 state 或清 historyReady 会锁死已读发送
   if (s === 'error') {
     online.value = false
     return
   }
   state.value = s
   if (s === 'connect') {
-    // 新连接重新以服务端历史为准；本次连接随后收到的屏蔽事件仍保留到 HISTORY 合并。
     hiddenIds.clear()
     closeImageViewerFor(previewOwner)
   }
@@ -276,26 +274,17 @@ function onState(s) {
 }
 
 function onSendKeydown(event) {
-  // 契约动机: 防止确认候选词时误发送草稿——输入法上屏确认同样触发回车，不先排掉组合事件
-  // （isComposing / keyCode 229）就会把没打完的草稿发出去、还会清掉它。
+  // 原因: 输入法候选上屏同样触发 Enter，必须排除 isComposing/keyCode 229 防误发半成品草稿
   if (event.isComposing || event.keyCode === 229) return
   event.preventDefault()
   send()
 }
 
-/**
- * 发送中状态：按钮在此期间不可再次触发，但输入框保持可编辑。
- * 成功只清掉"本次发出去的那段"，发送期间新敲的字留在输入框里。
- */
 const sending = ref(false)
 const sendingImage = ref(false)
 
-/**
- * 收到保存回执后移除已发送内容。
- * 按发送瞬间的原文做前缀匹配：用户在等待期间追加的文字不会被一起清掉；
- * 若草稿已被改动到对不上，则整段保留——宁可多留一段，也不能吞掉用户刚敲的字。
- */
 function consumeDraft(sent) {
+  // 原因: 按发送瞬间原文做前缀匹配，保留发送等待期间用户新输入的文字
   if (draft.value === sent) draft.value = ''
   else if (draft.value.startsWith(sent)) draft.value = draft.value.slice(sent.length)
 }
@@ -312,7 +301,6 @@ async function send() {
     await sock.chatConfirmed(text, 'TEXT')
     consumeDraft(sent)
   } catch (error) {
-    // 未落库的内容留在输入框，用户可直接重试
     ElMessage.error(error.message)
   } finally {
     sending.value = false
@@ -334,13 +322,13 @@ async function sendImage(e) {
     try {
       ({ url } = await upload(f, props.kind))
     } catch {
-      return // 上传失败的提示由请求层统一给出，这里不重复弹
+      // 原因: 上传失败的提示由请求层统一给出，这里直接中止避免重复弹窗
+      return
     }
     if (version !== epoch || sender !== sock || roomClosed.value) return
     try {
       await sender.chatConfirmed(url, 'IMAGE')
     } catch (error) {
-      // 文件已上传但消息没落库：明确告知，避免用户以为发过了
       ElMessage.error(`图片未发送：${error.message}`)
     }
   } finally {
@@ -348,7 +336,6 @@ async function sendImage(e) {
   }
 }
 
-/** 医生建议到院：发一张 SUGGEST 卡片，患者点卡片直达挂号页。附言选填 */
 async function suggest() {
   if (roomClosed.value) return ElMessage.warning('问诊已结束')
   if (suggesting.value) return
@@ -397,10 +384,6 @@ function openConsult() {
   sock.connect(props.sessionId)
 }
 
-/**
- * 切回页面时补一次已读：离开期间到达并已渲染（或排队待合并）的消息，
- * 在用户真正看到页面的这一刻才算读过。切走时不做任何事——正在标已读的是"看不见"。
- */
 function onVisibilityChange() {
   pageVisible.value = readVisibility()
   if (pageVisible.value) markReadIfSeen()

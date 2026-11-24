@@ -1,12 +1,11 @@
 import { getToken } from './token.js'
 
 /**
- * 图文问诊的 WebSocket 客户端。
+ * 图文问诊 WebSocket 客户端（用户端与医生工作台共用）。
  *
- * 浏览器建连时不能自定义请求头，token 只能挂在 query 上（后端也只在这里接受 query token）。
- * 协议四类上行 / 数类下行，见后端 ConsultWebSocketHandler 的类注释。
- *
- * 握手携带 sessionId 自动订阅；每次 HISTORY 重置最近消息窗口，更早记录按 beforeId 查询。
+ * 浏览器建连无法自定义请求头，token 仅能通过 query 传参；握手携带 sessionId 自动订阅。
+ * 每次 HISTORY 重置最近消息窗口；指数退避重连上限 4 次，reason='replaced' 时直接终止。
+ * chatConfirmed 仅在收到匹配 requestId 的 ACK 时 resolve；ERROR、断连或 10s 超时均 reject 以保留草稿。
  */
 export class ConsultSocket {
   constructor({ kind = 'client', onFrame, onState } = {}) {
@@ -93,7 +92,7 @@ export class ConsultSocket {
 
   startPing() {
     this.stopPing()
-    // 空闲连接会被中间层掐掉，30s 一次 PING 保活
+    // 原因: 空闲连接会被代理中间层切断，需每 30 秒发送 PING 保活
     this.pingTimer = setInterval(() => this.send({ type: 'PING' }), 30000)
   }
 
@@ -110,13 +109,6 @@ export class ConsultSocket {
     return false
   }
 
-  /**
-   * 发一条需要保存确认的消息。
-   *
-   * 只有收到后端 ACK（消息已落库）才 resolve；业务拒绝、连接断开、回执超时都 reject，
-   * 调用方据此保留草稿。不再提供"发出即成功"的 fire-and-forget 版本——浏览器发送成功
-   * 只代表字节进了 socket，后端可能因会话已结束等原因拒收。
-   */
   chatConfirmed(content, msgType) {
     if (this.ws?.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error('连接已断开，消息未发送'))

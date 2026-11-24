@@ -1,9 +1,4 @@
 <script setup>
-/**
- * 状态标签。色块不单独承载信息：浅底 + 同色文字 + 4px 前置圆点 + 文案，
- * 色盲用户也能分辨（WCAG 1.4.1）。tone 直接吃 dict.js 里的 tag 值；
- * plain 是内容标签（科室、擅长、种类），不带状态语义。
- */
 defineProps({
   tone: { type: String, default: 'plain' },
   size: { type: String, default: 'md' }

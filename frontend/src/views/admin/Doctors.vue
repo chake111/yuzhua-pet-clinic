@@ -11,16 +11,12 @@ import { money, toDate } from '@/utils/format'
 import { hiddenColumns } from '@/utils/tableDensity'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 医生档案。评分、接诊量、在线状态是聚合出来的，表单不提供编辑入口，
- * 只能「刷新统计」让后端重算一次。
- */
 const rows = ref([])
 const total = ref(0)
 const loading = ref(false)
 const depts = ref([])
 const q = reactive({ pageNum: 1, pageSize: 20, keyword: '', departmentId: null, status: null, sort: '' })
-// 查询时提交筛选快照，翻页和操作后的刷新沿用已提交条件。
+// 原因: 翻页与操作刷新沿用已提交筛选快照，避免未点查询的草稿生效
 let applied = { ...q }
 
 const open = ref(false)
@@ -66,7 +62,7 @@ function openCreate() {
   open.value = true
 }
 
-// 编辑前拉详情：列表行是 DoctorVo（手机号被屏蔽），直接回填会把手机号冲成空
+// 原因: 列表行 DoctorVo 手机号已脱敏，编辑前必须拉详情防止保存时把手机号覆写成空
 let editSeq = 0
 
 async function openEdit(row) {
@@ -75,10 +71,11 @@ async function openEdit(row) {
   try {
     detail = await doctorDetail(row.id)
   } catch {
-    // 请求失败不打开可提交的空白表单，提示由请求层负责
+    // 原因: 请求失败不打开空白可提交表单，避免误覆写医生档案
     return
   }
-  if (seq !== editSeq) return // 快速切换医生：旧响应不得覆盖新编辑对象
+  // 原因: 防止快速切换医生时旧异步响应覆盖当前编辑对象
+  if (seq !== editSeq) return
   editing.value = row
   form.value = { ...blank(), ...detail }
   specialtyTags.value = (detail.specialty || '').split(',').filter(Boolean)
@@ -130,22 +127,18 @@ async function del(row) {
   load()
 }
 
-// 十列合计 1112px，1440 的表格可用宽 1142，1280 只剩 982，1152 只剩 854。
-// 与其把列压到换行，不如按容器实际宽度收起次要列（规则见 utils/tableDensity.js）。
-// 用容器宽度而不是 window.innerWidth：后台可用宽 = 视口 − 侧栏 − 内外边距，
-// 侧栏在窄屏还会自动折叠，这条关系不单调，写死视口阈值必然在边界上差几十像素。
+// 原因: 侧栏自动折叠使可用宽与视口非单调，必须按容器实测宽度计算隐列（见 tableDensity.js）
 const tableCard = ref(null)
 const cardWidth = ref(0)
 const hidden = computed(() => hiddenColumns(cardWidth.value))
-// 最窄一档（医生+状态+操作）需要 450px。装不下时不再固定操作列，改为整表横向滚动——
-// 固定列会永远盖住它左边那列，宁可能滚，也不要把状态压没。
+// 原因: 低于最窄档 450px 时取消固定操作列改整表横滚，避免固定列盖住左侧状态列
 const pinActions = computed(() => cardWidth.value >= 450)
 let observer = null
 
 onMounted(() => {
   observer = new ResizeObserver(([entry]) => { cardWidth.value = entry.contentRect.width })
   if (tableCard.value) {
-    // 先同步量一次内容盒：否则首帧按 0 宽渲染成最窄档，下一帧才跳成 5 列，会闪一下
+    // 原因: 挂载即同步测量一次内容宽度，防止首帧按 0 宽渲染再跳变造成闪烁
     const style = getComputedStyle(tableCard.value)
     cardWidth.value = tableCard.value.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
     observer.observe(tableCard.value)
@@ -228,7 +221,6 @@ onBeforeUnmount(() => observer?.disconnect())
         <el-table-column label="操作" width="210" :fixed="pinActions ? 'right' : false">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-            <!-- 停诊/出诊是动作，不是状态：状态色留给「在线」「状态」两列，这里保持中性文字链 -->
             <el-button link size="small" @click="toggle(row)">
               {{ row.status === 1 ? '停诊' : '出诊' }}
             </el-button>
@@ -276,7 +268,6 @@ onBeforeUnmount(() => observer?.disconnect())
         </el-form-item>
         <el-form-item label="头像链接"><el-input v-model="form.avatar" placeholder="请输入图片链接（选填）" /></el-form-item>
         <el-form-item label="简介"><el-input v-model="form.introduction" type="textarea" :rows="3" maxlength="500" show-word-limit /></el-form-item>
-        <!-- 列表里删掉了「录入」列（十列塞不进 1440），建档时间在这里保留可查 -->
         <el-form-item v-if="editing && form.createTime" label="录入时间">
           <span class="pc-muted">{{ toDate(form.createTime) }}</span>
         </el-form-item>

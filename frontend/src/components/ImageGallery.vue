@@ -3,10 +3,6 @@ import { computed } from 'vue'
 import { PictureFilled, ZoomIn } from '@element-plus/icons-vue'
 import { openImageViewer } from '@/utils/imageViewer'
 
-/**
- * 成组缩略图。点任意一张进全站查看器，同一组图整体带进去，进去就能左右翻。
- * urls 直接吃后端约定的逗号串，页面里不必再 split。
- */
 const props = defineProps({
   urls: { type: [String, Array], default: '' },
   size: { type: Number, default: 88 },

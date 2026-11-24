@@ -10,10 +10,6 @@ import { toDate } from '@/utils/format'
 import DoctorCard from '@/components/DoctorCard.vue'
 import DeptIcon from '@/components/DeptIcon.vue'
 
-/**
- * 首页。后端把科室、推荐医生、公告打包在一个接口里返回，
- * 首屏一次请求就能画完。未登录也可浏览（需求 G3）。
- */
 const router = useRouter()
 const failed = ref(false)
 const loading = ref(true)
