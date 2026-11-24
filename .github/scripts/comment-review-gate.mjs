@@ -127,12 +127,16 @@ function sleep(ms) {
 export async function fetchWithRetry(
   url,
   init,
-  { fetchImpl = fetch, maxRetries = 3, baseDelayMs = 1000 } = {}
+  { fetchImpl = fetch, maxRetries = 3, baseDelayMs = 1000, timeoutMs = 90000 } = {}
 ) {
   let lastErr
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const res = await fetchImpl(url, init)
+      const requestInit =
+        init?.signal || typeof AbortSignal?.timeout !== 'function' || !(timeoutMs > 0)
+          ? init
+          : { ...init, signal: AbortSignal.timeout(timeoutMs) }
+      const res = await fetchImpl(url, requestInit)
       if (res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) {
         if (attempt < maxRetries) {
           const retryAfter = Number(res.headers?.get?.('retry-after') || 0)
@@ -344,10 +348,13 @@ async function runSingleReviewerOnBatch({
   rubricText,
   fetchImpl = fetch,
   baseDelayMs = 1000,
+  schemaFallbackCache = null,
 }) {
   if (!apiKey) {
     return { reviewerId: reviewer.id, ok: false, error: `Missing API key (${reviewer.key_env})` }
   }
+
+  const cacheKey = `${reviewer.provider}|${reviewer.base_url}|${reviewer.model_id}`
 
   try {
     // Pass 1: Blind Inference
@@ -367,31 +374,44 @@ async function runSingleReviewerOnBatch({
     const pass2Msgs = buildPass2Messages(batch, pass1Summary, rubricText, nonce)
 
     let rawContent = ''
-    let usedSchemaFallback = false
-    try {
+    let usedSchemaFallback = Boolean(schemaFallbackCache?.has(cacheKey))
+    if (usedSchemaFallback) {
       const res = await callModelEndpoint({
         reviewer,
         apiKey,
         messages: pass2Msgs,
-        useSchema: true,
+        useSchema: false,
         fetchImpl,
         baseDelayMs,
       })
       rawContent = res.content
-    } catch (err) {
-      if (err.status === 400 || err.status === 422) {
-        usedSchemaFallback = true
+    } else {
+      try {
         const res = await callModelEndpoint({
           reviewer,
           apiKey,
           messages: pass2Msgs,
-          useSchema: false,
+          useSchema: true,
           fetchImpl,
           baseDelayMs,
         })
         rawContent = res.content
-      } else {
-        throw err
+      } catch (err) {
+        if (err.status === 400 || err.status === 422) {
+          usedSchemaFallback = true
+          schemaFallbackCache?.add(cacheKey)
+          const res = await callModelEndpoint({
+            reviewer,
+            apiKey,
+            messages: pass2Msgs,
+            useSchema: false,
+            fetchImpl,
+            baseDelayMs,
+          })
+          rawContent = res.content
+        } else {
+          throw err
+        }
       }
     }
 
@@ -694,13 +714,16 @@ export async function runReviewGate({
   mode = 'advisory',
   fetchImpl = fetch,
   baseDelayMs = 1000,
+  schemaFallbackCache = new Set(),
 }) {
   const precheckPIHits = detectPromptInjectionPrecheck(items)
   const batches = buildBatches(items, { maxFiles: 8, maxItems: 40 })
 
   // Run each reviewer independently across all batches, keeping total concurrency <= 3
   const tasks = []
-  for (const batch of batches) {
+  let completedCalls = 0
+  for (let bIdx = 0; bIdx < batches.length; bIdx++) {
+    const batch = batches[bIdx]
     for (const reviewer of reviewers) {
       tasks.push(async () => {
         const res = await runSingleReviewerOnBatch({
@@ -710,7 +733,14 @@ export async function runReviewGate({
           rubricText,
           fetchImpl,
           baseDelayMs,
+          schemaFallbackCache,
         })
+        completedCalls++
+        if (batches.length > 1) {
+          console.error(
+            `[comment-review-gate] batch ${bIdx + 1}/${batches.length} ${reviewer.id}: ${res.ok ? 'ok' : 'err'} (${completedCalls}/${batches.length * reviewers.length})`
+          )
+        }
         return { reviewerId: reviewer.id, res }
       })
     }
@@ -893,6 +923,8 @@ export async function evaluateFixtures({
   const rubricText = fs.readFileSync(rubricPath, 'utf8')
   const reviewers = config.reviewers
 
+  const sharedSchemaFallbackCache = new Set()
+
   const runL2ForItem = async (fixture) => {
     if (mock) {
       // Deterministic mock evaluator reflecting realistic L2 behavior for offline test runs
@@ -965,14 +997,15 @@ export async function evaluateFixtures({
       mode: 'enforce',
       fetchImpl,
       baseDelayMs,
+      schemaFallbackCache: sharedSchemaFallbackCache,
     })
   }
 
   const redteamResults = []
   const goldenResults = []
 
-  // Batch redteam & golden evaluation cleanly (for live mode, batching saves RPM and latency!)
-  const evaluateGroup = async (fixtures) => {
+  // Batch redteam & golden evaluation cleanly (for live mode, concurrency <= 3 saves wall-clock time)
+  const evaluateGroup = async (fixtures, groupLabel) => {
     if (mock) {
       const out = []
       for (const fx of fixtures) {
@@ -983,86 +1016,89 @@ export async function evaluateFixtures({
       return out
     }
 
-    // In live mode, evaluate in batches through runReviewGate for throughput
-    const items = fixtures.map((fx) => ({
-      id: fx.id,
-      file: fx.file,
-      startLine: fx.startLine,
-      endLine: fx.endLine,
-      kind: fx.kind,
-      reason: 'fixture_eval',
-      commentText: fx.commentText,
-      codeContext: fx.codeContext,
-      allowedLines: Array.from(
-        { length: Math.max(12, fx.endLine - fx.startLine + 12) },
-        (_, idx) => Math.max(1, fx.startLine - 2 + idx)
-      ),
-    }))
-
-    // Note: isolate A5 prompt injection fixtures per-item so one PI doesn't taint the whole batch's prompt_injection_detected boolean!
+    // Isolate A5 prompt injection fixtures per-item so one PI doesn't taint the whole batch's prompt_injection_detected boolean
     const piFixtures = fixtures.filter((f) => f.category === 'A5')
     const normalFixtures = fixtures.filter((f) => f.category !== 'A5')
 
     const mapById = new Map()
+    const evalTasks = []
 
     for (const fx of piFixtures) {
-      const l1 = evaluateFixtureL1(fx)
-      const l2 = await runL2ForItem(fx)
-      mapById.set(fx.id, { fx, l1, l2 })
+      evalTasks.push(async () => {
+        const l1 = evaluateFixtureL1(fx)
+        const l2 = await runL2ForItem(fx)
+        mapById.set(fx.id, { fx, l1, l2 })
+        return fx.id
+      })
     }
 
-    // For normal fixtures, evaluate in batches of 5 items per batch
     for (let i = 0; i < normalFixtures.length; i += 5) {
       const slice = normalFixtures.slice(i, i + 5)
-      const batchItems = slice.map((fx) => ({
-        id: fx.id,
-        file: fx.file,
-        startLine: fx.startLine,
-        endLine: fx.endLine,
-        kind: fx.kind,
-        reason: 'fixture_eval',
-        commentText: fx.commentText,
-        codeContext: fx.codeContext,
-        allowedLines: Array.from(
-          { length: Math.max(12, fx.endLine - fx.startLine + 12) },
-          (_, idx) => Math.max(1, fx.startLine - 2 + idx)
-        ),
-      }))
-      const gateRes = await runReviewGate({
-        items: batchItems,
-        reviewers,
-        keysByEnv,
-        rubricText,
-        mode: 'enforce',
-        fetchImpl,
-        baseDelayMs,
-      })
-
-      for (const fx of slice) {
-        const l1 = evaluateFixtureL1(fx)
-        const matchingBlocking = gateRes.aggregation.blockingClusters.filter(
-          (c) => c.file === fx.file && c.line >= fx.startLine - 2 && c.line <= fx.endLine + 2
-        )
-        const l2Caught = gateRes.aggregation.infraFailure || gateRes.aggregation.promptInjection || matchingBlocking.length > 0
-        mapById.set(fx.id, {
-          fx,
-          l1,
-          l2: {
-            decision: l2Caught ? 'FAIL' : 'PASS',
-            aggregation: {
-              infraFailure: gateRes.aggregation.infraFailure,
-              promptInjection: gateRes.aggregation.promptInjection,
-              blockingClusters: matchingBlocking,
-            },
-          },
+      evalTasks.push(async () => {
+        const batchItems = slice.map((fx) => ({
+          id: fx.id,
+          file: fx.file,
+          startLine: fx.startLine,
+          endLine: fx.endLine,
+          kind: fx.kind,
+          reason: 'fixture_eval',
+          commentText: fx.commentText,
+          codeContext: fx.codeContext,
+          allowedLines: Array.from(
+            { length: Math.max(12, fx.endLine - fx.startLine + 12) },
+            (_, idx) => Math.max(1, fx.startLine - 2 + idx)
+          ),
+        }))
+        const gateRes = await runReviewGate({
+          items: batchItems,
+          reviewers,
+          keysByEnv,
+          rubricText,
+          mode: 'enforce',
+          fetchImpl,
+          baseDelayMs,
+          schemaFallbackCache: sharedSchemaFallbackCache,
         })
-      }
+
+        for (const fx of slice) {
+          const l1 = evaluateFixtureL1(fx)
+          const matchingBlocking = gateRes.aggregation.blockingClusters.filter(
+            (c) => c.file === fx.file && c.line >= fx.startLine - 2 && c.line <= fx.endLine + 2
+          )
+          const l2Caught =
+            gateRes.aggregation.infraFailure ||
+            gateRes.aggregation.promptInjection ||
+            matchingBlocking.length > 0
+          mapById.set(fx.id, {
+            fx,
+            l1,
+            l2: {
+              decision: l2Caught ? 'FAIL' : 'PASS',
+              aggregation: {
+                infraFailure: gateRes.aggregation.infraFailure,
+                promptInjection: gateRes.aggregation.promptInjection,
+                blockingClusters: matchingBlocking,
+              },
+            },
+          })
+        }
+        return slice.map((s) => s.id).join(',')
+      })
     }
+
+    let doneCount = 0
+    const wrappedTasks = evalTasks.map((fn) => async () => {
+      const label = await fn()
+      doneCount++
+      console.error(`[eval-fixtures:${groupLabel}] ${doneCount}/${evalTasks.length} (${label})`)
+      return label
+    })
+    await runWithConcurrency(wrappedTasks, 3)
 
     return fixtures.map((fx) => mapById.get(fx.id))
   }
 
-  for (const r of await evaluateGroup(redteam)) {
+  for (const r of await evaluateGroup(redteam, 'redteam')) {
     const caughtByL1 = r.l1.caughtByL1
     const caughtByL2 = r.l2.decision === 'FAIL'
     redteamResults.push({
@@ -1078,7 +1114,7 @@ export async function evaluateFixtures({
     })
   }
 
-  for (const r of await evaluateGroup(golden)) {
+  for (const r of await evaluateGroup(golden, 'golden')) {
     const l1Fail = r.l1.caughtByL1
     const l2Fail = r.l2.decision === 'FAIL'
     goldenResults.push({

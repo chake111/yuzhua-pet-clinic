@@ -9,6 +9,7 @@ import {
   aggregateReviewerResults,
   buildBatches,
   evaluateFixtures,
+  fetchWithRetry,
   filterAllowedFindings,
   renderPrComment,
   runReviewGate,
@@ -704,4 +705,34 @@ test('scanCodeLexical handles JS RegExp literals with \\/ without false comment 
 
   const javaRes = scanCodeLexical('double x = a / b;\ndouble y = c / d;', 1, { allowRegex: false })
   assert.equal(javaRes.comments.length, 0)
+})
+
+test('fetchWithRetry attaches AbortSignal.timeout and retries stalled calls', async () => {
+  let calls = 0
+  const server = await startMockServer((_req, res) => {
+    calls++
+    if (calls === 1) {
+      // Delay longer than timeoutMs so AbortSignal.timeout aborts the first attempt
+      setTimeout(() => {
+        if (!res.writableEnded) {
+          res.writeHead(200)
+          res.end('{}')
+        }
+      }, 150)
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ ok: true }))
+  })
+  try {
+    const res = await fetchWithRetry(
+      server.url,
+      { method: 'POST' },
+      { maxRetries: 1, baseDelayMs: 1, timeoutMs: 30 }
+    )
+    assert.equal(calls, 2)
+    assert.equal(res.status, 200)
+  } finally {
+    await server.close()
+  }
 })
