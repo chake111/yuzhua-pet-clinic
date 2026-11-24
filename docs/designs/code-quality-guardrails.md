@@ -101,14 +101,14 @@
 
 ## Open Questions & Stage 0 Feasibility Spike
 
-以下 **4 项高不确定性后端工具链交互**在里程碑 0.5 落地后、PR 1 启动前，通过 **2–4 天的 Stage 0 Spike**（独立临时分支，不改主干业务）逐项实测闭合；**必须将实测锁定的精确版本号、容器镜像 tag 与受控 NullAway 白名单回写进本计划后，才解锁 PR 1**。（前端 ESLint 10 插件、Node 22 `.ts` 覆盖率与 Vue 宏 3 项低成本烟测下沉至前端 PR 5A 第一步执行。）
+以下 **4 项高不确定性工具链交互**已于 2026-11-24 在独立 Spike 分支（`spike/jdk25-boot4` `74b1196`、`spike/openapi-ts` `32e75a3`）逐项实测通过，**精确锁定版本号、容器镜像 tag 与配置细节已回写至下文各阶段清单**。
 
-| 编号 | 待验证问题 | Stage 0 Spike 验证动作与出口标准 | 不通过时的降级预案 |
-| --- | --- | --- | --- |
-| **SPK-01** | Spring Boot `4.1.x` + JDK 25 下 `mybatis-plus-spring-boot4-starter`、Jackson 3、`jjwt` 与 SpringDoc `3.2.x` 是否全量兼容并跑通现有 8 个 `*IT` | 在 Spike 分支升级 POM 与 Jackson 3 适配（含 `JsonMapperBuilderCustomizer`、`javatime` 与 `TypeReference`）；若 `jjwt` 尚未原生支持 Jackson 3，优先用 Jackson 2/3 并存或 `JwtUtils` 轻量序列化桥接解决，跑通 `mvn verify` 全部 8 个 `*IT` | 仅当 `mybatis-plus` 或 Spring Boot 4 核心出现阻断级缺陷时，回退维持 Spring Boot `3.5.16` + JDK 25，并在文档记录阻塞 issue 与返工隔离边界 |
-| **SPK-02** | JDK 25 + Lombok `1.18.42+`（`-proc:full`）+ ErrorProne `2.43+` + NullAway（`JSpecifyMode=true`, `OnlyNullMarked=true`）+ `javaparser-core` Java 25 解析是否存在编译冲突或 lambda 误报失控 | 在 Spike 分支接入处理器链、高信号 ErrorProne `:ERROR` 规则与 `CommentGuardrailsTest`，抽样标注核心 Service 与 `AppointmentMapper`，确认 `mvn test` 通过并盘点 JSpecify lambda 误报 | 若遇 JSpecify 上游 lambda 误报，在受控 PR 中按规程申请 `.guardrails/suppression-budget.json` 配额并挂 `open` + `guardrail:tracked` Issue；若 `javaparser-core` 对 Java 25 语法解析异常，校验 `LanguageLevel.BLEEDING_EDGE` 或锁定兼容版 |
-| **SPK-03** | SpringDoc `3.2.x` 自定义转换器对 `@NullMarked`/`@Nullable`、`@Schema(nullable = true)`、`CodedEnum` 整型枚举、`ApiResult` 三态与 15 个 WS 帧字面量 `type` 能否生成可供 `openapi-typescript` 无损推导 `paths[P][M]` 与 WS 判别联合的 `schema.d.ts` | 用 Spike 样例导出 OpenAPI JSON 并运行精确锁版的 `openapi-typescript`，编译验证 `paths[P][M]` 推导、WS `if (f.type === 'HISTORY')` 类型收窄与 3 个可置空字段 `nullable` 类型 | 若 OpenAPI `3.1` 某结构生成异常，切换 `springdoc.api-docs.version=openapi_3_0` 并复测 |
-| **SPK-07** | `pitest-maven` + `pitest-junit5-plugin`（及其内置 ASM）是否支持 JDK 25 字节码（classfile major 69）与增量 git diff 类变异执行 | 在 Spike 分支对 `AppointmentServiceTest` 与 `DoctorScheduleServiceTest` 试跑 PIT，确认无 `Unsupported class file major version 69` 且能在可接受耗时内输出 XML/HTML 报告 | 若 PIT 尚未发布 JDK 25 兼容版，保留 Java 增量 diff 覆盖率与前端 Stryker 变异门禁，为后端 PIT 建 `guardrail:tracked` 跟踪 Issue 待上游发布后启用 |
+| 编号 | 待验证问题 | Stage 0 Spike 实测结果与锁定决策 |
+| --- | --- | --- |
+| **SPK-01** | Spring Boot `4.1.x` + JDK 25 下 `mybatis-plus-spring-boot4-starter`、Jackson 3、`jjwt` 与 SpringDoc `3.2.x` 兼容性与 8 个 `*IT` 全通验证 | **PASS**（Temurin `25.0.5.1+2-LTS`）：锁定 `spring-boot-starter-parent:4.1.3`（`4.2.0` 亦已 GA）、`mybatis-plus-spring-boot4-starter:3.5.18`、`springdoc-openapi-starter-webmvc-ui:3.2.0`（OpenAPI `3.1.0`）、`jjwt-api`/`jjwt-impl:0.13.0`（移除 `jjwt-jackson`，在 `com.yuzhua.security` 通过 `Jackson3JwtSerializer`/`Jackson3JwtDeserializer` + `META-INF/services/io.jsonwebtoken.io.{Serializer,Deserializer}` SPI 桥接 Jackson 3）、`jacoco-maven-plugin:0.8.16`、`checkstyle:14.4.0`、`maven-enforcer-plugin:3.7.0`、`testcontainers-mysql:2.0.5`（Testcontainers 2.x 替代 `mysql`）、`spring-boot-starter-webmvc-test` + `spring-boot-starter-actuator-test`（`4.1.3`）与 `RestTestClient` + `@AutoConfigureMetrics`；镜像锁定 `maven:3.9-eclipse-temurin-25` + `eclipse-temurin:25-jre`。`mvn verify` 122 单测 + 8 `*IT`（21 用例）全过。 |
+| **SPK-02** | JDK 25 + Lombok `-proc:full` + ErrorProne + NullAway（`JSpecifyMode=true`, `OnlyNullMarked=true`）+ `javaparser-core` + `ArchUnit` | **PASS**：锁定 `lombok:1.18.48`、`jspecify:1.0.0`、`error_prone_core:2.53.0`、`nullaway:0.14.4`、`archunit-junit5:1.5.1`、`javaparser-core:3.28.2`（`LanguageLevel.JAVA_25`）。`-Xplugin:ErrorProne` 全部 `-Xep*` 参数须置于单个 `<arg>`，测试编译在 `default-testCompile` 覆盖 `<compilerArgs>` 设 `-Xep:ReturnValueIgnored:OFF -Xep:NullAway:OFF`。`UnusedVariable:ERROR` 检出 `ConsultService.requireMember` 冗余形参；抽样标注 `AppointmentMapper`、`AppointmentService`、`DoctorScheduleService` 零 JSpecify lambda 误报（仅 `DoctorScheduleService.refCounts` 裸 `selectMaps` `Map.get` 需 `Objects.requireNonNull`，PR 4A 转 `ScheduleRefCount` 消除）。`ArchUnit` 与 `CommentGuardrailsTest` 在 classfile major `69` 下全过。 |
+| **SPK-03** | SpringDoc `3.2.x` + `openapi-typescript` 对 `paths[P][M]`、WS 15 帧判别联合与 3 个三态字段生成与类型推导 | **PASS**（Node `v22.23.2`）：锁定 `openapi-typescript@7.13.0`（精确版本）、`typescript@~5.8.3`（`5.8.3`）、`vue-tsc@^2.2.12`、`typescript-eslint@^8.74.0`、`eslint-plugin-jsdoc@^65.5.3`、`@eslint-community/eslint-plugin-eslint-comments@^4.8.1`、`knip@^5.88.1`、`@stryker-mutator/core@^10.1.1`。**保留 OpenAPI `3.1.0`**（`springdoc.api-docs.version=openapi_3_1`）；PR 4B `GlobalOpenApiCustomizer` 须显式输出 `discriminator.mapping` 防止 `openapi-typescript@7.13.0` 将字面量 `type` 覆写为 Schema 名。ESLint `10.15.0`、`projectService: true`、`tableDensity.ts` 100% V8 覆盖率与双 `<script lang="ts">` SFC 均实测通过。 |
+| **SPK-07** | `pitest-maven` + `pitest-junit5-plugin` 是否支持 JDK 25 字节码（classfile major 69） | **PASS**：锁定 `pitest-maven:1.30.2`（内置 ASM `9.11`，无需覆写 `asm`）+ `pitest-junit5-plugin:1.2.3`，自动加载 Lombok 与 JSpecify 过滤器。在 `AppointmentService` 与 `DoctorScheduleService`（`AppointmentServiceTest`、`DoctorScheduleServiceTest`）实测：299 个变异体、170 击杀（57%，测试强度 68%）、执行 554 次测试总耗时 43s，正常产出 `index.html` 与 `mutations.xml`。 |
 
 ## Critical User Journeys (CUJs)
 
@@ -623,28 +623,29 @@ jobs:
 
 ---
 
-### 阶段 0：Stage 0 Feasibility Spike（2–4 天独立临时分支，不改主干业务）
+### 阶段 0：Stage 0 Feasibility Spike（已完成 — `spike/jdk25-boot4` `74b1196`、`spike/openapi-ts` `32e75a3`）
 
-*   在临时分支执行 `SPK-01`、`SPK-02`、`SPK-03`、`SPK-07`。
-*   **出口门槛**：将实测通过的精确依赖版本号（`spring-boot-starter-parent`、`mybatis-plus-spring-boot4-starter`、`springdoc-openapi-starter-webmvc-ui`、`jjwt-*`、`jacoco-maven-plugin`、`lombok`、`jspecify`、`error_prone_core`、`nullaway`、`archunit-junit5`、`checkstyle`、`pitest-maven`、`javaparser-core`）、Temurin 25 精确镜像 tag 及受控 NullAway 白名单（如有）回写至下方 PR 1–5C 清单后，才开启 PR 1。
+*   已在独立临时分支完成 `SPK-01`、`SPK-02`、`SPK-03`、`SPK-07` 与前端 PR 5A 3 项烟测，全部通过且零受控 NullAway 白名单需求。
+*   **已回写锁定版本号与镜像 tag**：`spring-boot-starter-parent:4.1.3`、`mybatis-plus-spring-boot4-starter:3.5.18`、`springdoc-openapi-starter-webmvc-ui:3.2.0`、`jjwt-api`/`jjwt-impl:0.13.0`（Jackson 3 SPI 桥接）、`jacoco-maven-plugin:0.8.16`、`lombok:1.18.48`、`jspecify:1.0.0`、`error_prone_core:2.53.0`、`nullaway:0.14.4`、`archunit-junit5:1.5.1`、`checkstyle:14.4.0`、`maven-enforcer-plugin:3.7.0`、`pitest-maven:1.30.2`、`pitest-junit5-plugin:1.2.3`、`javaparser-core:3.28.2`、`testcontainers-mysql:2.0.5`、Temurin 25 镜像 `maven:3.9-eclipse-temurin-25` + `eclipse-temurin:25-jre`，以及前端 `openapi-typescript@7.13.0` 等全套 npm 锁定版本。
 
 ---
 
-### 阶段 1（PR 1）：JDK 25 LTS + Spring Boot 4.1 栈基线升级
+### 阶段 1（PR 1）：JDK 25 LTS + Spring Boot 4.1.3 栈基线升级
 
 #### 1. `backend/pom.xml`（`Modify`）
-*   升级 `spring-boot-starter-parent` 至 `4.1.x`（Spike 锁定精确版）、`<java.version>` 升至 `25`、`maven-compiler-plugin` 配置 `<release>25</release>`、`<encoding>UTF-8</encoding>`、`<parameters>true</parameters>`、`-proc:full`；`mybatis-plus-spring-boot3-starter` 替换为 `mybatis-plus-spring-boot4-starter`（`3.5.18+`）；`springdoc-openapi-starter-webmvc-ui` 升至 `3.2.x`；`jjwt-*` 切至 SPK-01 验证方案；`jacoco-maven-plugin` 升至 `0.8.14+`（仍保留 `SlowSqlInterceptor` LINE `>= 95%`）；显式锁定 `lombok` `1.18.42+`；更新 Checkstyle 版本支持 Java 25；接入 `maven-enforcer-plugin`（候选 `3.5.0`）校验 JDK `>= 25`。
+*   升级 `spring-boot-starter-parent` 至 `4.1.3`、`<java.version>` 升至 `25`、`maven-compiler-plugin` 配置 `<release>25</release>`、`<encoding>UTF-8</encoding>`、`<parameters>true</parameters>`、`-proc:full`；`mybatis-plus-spring-boot3-starter` 替换为 `mybatis-plus-spring-boot4-starter`（`3.5.18`）；`springdoc-openapi-starter-webmvc-ui` 升至 `3.2.0`；`jjwt-api`/`jjwt-impl` 升至 `0.13.0` 并移除 `jjwt-jackson`（由 `com.yuzhua.security` 的 Jackson 3 SPI 桥接类 `Jackson3JwtSerializer`/`Jackson3JwtDeserializer` + `META-INF/services/io.jsonwebtoken.io.{Serializer,Deserializer}` 承接）；`jacoco-maven-plugin` 升至 `0.8.16`（仍保留 `SlowSqlInterceptor` LINE `>= 95%`）；显式锁定 `lombok:1.18.48`；`checkstyle` 升至 `14.4.0`（`maven-checkstyle-plugin:3.6.0`）；`javaparser-core` 升至 `3.28.2`（`CommentGuardrailsTest` 切至 `LanguageLevel.JAVA_25`）；接入 `maven-enforcer-plugin:3.7.0` 校验 JDK `>= 25`；测试依赖补充 Boot 4 模块化启动器 `spring-boot-starter-webmvc-test`、`spring-boot-starter-actuator-test`（`4.1.3`），并将 `org.testcontainers:mysql` 替换为 `org.testcontainers:testcontainers-mysql`（`2.0.5`）。
 
-#### 2. Jackson 3、Spring Boot 4 测试基座与容器/CI 适配（`Modify` — 共 11 个精确文件）
-*   `backend/src/main/java/com/yuzhua/config/JacksonConfig.java`：`Jackson2ObjectMapperBuilderCustomizer` 迁至 Boot 4 `JsonMapperBuilderCustomizer`，6 个 `com.fasterxml.jackson.datatype.jsr310.*` 迁至 `tools.jackson.databind.ext.javatime.*`。
-*   `backend/src/main/java/com/yuzhua/config/WebMvcConfig.java`、`backend/src/main/java/com/yuzhua/security/AuthInterceptor.java`、`backend/src/main/java/com/yuzhua/websocket/ConsultPush.java`：`com.fasterxml.jackson.databind.*` 迁至 `tools.jackson.databind.*`。
+#### 2. Jackson 3、Spring Boot 4 测试基座与容器/CI 适配（`Create` / `Modify`）
+*   `backend/src/main/java/com/yuzhua/config/JacksonConfig.java`：`Jackson2ObjectMapperBuilderCustomizer` 迁至 `org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer`，经 `SimpleModule` 注册 `tools.jackson.databind.ext.javatime.*` 6 个序列化/反序列化器并禁用 `DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS`。
+*   `backend/src/main/java/com/yuzhua/config/WebMvcConfig.java`、`backend/src/main/java/com/yuzhua/security/AuthInterceptor.java`、`backend/src/main/java/com/yuzhua/websocket/ConsultPush.java`、`backend/src/test/java/com/yuzhua/config/WebMvcConfigCacheControlTest.java`、`backend/src/test/java/com/yuzhua/arch/CommentGuardrailsTest.java`：`com.fasterxml.jackson.databind.*` 迁至 `tools.jackson.databind.*`。
+*   `backend/src/main/java/com/yuzhua/security/Jackson3JwtSerializer.java`、`Jackson3JwtDeserializer.java` 与 `backend/src/main/resources/META-INF/services/io.jsonwebtoken.io.{Serializer,Deserializer}`（`Create`）：实现基于 `tools.jackson.databind.json.JsonMapper` 的 JJWT SPI 编解码，消除对 Jackson 2 的运行时依赖。
 *   `backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java`：`com.fasterxml.jackson.databind.*` 迁至 `tools.jackson.databind.*`，第 3 行 `com.fasterxml.jackson.core.type.TypeReference` 迁至 `tools.jackson.core.type.TypeReference`。
-*   `backend/src/main/resources/application.yml` 与 `backend/src/main/resources/application-example.yml`：对齐 Boot 4 `spring.jackson.*` 属性键与 `default-property-inclusion: non_null` 行为。
-*   `backend/src/test/java/com/yuzhua/it/MySqlITSupport.java`：同步迁至 Jackson 3（`tools.jackson.databind.*`、`.asString()` 等新 API）与 Boot 4 `@AutoConfigureMockMvc`。
-*   `backend/src/test/java/com/yuzhua/it/ObservabilityIT.java`：同步迁至 Boot 4 `@AutoConfigureObservability` 与测试 HTTP 客户端 API。
-*   `backend/Dockerfile`（`Modify`）：构建阶段切至 `maven:3.9-eclipse-temurin-25`，运行阶段切至 SPK-01 锁定的 Temurin 25 JRE 镜像，并在 `mvn package` 前补充 `COPY config ./config`（PR 2 同步追加 `COPY lombok.config .`）。
+*   `backend/src/main/resources/application.yml` 与 `backend/src/main/resources/application-example.yml`：确认对齐 Boot 4 `spring.jackson.time-zone` 与 `default-property-inclusion: non_null`。
+*   `backend/src/test/java/com/yuzhua/it/MySqlITSupport.java`（及 `BookingFlowIT.java`、`DuplicatePayIT.java`、`IdempotencyIT.java`）：同步迁至 Jackson 3（`tools.jackson.databind.*`、`.asString()`）、`org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc` 与 `org.testcontainers.mysql.MySQLContainer`。
+*   `backend/src/test/java/com/yuzhua/it/ObservabilityIT.java`：迁至 Boot 4 `@AutoConfigureMetrics` 与 `RestTestClient.bindToServer()`。
+*   `backend/Dockerfile`（`Modify`）：构建阶段切至 `maven:3.9-eclipse-temurin-25`，运行阶段切至 `eclipse-temurin:25-jre`，并在 `mvn package` 前补充 `COPY config ./config`（PR 2 同步追加 `lombok.config`）。
 *   `.github/workflows/ci.yml`（`Modify`）：`backend` job `java-version` 升至 `'25'`（Temurin）。（`.github/workflows/docker.yml` 直接调用 Dockerfile，无需修改。）
-*   **PR 1 出口验证**：`cd backend && mvn --batch-mode --no-transfer-progress verify`（全部 8 个 `*IT` 通过）+ `docker compose config -q` + L3 `docker compose up -d --build --wait` 健康检查与 `/actuator/prometheus` smoke。
+*   **PR 1 出口验证**：`cd backend && mvn --batch-mode --no-transfer-progress verify`（全部 8 个 `*IT` 通过）+ `docker build ./backend` + `docker compose config -q` + L3 `docker compose up -d --build --wait` 健康检查与 `/actuator/prometheus` smoke。
 
 ---
 
@@ -653,7 +654,7 @@ jobs:
 #### 1. `backend/pom.xml`、`backend/lombok.config`、`backend/Dockerfile`、`backend/config/checkstyle/checkstyle.xml`（`Create` / `Modify`）
 *   `backend/lombok.config`（`Create`）：`config.stopBubbling = true`、`lombok.addNullAnnotations = jspecify`、`lombok.addLombokGeneratedAnnotation = true`。
 *   `backend/Dockerfile`（`Modify`）：在 `mvn package` 前补充 `COPY lombok.config .`。
-*   `backend/pom.xml`（`Modify`）：新增 `org.jspecify:jspecify`（`1.0.0`，compile）、`com.tngtech.archunit:archunit-junit5`（`1.4.x`，test）；`maven-compiler-plugin` 开启 `<fork>true</fork>`、JDK 25 必需的 `-J--add-exports=jdk.compiler/com.sun.tools.javac.{api,file,main,model,parser,processing,tree,util,code,comp}=ALL-UNNAMED` 与 `-J--add-opens=jdk.compiler/com.sun.tools.javac.{code,comp}=ALL-UNNAMED`、`<annotationProcessorPaths>` 严格排序 `lombok -> error_prone_core (2.43+) -> nullaway (0.12.7+)`，配置 `-XDcompilePolicy=simple`、`--should-stop=ifError=FLOW`、`-Xplugin:ErrorProne` 并将以下高信号检查提级为 `:ERROR`：`NullAway`（`-XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true`）、`ReturnValueIgnored`、`FutureReturnValueIgnored`、`EqualsIncompatibleType`、`MissingCasesInEnumSwitch`、`DeadException`、`UnusedVariable`、`UnusedMethod`、`ModifiedButNotUsed`、`StringSplitter`、`BadImport`（不启用 `MissingSummary`）；`testCompilerArgs` 仅显式关闭测试桩常见误报（`-Xep:ReturnValueIgnored:OFF -Xep:NullAway:OFF`）。**不引入 `spotbugs-maven-plugin`。**
+*   `backend/pom.xml`（`Modify`）：新增 `org.jspecify:jspecify`（`1.0.0`，compile）、`com.tngtech.archunit:archunit-junit5`（`1.5.1`，test）；`maven-compiler-plugin` 开启 `<fork>true</fork>`、JDK 25 必需的 `-J--add-exports=jdk.compiler/com.sun.tools.javac.{api,file,main,model,parser,processing,tree,util,code,comp}=ALL-UNNAMED` 与 `-J--add-opens=jdk.compiler/com.sun.tools.javac.{code,comp}=ALL-UNNAMED`、`<annotationProcessorPaths>` 严格排序 `lombok (1.18.48) -> error_prone_core (2.53.0) -> nullaway (0.14.4)`，配置 `-XDcompilePolicy=simple`、`--should-stop=ifError=FLOW`、单个 `-Xplugin:ErrorProne ...` 参数并将以下高信号检查提级为 `:ERROR`：`NullAway`（`-XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true`）、`ReturnValueIgnored`、`FutureReturnValueIgnored`、`EqualsIncompatibleType`、`MissingCasesInEnumSwitch`、`DeadException`、`UnusedVariable`、`UnusedMethod`、`ModifiedButNotUsed`、`StringSplitter`、`BadImport`（不启用 `MissingSummary`）；`default-testCompile` execution 覆盖 `<compilerArgs>` 显式关闭测试桩常见误报（`-Xep:ReturnValueIgnored:OFF -Xep:NullAway:OFF`）。**不引入 `spotbugs-maven-plugin`。**
 *   `backend/config/checkstyle/checkstyle.xml`（`Modify`）：启用 `AvoidStarImport`。
 
 #### 2. 四条顶层包循环解耦与精确调用方更新（`Move` / `Create` / `Modify`）
@@ -794,8 +795,8 @@ jobs:
 
 #### 3. 离线 OpenAPI 导出与 LF 桥接（`Create` / `Modify`）
 *   `backend/src/main/java/com/yuzhua/YuzhuaApplication.java` 与 `config/MybatisPlusConfig.java`（`Modify`）：`@MapperScan("com.yuzhua.mapper")` 迁入 `MybatisPlusConfig`。
-*   `backend/src/main/resources/application.yml`（`Modify`）：显式声明 `springdoc.enable-default-api-docs: true` 与 SPK-03 确认的 `springdoc.api-docs.version`（注：`vite.config.ts` 第 2 行注释随 PR 5A 重命名时同步更新，避免前向引用）。
-*   `backend/src/main/java/com/yuzhua/config/OpenApiConfig.java`（`Modify`）：固定相对 `servers: ["/api"]`；注册 ① JSpecify `PropertyCustomizer`（非空字段进 `required`，`@Nullable` 字段移出 `required`，3 个可置空请求字段由标准 `@Schema(nullable = true)` 承担，不写双模式自定义转换器）；② `CodedEnum` `ModelConverter` + `ParameterCustomizer`（按 `Integer`/`String` 注册具名枚举 Schema）；③ `GlobalOpenApiCustomizer` 将 15 个 WS 子帧以 `oneOf` + `discriminator` + 必填字面量 `type` 注册进 `components.schemas`。
+*   `backend/src/main/resources/application.yml`（`Modify`）：显式声明 `springdoc.enable-default-api-docs: true` 与 `springdoc.api-docs.version: openapi_3_1`（SPK-03 确认保持 OpenAPI `3.1.0`；注：`vite.config.ts` 第 2 行注释随 PR 5A 重命名时同步更新，避免前向引用）。
+*   `backend/src/main/java/com/yuzhua/config/OpenApiConfig.java`（`Modify`）：固定相对 `servers: ["/api"]`；注册 ① JSpecify `PropertyCustomizer`（非空字段进 `required`，`@Nullable` 字段移出 `required`，3 个可置空请求字段由标准 `@Schema(nullable = true)` 承担，不写双模式自定义转换器）；② `CodedEnum` `ModelConverter` + `ParameterCustomizer`（按 `Integer`/`String` 注册具名枚举 Schema）；③ `GlobalOpenApiCustomizer` 将 15 个 WS 子帧以 `oneOf` + `discriminator`（含完整 `discriminator.mapping`）+ 必填字面量 `type` 注册进 `components.schemas`。
 *   `backend/src/test/java/com/yuzhua/contract/OpenApiContractTest.java`（`Create`）：最小 MVC + SpringDoc 测试配置（显式排除 `WebMvcConfig`/`AuthInterceptor`）+ `BeanFactoryPostProcessor` 自动 mock Controller 构造依赖，按递归键序 + LF 输出并与 `contracts/openapi.json` 逐字节比对（`-Dopenapi.update=true` 写入）；断言核心 VO `required` 非空、数值枚举为整型、15 个 WS 子帧含字面量 `type`，并仅对 **响应 Schema** 断言分级敏感字段黑名单（全站禁 `password`/`tokenVersion`/`deleted`/`idemKey`，公开 `DoctorVo`/`HomeVo` 禁 `phone`，`ReviewVo` 禁 `userId`，`UserVo` 允许 `phone`）。
 *   `backend/src/test/java/com/yuzhua/it/ObservabilityIT.java`（`Modify`）：追加完整上下文 `/v3/api-docs` 键序归一化后与 `contracts/openapi.json` 一致性断言。
 *   `.gitattributes`（`Modify`）：追加 `contracts/openapi.json text eol=lf` 与 `frontend/src/api/schema.d.ts text eol=lf`。
@@ -806,10 +807,10 @@ jobs:
 
 ### 阶段 5A（PR 5A）：前端快速烟测、10 个 `.vue` 测试逻辑下沉、组件解耦、TS/ESLint 10 脚手架与 24 个 `.js -> .ts`
 
-> 第一步执行 3 项前端快速烟测（ESLint `^10.15.0` 插件兼容、Node 22 `.ts` `tableDensity.ts` 95% 覆盖率映射、`defineProps<Schema<K>>()` 宏解析）并锁定版本。
+> 已在 `spike/openapi-ts`（`32e75a3`）完成 3 项前端烟测并锁定 npm 精确版本；V8 strip-types 在 Node `22.23.2` 下无需 `--enable-source-maps` 即可 1:1 映射行号。
 
 #### 1. 构建、类型、容器、死代码与契约脚本（`Create` / `Modify` / `Rename`）
-*   `frontend/package.json` 与 `frontend/package-lock.json`（`Modify`）：新增 `"engines": { "node": ">=22.18.0" }`；移除 `dependencies.axios`；保留现有 `eslint ^10.15.0`，新增 `devDependencies`：`typescript`（`^5.8.x`）、`vue-tsc`（`^2.2.x`）、`typescript-eslint`（`^8.x`）、**精确锁版本**的 `openapi-typescript`（无 `^`）、`eslint-plugin-jsdoc`（`^63.x`）、`@eslint-community/eslint-plugin-eslint-comments`（或 ESLint 10 内置 `reportUnusedDisableDirectives` 降级组合）、`knip`（`^5.x`）；新增脚本 `typecheck`、`api:gen`、`api:check`、`deadcode: "knip"`；`lint` 纳入 `vite.config.ts`；`test:coverage` 更新为 `src/utils/tableDensity.ts`。
+*   `frontend/package.json` 与 `frontend/package-lock.json`（`Modify`）：新增 `"engines": { "node": ">=22.18.0" }`；移除 `dependencies.axios`；保留现有 `eslint ^10.15.0`（`10.15.0`），新增 `devDependencies`：`typescript`（`~5.8.3`，解析 `5.8.3`）、`vue-tsc`（`^2.2.12`）、`typescript-eslint`（`^8.74.0`）、**精确锁版本**的 `openapi-typescript`（`7.13.0`，无 `^`）、`eslint-plugin-jsdoc`（`^65.5.3`）、`@eslint-community/eslint-plugin-eslint-comments`（`^4.8.1`，补充内置 `linterOptions.reportUnusedDisableDirectives: 'error'`）、`knip`（`^5.88.1`）、`@types/node`（`^22.20.5`）；新增脚本 `typecheck`、`api:gen`、`api:check`、`deadcode: "knip"`；`lint` 纳入 `vite.config.ts`；`test:coverage` 更新为 `src/utils/tableDensity.ts`。
 *   `frontend/.npmrc`（`Create`）：`engine-strict=true`。
 *   `deploy/web/Dockerfile`（`Modify`）：锁定 `node:22.18-alpine`（或确认的 `22.18+` 固定 tag），并在第 3 行 `RUN npm ci` 之前将 `COPY frontend/package*.json ./` 改为 `COPY frontend/package*.json frontend/.npmrc ./`。
 *   `frontend/tsconfig.json`、`frontend/tsconfig.app.json`、`frontend/tsconfig.node.json`（`Create`）：
@@ -871,8 +872,8 @@ jobs:
 
 #### 2. 增量 diff 覆盖率（L2 阻断 `>= 80%`）与 PIT / Stryker 增量变异测试（L2 `advisory -> enforce >= 70%`）
 *   `tools/check-diff-coverage.mjs`（`Create`）：零外部依赖 Node 脚本，结合 `git diff` 变更行号解析后端 JaCoCo XML（`backend/target/site/jacoco/jacoco.xml`）与前端 Node LCOV（覆盖 `frontend/src/{utils,stores,api}/**/*.ts`），计算新增/修改可执行行覆盖率并在 `< 80%` 时 `exit 1`（无新增可执行行短路 `PASS`）。
-*   `backend/pom.xml`（`Modify`）：按 SPK-07 实测锁定版本接入 `pitest-maven` + `pitest-junit5-plugin`（限定 PR 变更类 `backend/src/main/java` 排除 `vo`/`dto`/`entity`/`props`/`config`，`mutators=DEFAULTS`，目标 `>= 70%`；若 SPK-07 触发降级则延后并挂跟踪 Issue）。
-*   `frontend/stryker.config.mjs`（`Create`）与 `frontend/package.json`（`Modify`）：接入 `@stryker-mutator/core` 增量模式（限定 `frontend/src/{utils,stores,api}/**/*.ts` 排除 `schema.d.ts`/`types.ts`，`command` 运行 `node --test`，目标 `>= 70%`）。
+*   `backend/pom.xml`（`Modify`）：按 SPK-07 实测锁定版本接入 `pitest-maven:1.30.2` + `pitest-junit5-plugin:1.2.3`（限定 PR 变更类 `backend/src/main/java` 排除 `vo`/`dto`/`entity`/`props`/`config`，`mutators=DEFAULTS`，目标 `>= 70%`）。
+*   `frontend/stryker.config.mjs`（`Create`）与 `frontend/package.json`（`Modify`）：接入 `@stryker-mutator/core`（`^10.1.1`）增量模式（限定 `frontend/src/{utils,stores,api}/**/*.ts` 排除 `schema.d.ts`/`types.ts`，`command` 运行 `node --test`，目标 `>= 70%`）。
 *   `.github/workflows/ci.yml`（`Modify`）：
     *   `frontend` job 锁定 Node `22.18.0`，分步执行 `api:check` -> `typecheck` -> `lint` -> `style-guard` -> `deadcode` -> `test:coverage` -> `check-diff-coverage --lang ts --min 80` -> Stryker 增量变异（受 `vars.MUTATION_GATE_MODE || 'advisory'` 控制）-> `build` -> `bundle-budget`；
     *   `backend` job 追加 `check-diff-coverage --lang java --min 80` -> PIT 增量变异（受 `vars.MUTATION_GATE_MODE || 'advisory'` 控制）；
