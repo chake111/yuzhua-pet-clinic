@@ -1,0 +1,20 @@
+{
+  "threshold": 3,
+  "minTokens": 70,
+  "minLines": 8,
+  "reporters": ["console"],
+  "ignore": [
+    "**/.guardrails/**",
+    "**/schema.d.ts",
+    "**/node_modules/**",
+    "**/target/**",
+    "**/dist/**"
+  ],
+  "ignorePattern": [
+    "^\\s*import\\s+.*$"
+  ],
+  "path": [
+    "backend/src/main/java",
+    "frontend/src"
+  ]
+}

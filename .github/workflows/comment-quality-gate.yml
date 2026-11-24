@@ -1,0 +1,164 @@
+name: Comment Quality Gate (L2)
+
+on:
+  pull_request_target:
+    # 限定目标分支为受保护的 main，防止 Bot 建未保护分支篡改 workflow 后向其提 PR 窃取密钥
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  schedule:
+    # 每周一 02:00 UTC 全仓巡检已关闭 Issue 的僵尸 TODO 与抑制项
+    - cron: '0 2 * * 1'
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
+concurrency:
+  group: comment-gate-${{ github.event.pull_request.number || github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  comment-gate:
+    name: LLM Comment Quality Gate
+    # 同仓 PR 才允许接触付费 LLM secrets；fork PR 由 verdict job 显式判失败
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 检出受信任基线代码与脚本（固定 main）
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: trusted-base
+          persist-credentials: false
+
+      - name: 检出待审 PR 代码至只读数据目录（不执行其中任何代码或安装其依赖）
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          path: untrusted-pr
+          persist-credentials: false
+
+      - name: 拉取 base.sha 供纯文本 diff 比对（凭证不落盘）
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          git -C untrusted-pr -c core.hooksPath=/dev/null
+          -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          fetch --no-tags --depth=1 origin "$BASE_SHA"
+
+      - name: 安装 Node 22.18+
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+
+      - name: 安装 trusted-base 门禁脚本依赖
+        run: |
+          if [ -f trusted-base/.github/scripts/package-lock.json ]; then
+            npm ci --prefix trusted-base/.github/scripts --ignore-scripts
+          fi
+
+      - name: 静态防绕过扫描（含 guardrail:budget-approved actor 校验）
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node trusted-base/.github/scripts/check-gate-integrity.mjs --repo untrusted-pr
+
+      - name: L2 校验 PR diff 新增/修改的 TODO 与抑制项 Issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node trusted-base/tools/check-issue-refs.mjs --mode pr-diff --repo untrusted-pr
+
+      - name: Step 1 — 离线 AST 抽取待审注释（排在密钥检查之前，排除 .guardrails/**）
+        id: extract
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node trusted-base/.github/scripts/extract-comment-diff.mjs --repo untrusted-pr --out /tmp/comment-diff.json
+
+      - name: 零待审注释快速短路 PASS
+        if: steps.extract.outputs.has_targets == 'false'
+        run: echo "PR diff 无待审注释或高风险目标，跳过 LLM 评审直接 PASS（0 token）"
+
+      - name: Step 2 — 校验异构三评审 LLM 密钥（Fail-Closed）
+        if: steps.extract.outputs.has_targets == 'true'
+        env:
+          LLM_GATE_KEY_1: ${{ secrets.LLM_GATE_KEY_1 }}
+          LLM_GATE_KEY_2: ${{ secrets.LLM_GATE_KEY_2 }}
+          LLM_GATE_KEY_3: ${{ secrets.LLM_GATE_KEY_3 }}
+        run: |
+          if [ -z "$LLM_GATE_KEY_1" ] || [ -z "$LLM_GATE_KEY_2" ] || [ -z "$LLM_GATE_KEY_3" ]; then
+            echo "::error::存在待审注释，但 LLM_GATE_KEY_1/2/3 未完整配置，按 Fail-Closed 失败"
+            exit 1
+          fi
+
+      - name: Step 3 — 执行异构三评审独立盲测 + 无维度聚类 2/3 多数决
+        if: steps.extract.outputs.has_targets == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LLM_GATE_KEY_1: ${{ secrets.LLM_GATE_KEY_1 }}
+          LLM_GATE_KEY_2: ${{ secrets.LLM_GATE_KEY_2 }}
+          LLM_GATE_KEY_3: ${{ secrets.LLM_GATE_KEY_3 }}
+          COMMENT_GATE_MODE: ${{ vars.COMMENT_GATE_MODE || 'advisory' }}
+        run: >-
+          node trusted-base/.github/scripts/comment-review-gate.mjs
+          --config trusted-base/.guardrails/llm-gate-config.json
+          --rubric trusted-base/.github/scripts/comment-review-rubric.md
+          --maintainers trusted-base/.guardrails/human-maintainers.json
+          --input /tmp/comment-diff.json
+
+  comment-gate-verdict:
+    # 分支保护唯一注册的 Required Status Check，拒绝 fork PR 因 skipped 绕过
+    name: LLM Comment Gate Verdict
+    if: always() && github.event_name == 'pull_request_target'
+    needs: [comment-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 校验门禁结果（Fail-Closed）
+        env:
+          GATE_RESULT: ${{ needs.comment-gate.result }}
+          IS_SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          if [ "$GATE_RESULT" = "success" ]; then
+            exit 0
+          fi
+          if [ "$IS_SAME_REPO" != "true" ]; then
+            echo "::error::外部 fork PR 不允许访问付费 LLM 门禁且不得通过 skipped 绕过，请维护者拉入同仓分支验证。"
+            exit 1
+          fi
+          echo "::error::Comment Quality Gate 未通过（result=$GATE_RESULT）。"
+          exit 1
+
+  stale-todo-sweep:
+    name: Weekly Stale TODO & Suppression Sweep
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+      - name: 全仓扫描已关闭 Issue 的僵尸 TODO 与抑制项
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node tools/check-issue-refs.mjs --mode repo-sweep --repo .
