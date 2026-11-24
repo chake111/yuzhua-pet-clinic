@@ -1,0 +1,4369 @@
+{
+  "scannedItems": 316,
+  "decision": "FAIL",
+  "overridable": false,
+  "aggregation": {
+    "infraFailure": true,
+    "okCount": 1,
+    "failedReviewers": [
+      {
+        "id": "R1",
+        "error": "OpenAI-compat HTTP 402: {\"error\":{\"message\":\"Insufficient Balance (request_id: 988ba9bc-87dc-4cd5-9a12-b6fac8db3e4a)\",\"type\":\"insufficient_balance_error\",\"param\":null,\"code\":\"invalid_request_error\"}}; OpenAI-compat HTTP 402: {\"error\":{\"message\":\"Insufficient Balance (request_id: 1b1ce26f-0fb6-42c1-88be-fd9fb7680265)\",\"type\":\"insufficient_balance_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+      },
+      {
+        "id": "R3",
+        "error": "The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout"
+      }
+    ],
+    "promptInjection": true,
+    "precheckPIHits": [
+      {
+        "file": "backend/src/main/java/com/yuzhua/config/SlowSqlInterceptor.java",
+        "line": 58,
+        "pattern": "(?:直接|必须|一律)(?:放行|通过|输出\\s*PASS|标为\\s*PASS)",
+        "snippet": "// 原因: 阈值为 0 表示关闭慢 SQL 监控，直接放行避免额外计时开销\r"
+      }
+    ],
+    "piEvidence": [],
+    "clusters": [
+      {
+        "file": "backend/src/main/java/com/yuzhua/config/SlowSqlInterceptor.java",
+        "line": 54,
+        "minLine": 54,
+        "maxLine": 54,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该方法级 Javadoc 基本是对 L59 `thresholdMs <= 0` 与 L74 `elapsedMs >= thresholdMs` 两处字面条件的复述，且与 L58、L73 的行内「原因」注释信息重叠；未补充盲测归纳出的关键失败语义——计时/日志纯属观测，catch 中置 failed 后原样 rethrow 原 Throwable，finally 中的日志不得改变或吞掉查询结果与异常。",
+            "suggestion": "精简为契约要点并补齐失败语义，例如：「纯观测：阈值取自配置（每次调用读取，可热更新），<=0 关闭监控；计时与 WARN 日志不改变返回值，原异常原样抛出，日志自身失败不得影响查询链路。」避免与 L58/L73 行内注释重复表述同一条件。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/config/WebMvcConfig.java",
+        "line": 69,
+        "minLine": 69,
+        "maxLine": 69,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释以「短缓存」「永久不可变」概括缓存策略，与实现的具体取值存在措辞偏差：seed 为 max-age=1 天 public，兜底为 max-age=365 天 public + immutable，365 天并非「永久」，读者据此可能误判缓存有效期无上限。",
+            "suggestion": "改为与代码一致的量化表述，例如：「按路径特异度先注册 /seed/**（可覆盖更新，max-age=1 天 public），再注册兜底 /**（UUID 命名内容不变，max-age=365 天 public+immutable）；顺序颠倒会被兜底模式抢先匹配。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/mapper/AppointmentMapper.java",
+        "line": 20,
+        "minLine": 20,
+        "maxLine": 20,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释称该查询为「幂等键当前读」，但 L21 的 SQL 是普通 SELECT（WHERE user_id/idem_key/deleted=0 LIMIT 1），没有 FOR UPDATE 或 LOCK IN SHARE MODE。在 REPEATABLE READ 下这是一致性快照读，看不到本事务快照建立之后并发插入的同键预约，与注释宣称的当前读语义相悖，会让调用方误以为仅靠此查询即可防重复下单。",
+            "suggestion": "二选一并保持文实一致：若确需当前读，SQL 补 FOR UPDATE（并说明与唯一索引/插入冲突回滚的配合）；若保持快照读，注释改为「快照读预检，最终去重依赖 (user_id, idem_key) 唯一索引与插入冲突回滚」，并保留 raw @Select 必须显式 deleted=0 的原因说明。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/mapper/ConsultSessionMapper.java",
+        "line": 42,
+        "minLine": 42,
+        "maxLine": 42,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释只解释了「为何手写 SQL」（Wrapper 无法在子查询过滤 hidden=0），但遗漏了该重算最关键的并发前置条件：必须在持有 consult_session 行锁、且与屏蔽/恢复消息同一事务内执行，否则重算结果会基于旧快照或与他人写入交错。这是仅凭方法名与 SQL 字面无法推导的高风险约束。",
+            "suggestion": "补一句前置约束与幂等语义，如「须在 selectByIdForUpdate 会话行锁内、与屏蔽/恢复同一事务调用；采用绝对值重算而非增量，可重复执行」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/mapper/DepartmentMapper.java",
+        "line": 13,
+        "minLine": 13,
+        "maxLine": 13,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "READABILITY_NOISE"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "READABILITY_NOISE",
+            "severity": "Nit",
+            "message": "Javadoc 以「两条路径原本各自做…现在双方都先取这一把行锁」的变更前后叙事组织内容，属于历史变更日记式表述；竞态本身的说明有价值，但「原本/现在」的对比会随时间失效并增加阅读噪音。",
+            "suggestion": "改为现在时的不变量陈述，例如：「删除科室与写入医生归属必须共用本行锁：否则两侧的先查后写落在不同事务可同时通过，留下指向已删科室的医生。必须是当前读，selectById 的快照读在等锁后仍返回旧版本；返回 null 表示科室已删除，调用方须中止。」删去「原本…现在…」句式。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/mapper/DoctorScheduleMapper.java",
+        "line": 12,
+        "minLine": 12,
+        "maxLine": 12,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释把返回 0 唯一解释为「已满」，但 L17 的守卫是 status = 1 AND remain_num > 0：排班被停诊（status != 1）或行已被物理删除时同样返回 0。调用方若按注释只提示「号源已满」，会掩盖停诊/排班不存在这两类失败原因，且掩盖了必须回滚的另外两种前置失败。",
+            "suggestion": "改为「返回 1 成功；返回 0 表示号源已满、排班已停诊(status<>1)或排班不存在，调用方一律回滚事务并中止下单；如需区分提示，请在持锁的 selectByIdForUpdate 结果上判定原因」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/AccountGuard.java",
+        "line": 29,
+        "minLine": 29,
+        "maxLine": 29,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该方法注释基本是按代码行罗列校验项（未过期/启用/角色与医生绑定/版本一致），未给出鉴权入口最需要的失败语义：任何身份或过期字段为 null、typ 未知、库中无记录、缺版本声明一律 fail-closed 返回 false（不抛异常），且每次调用都会实打实读库、无缓存。",
+            "suggestion": "补充失败语义与成本约定，例如「fail-closed：字段缺失/未知 typ/查无此人/版本缺失或不等均返回 false，不抛异常；每次调用一次主键查询，不缓存，调用方不得以签名有效替代本校验」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/AuthInterceptor.java",
+        "line": 20,
+        "minLine": 20,
+        "maxLine": 20,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释量化声称「代价是每请求两次索引查询」，但可见实现中 preHandle 只做 jwtUtils.parse（无 DB）+ accountGuard.active，而 AccountGuard.active 每次仅执行一次 selectById（sys_user 或 admin_user 二选一），@RequireRole 校验亦不查库。该数字与当前实现不符，易误导后续性能评估。",
+            "suggestion": "核实实际查询次数后改为准确表述，如「代价是每请求一次主键/索引回查（AccountGuard.active），本项目量级下可接受」；若确有第二次查询，请在注释中指明其来源方法。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/JwtUtils.java",
+        "line": 68,
+        "minLine": 68,
+        "maxLine": 68,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "签发方法的 Javadoc 基本复述字面行为（按身份/版本签发、过期取配置项），未说明 Pass 1 归纳的关键不变量：iat 与 exp 复用同一个 Instant now 以避免时钟偏移、exp 必然写入（parse 对缺失 exp 的令牌直接拒绝）、avatar/doctorId/ver 为 null 时省略而非写 null。",
+            "suggestion": "补充 Why/契约，例如：「iat/exp 复用同一 Instant 防偏移；exp 必填，parse 拒绝无 exp 令牌；可选 claim 为 null 时省略；调用方须传入已认证的 LoginUser」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/JwtUtils.java",
+        "line": 118,
+        "minLine": 118,
+        "maxLine": 118,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN",
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「从 \"Bearer xxx\" 里取出裸 token」仅复述方法名与字面逻辑，未给出真正的调用契约：null/空白返回 null 而不抛异常、前缀缺失时容忍裸 token（原样 trim 返回）、此处不做任何验签/合法性校验。这些是调用方必须知道的边界语义。",
+            "suggestion": "改写为说明契约与容错原因，如「null/空白→null 不抛异常；前缀缺失时按裸 token 容忍（历史客户端兼容）；仅做字符串剥离，验签交由 parse」。"
+          },
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释把前缀写死为 \"Bearer\"，实现却从 props.getJwt().getPrefix() 读取可配置前缀，且匹配是大小写敏感的 startsWith；读者可能误以为前缀固定且大小写不敏感。",
+            "suggestion": "将示例标注为「配置前缀（默认 Bearer）」并明确大小写敏感匹配，避免与可配置实现漂移。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/LoginUser.java",
+        "line": 39,
+        "minLine": 39,
+        "maxLine": 39,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "isDoctor 的注释只是把 `TYP_ADMIN.equals(typ) && ROLE_DOCTOR.equals(role)` 翻译成中文，未点出真正的安全动机：用户端（CLIENT）令牌即便携带 role=DOCTOR 也不算后台医生，且常量前置 equals 使 null typ/role 一律 false（fail-closed），doctorId 绑定需另行校验。",
+            "suggestion": "补充「CLIENT 令牌带 DOCTOR 角色不视为后台医生；typ/role 为 null 时 fail-closed 返回 false；医生归属仍须校验 doctorId 绑定」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/LoginUser.java",
+        "line": 44,
+        "minLine": 44,
+        "maxLine": 44,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「判定当前登录态是否属于用户端登录体系（typ=CLIENT）」是对单行 equals 的逐字复述，零信息增益；未说明该方法只看登录体系不看 role、null typ 返回 false，且它本身不构成授权授予。",
+            "suggestion": "改为说明语义边界，如「仅判定登录体系（不检查 role），null typ 视为非用户端；用于 /admin/** 隔离，不等同于权限通过」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/UserContext.java",
+        "line": 49,
+        "minLine": 49,
+        "maxLine": 49,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释称「管理员调用则抛 403」，但实现的判定条件是 `u.getDoctorId() == null`，与角色无关：绑定了 doctorId 的管理员会正常返回，未绑定的 CLIENT 账号同样 403；且未登录时先由 require() 抛 401。注释把失败条件错误地绑定到角色上。",
+            "suggestion": "改为「未登录先抛 401；doctorId 未绑定（无论 ADMIN/CLIENT）抛 403，避免无绑定账号被当作医生做归属过滤」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+        "line": 43,
+        "minLine": 43,
+        "maxLine": 43,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释声称订单号「总长 27 字符」，但 yyyyMMddHHmmssSSS 只有 17 位，加 8 位随机为 25 位；若确有固定前缀（如 2 位业务前缀）则注释未提及，读者按注释核算列宽会得到错误结论。",
+            "suggestion": "核对生成逻辑后写明构成，如「前缀 X(2) + 毫秒时间戳(17) + 随机(8) = 27 字符，需与 order_no 列宽一致」，或直接修正为实际长度。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+        "line": 189,
+        "minLine": 189,
+        "maxLine": 189,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "pay 的 Javadoc 未覆盖两条关键语义：已支付时直接返回原详情（幂等重放而非报错），以及 lockOwned 对非本人订单抛 404 而非 403（隐藏订单存在性）；仅写「校验超时与状态」偏泛。",
+            "suggestion": "补充「已 PAID 幂等返回原详情；非本人订单按 404 处理以免泄露存在性；支付窗口自创建时间起算 props.payTimeoutMinutes」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+        "line": 370,
+        "minLine": 370,
+        "maxLine": 370,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "lockForWrite 是并发临界区入口，但注释只说「先锁预约行…锁顺序：预约在前」，未解释该方法为何必须是 public @Transactional 包装（私有/自调用 @Transactional 不生效，需经 Spring 代理），也未声明调用方必须已处于/加入同一事务，否则锁在方法返回时即释放，下游「判空再插库」失去保护。",
+            "suggestion": "补充前置约束与动机：「public @Transactional 以走 Spring 代理（自调用不生效）；调用方须在同一事务内（REQUIRED 加入），锁持有至外层事务提交；锁序与取消/下单路径保持一致以防死锁」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/ConsultService.java",
+        "line": 57,
+        "minLine": 57,
+        "maxLine": 57,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "该 Javadoc 位于事务 + 鉴权高风险入口，却只复述了代码字面可见的校验步骤（requireOwned、doctor.status != 1），未给出任何仅凭代码无法直观推导的 Why：会话 userId 取自宠物主人 pet.getUserId() 而非请求体（防越权代建）、医生不存在走 notFound 而停诊走业务错误的区分、会话初始 ST_PENDING 与双侧未读计数 0 必须与 save 处于同一事务。",
+            "suggestion": "改写为说明约束与原因，例如：「单事务创建问诊会话：宠物须为调用者本人所有（requireOwned 失败即 403/notFound），医生不存在按 notFound、停诊按业务错误拒绝；会话 userId 强制取自宠物主人而非请求参数，防止代他人建单；初始 ST_PENDING 且双侧未读为 0，与会话落库同事务保证一致。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DepartmentService.java",
+        "line": 52,
+        "minLine": 52,
+        "maxLine": 52,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释主体「校验编码唯一后新建科室」复述了 L60-L62 的字面行为，默认值 99/启用也只是 setter 的直译；真正需要提示的 Why——check-then-insert 并非原子，并发下的编码唯一性最终依赖数据库唯一索引——完全缺失。",
+            "suggestion": "补一句并发前提，例如：「编码唯一性为先查后插，非原子；并发重复最终由 department.code 唯一索引兜底（插入冲突需按业务错误透出）。默认 sort=99、status=启用。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DepartmentService.java",
+        "line": 74,
+        "minLine": 74,
+        "maxLine": 74,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「校验科室存在与编码唯一后更新科室配置」是对 require(id)/exists(...) 的逐句翻译，零信息增益。未说明关键语义：编码唯一性检查在编码未变更时跳过且用 ne(id) 排除自身；构造仅含部分字段的 row 走 updateById，null 字段不写回（部分更新语义），这些是调用方极易误解的约束。",
+            "suggestion": "补充 Why 与边界，例如：「更新科室：require 不存在即 notFound；编码唯一性仅在编码变更时校验并排除自身（并发唯一性最终由 DB 唯一索引兜底）；使用仅填充可编辑字段的实体走 updateById，null 字段保持原值，避免整行覆盖。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorReviewService.java",
+        "line": 93,
+        "minLine": 93,
+        "maxLine": 93,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「医生（或管理员）回复评价」只是方法名翻译，属于鉴权边界 Javadoc 写空泛套话。未描述失败语义与前置约束：回复非空且 ≤500 字、评价不存在走 notFound、医生只能回复 doctorId 与自身一致的评价否则 403（fail-closed），以及同时写入 replyTime。",
+            "suggestion": "改为：「回复评价：内容非空且 ≤500 字；评价不存在 notFound；医生侧鉴权 fail-closed——仅当 review.doctorId 等于当前医生业务 id 才允许，否则 403；写入回复正文与 replyTime，同一事务提交。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+        "line": 84,
+        "minLine": 84,
+        "maxLine": 84,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「校验医生在诊、时段范围与唯一性后新建排班，初始余量等于总量」逐项复述 L87-L98 的字面调用，未揭示不可从签名推导的约束：(doctorId, workDate, period) 的先查后插在并发下不原子、需 DB 唯一约束兜底，以及 period 必须与起止时间匹配这一非直观校验目的。",
+            "suggestion": "补充 Why，例如：「新建排班：医生须可排班；period 必须与 startTime/endTime 匹配（防止上下午与时间自相矛盾）；(医生,日期,时段) 先查后插非原子，并发重复由 DB 唯一约束兜底；初始化 remainNum=totalNum 表示尚未放号占用。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+        "line": 196,
+        "minLine": 196,
+        "maxLine": 196,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "batchCreate 的 Javadoc 说明了 skipped 口径（已存在三元组计数、日期筛选未命中不计），信息增益到位，但遗漏了调用方必须知道的前置约束：医生须在诊（requireSchedulable）、start ≤ end、一次跨度上限 90 天、periods 需唯一且时间合法，这些都是会直接抛 BizException 的失败语义。",
+            "suggestion": "在 @param 或正文补一句前置约束与失败语义，例如「医生须在诊；start ≤ end 且跨度 ≤ 90 天；periods 不得重复且时间需合法，违反即抛 BizException 整批回滚」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+        "line": 280,
+        "minLine": 280,
+        "maxLine": 280,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "READABILITY_NOISE"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "READABILITY_NOISE",
+            "severity": "Nit",
+            "message": "stopClinic 注释中「之前这里会把 remain_num 一并清零、恢复时再按存活订单重算…（跟踪表 I07/D2）」属于历史变更日记 + 内部跟踪单号，对当前读者是噪音；真正需要保留的是「余量是事实状态，不得被状态开关改写」这一不变量。",
+            "suggestion": "压缩为不变量式表述，如「remain_num 为事实余量，停诊/恢复均不得清零或重算，否则页面无法区分真余量与停诊清零」，删除历史行为叙述与 I07/D2 跟踪表编号（放到提交信息或缺陷系统）。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+        "line": 302,
+        "minLine": 302,
+        "maxLine": 302,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "resumeClinic 的 Javadoc 只写了「开状态、保余量、UPDATE 行锁、0 行抛 404」，但实现第 310 行还有 requireSchedulable(s.getDoctorId()) 这一非直观前置条件：医生本身停诊时恢复排班会失败。该约束与 stopClinic（不校验医生在诊）不对称，恰是最需要注释解释的 Why，缺失后调用方会误判失败原因。",
+            "suggestion": "补充前置条件与不对称原因，例如「恢复前要求医生档案处于出诊状态（requireSchedulable），避免医生已停诊却放出可约号；停诊方向不做此校验以便随时关号」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+        "line": 114,
+        "minLine": 114,
+        "maxLine": 114,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "「状态不在通用更新里写」易被读成 update 忽略 status，但实现第 123-126 行会读取并校验 form.getStatus()，且第 142 行在 status != null 时调用 applyStatus(id, status) 实际改状态。注释与代码并非完全相悖（确实不在通用 SET 里写），但表述歧义会误导调用方以为编辑接口无法改状态。",
+            "suggestion": "改为明确表述：「status 不进通用行 SET；若表单显式带 status，则校验后委托 applyStatus 同步 onlineStatus，避免通用更新把在线标志写脏」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+        "line": 147,
+        "minLine": 147,
+        "maxLine": 147,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "changeStatus 注释解释了「只挡将来的号、已约单与排班行不动」的业务 Why，但漏掉最不可从字面推导的副作用：applyStatus 会按 socketRegistry.doctorConnected(id) 重算 onlineStatus = (status==1 && 已连接)，即停诊会同时下线在线标志。",
+            "suggestion": "补一句「委托 applyStatus：status 与 onlineStatus 一并写入，onlineStatus = (status==1 && WebSocket 已连接)，保证停诊后不再展示为在线」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+        "line": 170,
+        "minLine": 170,
+        "maxLine": 170,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "该 Javadoc「校验医生不存在关联排班、业务记录与后台账号后才允许删除」只是把下方 selectCount 判断链翻译成中文，未提供任何 Why：为何禁止硬删（保留历史档案、应改用停诊）、计数是否含已取消/逻辑存活行、以及 check-then-delete 未加行锁（依赖事务与低并发）这一并发前提。删除属高风险边界，需要失败语义与前置约束。",
+            "suggestion": "改写为「有任一引用即拒删并提示改用停诊以保留档案；计数含已取消预约等业务痕迹；引用统计未加行锁，check-then-delete 依赖同一事务与低并发，必要时对医生行加锁」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+        "line": 185,
+        "minLine": 185,
+        "maxLine": 185,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「事务内重算医生评分、评价数与已完成接诊数」基本是方法名与 @Transactional 的复述，未说明为何两条 refresh 必须同事务提交（评分/评价数与接诊量需一致快照）、统计由 SQL 侧重算而非客户端传入、以及可重复调用的幂等性。",
+            "suggestion": "补充「两条聚合 SQL 必须同事务提交，避免评分与接诊量出现半更新；计数全部由 DB 重算、不接受外部入参，评价/完诊后可幂等重复调用」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/NoticeService.java",
+        "line": 98,
+        "minLine": 98,
+        "maxLine": 98,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「阅读量由更新策略保留」表述含糊，未点明依赖 MyBatis-Plus NOT_NULL 字段策略（row 未 set viewCount 故不进 SET），也未说明 status/type/topFlag 省略时回落当前值的部分更新语义——这两点恰是调用方判断「省略字段会不会被清空」的关键。",
+            "suggestion": "明确写「未 set 的 viewCount/发布元数据依赖 MP NOT_NULL 策略不进 SET；status/type/topFlag 省略时回落库中当前值，校验作用于合并后的行」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/PetService.java",
+        "line": 40,
+        "minLine": 40,
+        "maxLine": 40,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「事务内校验并创建当前登录用户的宠物档案，有生日时按生日推算月龄」几乎逐行复述实现（validate / setUserId / deriveAgeMonth），未揭示安全相关的 Why：userId 强制取自 UserContext.requireId() 而非请求体，防止伪造归属；未认证即 fail-closed。",
+            "suggestion": "改为「归属强制取自 UserContext.requireId()，忽略请求体中的 userId 以防越权建档；有生日时以生日推算月龄覆盖入参，避免前端传入不一致月龄」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/PetService.java",
+        "line": 124,
+        "minLine": 124,
+        "maxLine": 124,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "updateByAdmin 是刻意绕过归属校验的鉴权敏感入口，注释仅写「不校验归属，其余校验与用户端一致」，未说明鉴权前提（管理员身份/权限在 Admin 控制器或路由层已强制校验，服务层只做存在性检查 → 404），也未说明 userId 从既有行保留、管理员不得借此转移归属。缺失这些前置约束会让后续调用方误以为该方法可安全暴露给普通用户。",
+            "suggestion": "补充「仅供已鉴权的后台接口调用（管理员校验在控制器层）；服务层只校验存在性并返回 404；userId 沿用库中原值，禁止通过本方法变更归属」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/PetService.java",
+        "line": 161,
+        "minLine": 161,
+        "maxLine": 161,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "removeByAdmin 注释保留了「历史业务单仍展示末次宠物信息」的 Why，但与 updateByAdmin 一样未声明鉴权前提：不校验本人归属的安全性依赖上游后台管理员鉴权，服务层仅存在性检查（404）。",
+            "suggestion": "补一句「管理员鉴权由后台控制器层保证；此处仅存在性校验（不存在返回 404），逻辑删除不影响历史单据展示」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/SysUserService.java",
+        "line": 34,
+        "minLine": 34,
+        "maxLine": 34,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "register 注释复述了唯一性校验与签发令牌，并补充了初始 token_version=1，但未点明并发关键前提：check-then-insert 本身不能防并发重复注册，真正的兜底是 username/phone 的数据库唯一索引；同时密码经 passwordEncoder 编码、状态与默认值一律服务端设定。",
+            "suggestion": "补充「唯一性预检仅为友好提示，并发重复由 DB 唯一索引兜底（冲突时事务回滚）；密码仅存编码值，status/token_version 等系统字段不接受请求体传入」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultDeliveryGuard.java",
+        "line": 38,
+        "minLine": 38,
+        "maxLine": 38,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "checkBusiness 的注释列出了四项校验与 status=2 放行的理由，但未记录 sessionId == null 直接返回 OK 的短路分支。鉴权方法中的「无会话即放行」是刻意的 fail-open 例外（供无会话上下文复用），不写清楚容易被误读为漏校验或被后续维护者当作 bug 修改。",
+            "suggestion": "补一句「sessionId 为 null 时只校验账号后放行（无会话上下文的调用），会话相关判定仅在传入 sessionId 时生效」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultPush.java",
+        "line": 60,
+        "minLine": 60,
+        "maxLine": 60,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "注释把 send() 描述为「单条连接的普通业务帧」，但实现中 sessionId == null 会转走 sendControl()，即降级为「只核对账号与令牌」的弱校验路径，非 null 才走 deliver(..., true) 的会话准入。这条鉴权强度分叉是安全边界上最不可直观推导的信息，注释完全未提，调用方可能误以为传入 null 也受会话准入保护。",
+            "suggestion": "补充分支与校验强度，如「sessionId 非空走会话准入（checkBusiness）；sessionId==null 视为控制帧转 sendControl，仅校验账号/令牌，故业务调用方必须显式传 sessionId，不得用 null 绕过会话准入」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultPush.java",
+        "line": 69,
+        "minLine": 69,
+        "maxLine": 69,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "sendControl 的注释只写了「只核对账号与令牌」，未记录两条失败/前置语义：底层 ws 为 null 时静默丢弃（不抛异常），以及 ACCOUNT_INVALID 时直接 closeForAccount 而不回错误帧（避免类注释所述的写错误帧递归）。这两点是调用方判断「控制帧是否一定送达」的关键。",
+            "suggestion": "补充「ws 为 null 直接静默返回；账号失效则关闭连接且不发错误帧（防递归），控制帧为 best-effort，不保证送达」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 39,
+        "minLine": 39,
+        "maxLine": 39,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「生成账号维度的唯一连接键（体系:主键）」基本是 u.getTyp() + \":\" + u.getId() 的字面复述。真正的 Why 是命名空间隔离：用户端与医生/后台的数字主键可能相同，不加 typ 前缀会串号顶替；同时该键的稳定性是「一账号一连接」顶替策略的基础。",
+            "suggestion": "补充碰撞与顶替动机，如「必须带 typ 前缀：不同体系的自增 id 可能相同，纯 id 作键会跨角色串号顶替；该键稳定不变，是 open() 同账号顶替与 close() 条件删除的依据」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 44,
+        "minLine": 44,
+        "maxLine": 44,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释说明了返回被顶掉的旧连接，但漏掉了所有权移交这一非直观契约：open() 只做原子 put 交换，并不关闭旧连接，关闭责任在调用方（Handler 的 closeQuietly(stale)），漏关会造成连接与推送泄漏。",
+            "suggestion": "在注释中明确「put 为原子交换，本方法不关闭旧连接；调用方必须负责关闭返回的非 null 旧连接，否则旧连接会继续留在客户端并占用资源」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 61,
+        "minLine": 61,
+        "maxLine": 61,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「按连接键查询当前有效连接，不存在时返回 null」只是把 conns.get(key) 的字面行为翻译成中文，没有任何 Why。此处真正不可直观推导的语义是：无锁弱一致读取，返回的 Conn 可能在返回瞬间已被顶号或关闭，因此调用方不能把它当作「连接仍可用/仍有权接收」的证明，必须再经 ConsultDeliveryGuard 校验。",
+            "suggestion": "补充并发语义与使用约束，如「无锁快照读：返回值可能刚被 open() 顶替或已关闭，仅代表查询瞬间的登记状态；能否写帧仍须由 ConsultDeliveryGuard 判定，勿据此做在线/鉴权结论」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 66,
+        "minLine": 66,
+        "maxLine": 66,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「将指定连接加入会话房间订阅集合」等价于复述 conn.getRooms().add(roomId)。房间订阅是 WS 广播的鉴权边界，注释却未说明关键前置约束：本方法不做任何参与方校验，鉴权必须由调用方（Handler 的 join 包装）先完成；也未说明基于并发 Set 的幂等重复加入语义。仅凭字面无法得知误用会导致越权订阅。",
+            "suggestion": "改为说明契约与前置条件，例如「幂等加入房间订阅（并发 Set，重复加入无副作用）。本方法不做参与方鉴权：调用方必须先校验 receiver 仍是会话当事人，否则会造成越权订阅并收到他人正文」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 79,
+        "minLine": 79,
+        "maxLine": 79,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「返回当前订阅了指定会话房间的连接快照列表」中的「快照」未解释一致性级别：实现是对 ConcurrentHashMap.values() 全量弱一致遍历，可能漏掉并发 join/leave，且返回的 Conn 可能随后被清退或关闭；快照的意义在于让 pushModeration 的「先发送后 finally 清退」不受遍历期变更影响。",
+            "suggestion": "补充「弱一致全表扫描：无锁，可能漏掉并发加入/退出的连接；返回后连接状态仍可能变化，故每帧写出前仍需 Guard 校验。快照用于保证发送与随后清退互不干扰」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java",
+        "line": 31,
+        "minLine": 31,
+        "maxLine": 31,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "类注释写「四类上行 / 五类下行」，但紧接着枚举的下行帧有 7 种（READY / HISTORY / MSG / READ / PRESENCE / ERROR / PONG），与 Pass 1 盲测得到的 4 上行 / 7 下行协议不符。协议数量是客户端对接的契约信息，数字漂移会误导后续维护者以为还有两类未列出或已废弃。",
+            "suggestion": "改为「四类上行 / 七类下行」，或直接删除计数只保留枚举清单（避免以后新增帧时再次漂移），例如「上行 SUBSCRIBE/CHAT/READ/PING；下行 READY/HISTORY/MSG/READ/PRESENCE/ERROR/PONG」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java",
+        "line": 59,
+        "minLine": 59,
+        "maxLine": 59,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该行解释了串行化包装的动机，但下一行的两个魔法值 5000 与 256 * 1024 无任何说明。它们是很有信息量的弱网/慢消费者约束：发送超时 5s、缓冲上限 256KB，超限会由 Decorator 直接关闭会话（SESSION_LIMIT_EXCEEDED），属于仅凭字面无法推导的行为。",
+            "suggestion": "在该注释中补充参数含义与后果，如「5000ms 发送超时 + 256KB 缓冲上限用于限制慢消费者背压，超限由 Decorator 主动关闭连接，避免内存被单条慢连接拖垮」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/api/http.js",
+        "line": 131,
+        "minLine": 131,
+        "maxLine": 131,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "put 的注释写「自动序列化请求体为 JSON」，无 FormData 例外；但 buildRequestInit 对任意 method 都会把 FormData 原样透传（并删除 Content-Type），字符串体也原样发送。相邻 post 的注释已正确写为「非 FormData」，同一契约两处措辞不一致，易让调用方以为 PUT 不能上传 FormData。",
+            "suggestion": "与 post 保持一致，改为「自动序列化非 FormData 请求体为 JSON（FormData 原样透传、字符串体不二次序列化）；遵循统一超时中止、401 强制重登与业务码异常抛出契约」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/api/http.js",
+        "line": 136,
+        "minLine": 136,
+        "maxLine": 136,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "首行「发起 DELETE 请求并解包 Result.data」完全可由 `unwrap(http.delete(url, cfg))` 字面推导；第二行契约句与相邻 put/post 文档（L131）逐字重复，未补充 DELETE 特有约束（无请求体、cfg 透传用途、失败不自动重试/幂等无保证）。",
+            "suggestion": "删除复述行，改为指向统一契约并补充 DELETE 特有信息，例如：「DELETE 无请求体，cfg 可覆盖 silent/kind；契约同 request（超时中止、401 强制重登、非 200 业务码抛错），失败不自动重试，调用方需自行保证幂等。」"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/api/httpError.js",
+        "line": 4,
+        "minLine": 4,
+        "maxLine": 4,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "「必须返回 reauth 清空登录态并跳转」易被读成该函数自身执行清 token 与路由跳转；实现（L7-L18）是纯决策函数，仅返回 {type:'reauth'|'silent'|'notify', message}，清态/跳转/弹窗均由调用方执行。",
+            "suggestion": "明确纯函数边界，例如：「纯决策函数，无副作用；业务 401 无视 silent 返回 reauth（由调用方清 token 并跳转），防止失效会话继续后台轮询；非 401 且 silent 返回 silent；其余返回 notify，业务错误用 msg 兜底『操作未成功』，传输层区分超时/连接失败文案。」"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/components/EntryIcon.vue",
+        "line": 4,
+        "minLine": 4,
+        "maxLine": 4,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释硬编码「内联 11 个固定路径」，但可见上下文（L5-L18）仅能确认 HomeFilled/Search/ChatDotRound/User 等键，数量无法核实且随图标增删即刻漂移；同时未说明键名必须与调用方图标名一致这一真实前置约束。",
+            "suggestion": "去掉易漂移的具体数量，改为：「@element-plus/icons-vue 为桶模块，按需内联少量固定 path（1024 viewBox）避免全站图标进入入口 chunk；键名必须与调用方使用的图标名严格一致，新增图标需同步补 path。」"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/components/LoginForm.vue",
+        "line": 6,
+        "minLine": 6,
+        "maxLine": 6,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该注释挂在 defineProps 之上，却只讲模板/打包取舍（原生控件 + Element Plus 同名类名），未说明此处真正不可从类型推导的注入契约：login/onSuccess 为必填回调，鉴权请求与登录后跳转归父组件，本组件只负责校验、预填与 busy/错误展示。",
+            "suggestion": "将打包取舍说明移至模板或组件顶部，并在 defineProps 处补契约：「login/onSuccess 必填：鉴权请求与登录后导航由父组件负责；initialUsername/Password 仅用于预填，组件自身只维护校验、busy 与错误展示，失败提示由请求层统一给出。」"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/router/index.js",
+        "line": 86,
+        "minLine": 86,
+        "maxLine": 86,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释称角色越界时「退回各自工作台首页」，暗示按角色分流到不同首页；但 L87 实现是无条件 return { path: '/admin/dashboard' }，ADMIN 与 DOCTOR 越界均落到同一个固定路由，不存在「各自」的分支逻辑。",
+            "suggestion": "改为与实现一致的表述，例如「原因: 角色越界统一退回 /admin/dashboard（该页对所有后台角色开放，不会形成重定向环），避免渲染空白页；未登录已在上一分支先行拦截并保留 redirect」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/stores/client.js",
+        "line": 13,
+        "minLine": 13,
+        "maxLine": 13,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "READABILITY_NOISE"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "READABILITY_NOISE",
+            "severity": "Nit",
+            "message": "该注释解释的是 nickname 的取值优先级（nickname → name → username），但物理位置紧贴 L14 的 logged 与 L15 的 userId 声明，真正相关的 computed 在 L16-18，读者会把「必须优先读取」误解为 logged/userId 的语义。",
+            "suggestion": "将注释下移到 L16 的 nickname computed 正上方（或并入其表达式行尾），使说明与被解释的 fallback 链紧邻；logged/userId 无需该说明。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/stores/session.js",
+        "line": 9,
+        "minLine": 9,
+        "maxLine": 9,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "READABILITY_NOISE"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "READABILITY_NOISE",
+            "severity": "Nit",
+            "message": "「公开形状（token/user + apply/refresh/logout）保持与原两份实现一致」属于重构历史叙述，对当前代码行为没有信息增益，且随时间推移会失去指代对象（原两份实现已不存在）。",
+            "suggestion": "删除历史对比句，改为陈述当前契约与前置约束，例如「返回 { token, user, apply, refresh, logout }；refresh 在无 token 时直接返回 null；user 由 localStorage JSON 反序列化，调用方需保证写入内容合法」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/utils/messageBox.js",
+        "line": 21,
+        "minLine": 21,
+        "maxLine": 21,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释仅说明「兼容两参调用形式」，但同一分支还隐含了更不直观的语义：当第三个参数存在时它被当作 appContext 处理，标题被强制置为空串并升格为四参调用（L24-L26）。这一参数移位约定无法从「兼容两参」一句推导，读者容易误以为第三参仍是 options。",
+            "suggestion": "补充一句说明参数移位约定，例如：「原因: 兼容 Element Plus 两参调用（第二参为配置对象）；此时若存在第三参则视为 appContext，升格为四参调用并将 title 置空，避免把 appContext 误当 options 合并」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/utils/token.js",
+        "line": 5,
+        "minLine": 5,
+        "maxLine": 5,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "getToken 文档中「缺失时返回空串」基本是 `|| ''` 的字面翻译；真正的调用契约未点明：永不返回 null/undefined，调用方可直接用真值判断「未登录」；传入未知 kind 时 KEYS[kind] 为 undefined，查找失败同样归一为 ''，即 fail-closed 退化为匿名而不是串到另一端身份。",
+            "suggestion": "在文档中明确「返回值恒为字符串（缺失/未知 kind 均为 ''），调用方可直接用真值判断登录态；未知 kind 不会回落到另一端令牌」，弱化对 `|| ''` 的字面复述。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/utils/token.js",
+        "line": 14,
+        "minLine": 14,
+        "maxLine": 14,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "setToken 的 Javadoc「写入指定端（client/admin）的登录令牌至 localStorage」只是对 `localStorage.setItem(KEYS[kind], token)` 的字面复述，零信息增益。该函数处于鉴权边界，却未说明任何非直观约束：覆盖写入（last-write-wins、幂等）、此处不做校验/续期（过期与 401 由请求层处理）、同步 API 在配额超限或隐私模式会抛异常且由调用方兜底、以及未知 kind 会写入 undefined 键的风险。",
+            "suggestion": "改写为说明「为什么/约束」，例如：覆盖式写入，同一端后写覆盖先写；不在此做过期校验与刷新，401/续期统一由请求层处理；localStorage 为同步 API，配额不足或隐私模式会抛错，调用方需自行 try/catch；kind 必须是 KEYS 中已定义的端，避免身份键串写。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/AppointmentDetail.vue",
+        "line": 22,
+        "minLine": 22,
+        "maxLine": 22,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "注释只解释了功能动机（可从评价管理页返回来源页），完全未提及下一行真正的高风险语义：`/^\\/admin\\/(?:appointments|reviews)(?:\\?|$)/` 是白名单而非黑名单，用于 fail-closed 阻断开放重定向（外链、`//host`、其他 admin 路由一律拒绝），非法值回退到恒定可用的 `/admin/appointments`，且 backLabel 与 returnTo 读同一份已消毒值以保证文案与目标一致。安全校验的「为什么」缺失，后续维护者极易把正则放宽成黑名单或任意 returnTo。",
+            "suggestion": "补充安全约束，例如：returnTo 走白名单（仅 /admin/appointments 与 /admin/reviews，且必须路径边界匹配）而非黑名单，防止开放重定向与外链/协议相对 URL 注入；不匹配一律 fail-closed 回退 /admin/appointments，保证返回按钮不落空；backLabel 复用同一已校验值以避免文案与跳转目标不一致。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Appointments.vue",
+        "line": 136,
+        "minLine": 136,
+        "maxLine": 136,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释「单行执行期间加锁」容易被读成按行加锁，而实现 `if (actingId.value) return` 是全局单飞：任意一行动作在途时，其他行的接诊/结束/取消同样被早退拒绝；同时未说明 actingId 在 finally 中释放（失败不会永久锁死 UI）以及异常向调用方冒泡（成功 toast 与 load() 只在 await 成功后执行）。",
+            "suggestion": "补充锁粒度与失败语义，例如：全局单飞锁，任一行动作在途即拒绝其他行提交；actingId 在 finally 释放，失败不会卡死按钮；异常向上抛出，成功提示与列表刷新仅在 await 成功后执行；actingId 同时驱动行内按钮 loading/disabled。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Appointments.vue",
+        "line": 183,
+        "minLine": 183,
+        "maxLine": 183,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释解释了「默认今日 + 写入地址栏便于分享刷新」，但遗漏了本段最关键的非直观控制流：使用 router.replace 而非 push（不污染历史），且写入后立即 return，把唯一一次首屏加载交给 route.query watcher 执行，避免与 L191 的 load() 造成重复首屏请求。",
+            "suggestion": "追加一句说明：用 replace 保持历史干净，写入查询后立刻 return，由 query watcher 触发唯一一次 load()，避免初始化重复拉取。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/ConsultRecords.vue",
+        "line": 18,
+        "minLine": 18,
+        "maxLine": 18,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释只给出「沿用已提交筛选快照、避免草稿生效」的意图，未说明 applied 的实际判定规则这一非直观部分：applied 与当前 q 逐字段比较用于区分「改筛选」与「纯翻页」，筛选变化必须把 pageNum 重置为 1（否则会请求越界页得到空列表），且快照仅在请求真正发出后更新，代表 applied 而非 pending 状态。",
+            "suggestion": "补充判定与更新时机，例如：applied 记录上一次真正发出的查询；与当前 q 比较，若筛选字段变化则强制 pageNum=1，防止停留在越界页返回空列表；快照只在请求发出后更新，避免把未提交的表单草稿当成已应用状态。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Doctors.vue",
+        "line": 65,
+        "minLine": 65,
+        "maxLine": 65,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释锚点与实现不符：该行下方是 `let editSeq = 0`（openEdit 的单调请求序号计数器），但注释讲的是「列表行手机号脱敏所以编辑前必须拉详情」，属于 doctorDetail 调用（L72）的理由，完全没有解释 editSeq 的并发语义（最后一次点击生效、序号只增不减、旧响应静默丢弃）。高风险异步竞态点被无关理由覆盖，读者会误以为 editSeq 与手机号脱敏有关。",
+            "suggestion": "将手机号脱敏/防覆写的理由移到 L72 `detail = await doctorDetail(row.id)` 上方；在 L65 改为说明计数器契约，例如「单调递增请求序号：每次 openEdit 先自增再 await，仅最新序号可写 editing/form/open，旧响应静默丢弃（last-click-wins），计数器永不重置」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Schedules.vue",
+        "line": 60,
+        "minLine": 60,
+        "maxLine": 60,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "失败机制描述不准确：JS 中数组「下标越界」只会得到 undefined，不会抛异常；`periodTimes[v] || []` 真正防的是调用方对 undefined 解构（如 onPeriod 的 `const [s, e] = ...`）抛 TypeError。「防止本地异常」也含义含糊，且未点明 periodTimes（默认填充时间）与 periodRanges（更宽的校验窗口）是两套不可混用的映射。",
+            "suggestion": "改为「原因: 未知时段 key 回退为空数组，避免调用方解构 undefined 抛 TypeError（字段被清空而非崩溃）；此处 periodTimes 是默认填充时间，勿与校验窗口 periodRanges 混用」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Workbench.vue",
+        "line": 75,
+        "minLine": 75,
+        "maxLine": 75,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "该 catch 属于「接诊」流程（L71 accept → L72 order.value.status = 1），流程中并不涉及病历表单内容；注释「保留当前表单内容以便重试」是从保存失败分支照搬的描述，与本处真实不变量（失败时不做乐观状态翻转、status 仍为 0、按钮可再次点击、action 在 finally 清空避免 busy 卡死）不一致。",
+            "suggestion": "改为描述接诊失败语义，例如「原因: 接诊失败不做乐观状态翻转（status 仍为待接诊），错误提示由请求层统一给出；action 在 finally 清空以便直接重试」。表单保留的说明留在 save/doFinish 的 catch 中。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/Booking.vue",
+        "line": 78,
+        "minLine": 78,
+        "maxLine": 78,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该注释挂在 nextHint computed 首部，却只解释了第一条分支（停诊文案为何简写），未说明整个 computed 的关键不变量：停诊 → 无排班 → 已约满 → 未选时段 → 未选宠物 → 就绪摘要 的降序优先级、首个命中即返回的互斥语义（存在上游阻塞时绝不展示『就绪』）。读者仅看代码需自行推断分支顺序不可随意调换。",
+            "suggestion": "改为说明优先级契约，例如：『按阻塞优先级降序首个命中即返回，保证上游阻塞未解除时不会展示就绪摘要；停诊细节已在医生卡片展示，此处只给结果文案避免重复』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/Booking.vue",
+        "line": 143,
+        "minLine": 143,
+        "maxLine": 143,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释解释了『不阻塞医生/号源展示、区块级重试』，但遗漏了本失败分支最关键的 fail-closed 语义：同时清空 myPets 与 form.petId，是为了避免把上次加载残留、本次未校验的 petId 带入提交；此外未说明为何此处不再弹提示（请求层已统一提示）。",
+            "suggestion": "补充一句：『同时清空列表与 form.petId 做 fail-closed，防止提交未校验的旧 petId；失败提示由请求层统一给出，此处只置 petsFailed 驱动局部重试』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/ConsultRoom.vue",
+        "line": 24,
+        "minLine": 24,
+        "maxLine": 24,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释把 panelKey 递增的触发点限定为『关闭问诊后』，并断言重挂是为了『从库中拉取最新系统消息』。但上下文只显示 L53 在某个重载/重连处理函数末尾执行 panelKey.value += 1，Pass 1 归纳的语义是『重载/重连时通过递增强制重挂以重置面板局部状态与连接』；注释描述的触发范围偏窄，且『从库中拉取』是前端代码无法证实的后端取数机制断言。",
+            "suggestion": "改为与实现一致的描述：『key 单调递增用作 :key，重载/重连（含问诊关闭后刷新）时强制面板重挂，以重置面板内部状态与消息连接；key 不复用』，删除对后端数据来源的断言或改为『重新拉取最新消息』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/ConsultRoom.vue",
+        "line": 57,
+        "minLine": 57,
+        "maxLine": 57,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释解释了为何要手动同步 visualViewport.height（软键盘 + dvh 不更新），但代码中最不直观的 `scale === 1` 守卫没有任何说明——即 pinch-zoom（scale ≠ 1）时刻意忽略 resize 以避免布局跳动。这属于仅凭字面无法推导的 Why，缺失后易被误当作冗余判断而删除。",
+            "suggestion": "在同一注释追加：『仅在 scale === 1 时同步，捏合缩放引起的 viewport 变化不参与布局，避免高度抖动；visualViewport 不支持时保持 dvh 兜底』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/OrderDetail.vue",
+        "line": 223,
+        "minLine": 223,
+        "maxLine": 223,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释只覆盖了『医生未写病历 → 空 data → 降级 null』这一半语义，未解释 `.catch(() => null)` 的关键意图：病历是附属可选资源（可能不存在或无权限），其请求失败必须被吞掉，不能进入外层 catch 把整页标记为 failed（主详情失败才是唯一失败路径）。",
+            "suggestion": "补充：『病历为附属资源，不存在/无权限/请求失败一律降级为 null 渲染空态，不得让整页 failed；仅 appointmentDetail 失败才走外层 catch』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/OrderDetail.vue",
+        "line": 264,
+        "minLine": 264,
+        "maxLine": 264,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "该空 catch 的覆盖范围不止接口失败：ElMessageBox.prompt 在用户点『再想想』/关闭时也会 reject 并落入此处，属于正常无操作路径。注释只写『请求层已提示失败原因』，把 catch 语义窄化为接口异常，后续维护者很可能在此补一个错误提示，从而对用户的正常取消操作弹出误报。",
+            "suggestion": "明确双重语义，例如：『此处同时吞掉用户关闭/「再想想」的 prompt reject（正常无操作，不得提示）与取消接口失败（请求层已提示）；保留当前预约状态，action 在 finally 统一复位』。"
+          }
+        ]
+      }
+    ],
+    "blockingClusters": [],
+    "advisoryClusters": [
+      {
+        "file": "backend/src/main/java/com/yuzhua/config/SlowSqlInterceptor.java",
+        "line": 54,
+        "minLine": 54,
+        "maxLine": 54,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该方法级 Javadoc 基本是对 L59 `thresholdMs <= 0` 与 L74 `elapsedMs >= thresholdMs` 两处字面条件的复述，且与 L58、L73 的行内「原因」注释信息重叠；未补充盲测归纳出的关键失败语义——计时/日志纯属观测，catch 中置 failed 后原样 rethrow 原 Throwable，finally 中的日志不得改变或吞掉查询结果与异常。",
+            "suggestion": "精简为契约要点并补齐失败语义，例如：「纯观测：阈值取自配置（每次调用读取，可热更新），<=0 关闭监控；计时与 WARN 日志不改变返回值，原异常原样抛出，日志自身失败不得影响查询链路。」避免与 L58/L73 行内注释重复表述同一条件。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/config/WebMvcConfig.java",
+        "line": 69,
+        "minLine": 69,
+        "maxLine": 69,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释以「短缓存」「永久不可变」概括缓存策略，与实现的具体取值存在措辞偏差：seed 为 max-age=1 天 public，兜底为 max-age=365 天 public + immutable，365 天并非「永久」，读者据此可能误判缓存有效期无上限。",
+            "suggestion": "改为与代码一致的量化表述，例如：「按路径特异度先注册 /seed/**（可覆盖更新，max-age=1 天 public），再注册兜底 /**（UUID 命名内容不变，max-age=365 天 public+immutable）；顺序颠倒会被兜底模式抢先匹配。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/mapper/AppointmentMapper.java",
+        "line": 20,
+        "minLine": 20,
+        "maxLine": 20,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释称该查询为「幂等键当前读」，但 L21 的 SQL 是普通 SELECT（WHERE user_id/idem_key/deleted=0 LIMIT 1），没有 FOR UPDATE 或 LOCK IN SHARE MODE。在 REPEATABLE READ 下这是一致性快照读，看不到本事务快照建立之后并发插入的同键预约，与注释宣称的当前读语义相悖，会让调用方误以为仅靠此查询即可防重复下单。",
+            "suggestion": "二选一并保持文实一致：若确需当前读，SQL 补 FOR UPDATE（并说明与唯一索引/插入冲突回滚的配合）；若保持快照读，注释改为「快照读预检，最终去重依赖 (user_id, idem_key) 唯一索引与插入冲突回滚」，并保留 raw @Select 必须显式 deleted=0 的原因说明。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/mapper/ConsultSessionMapper.java",
+        "line": 42,
+        "minLine": 42,
+        "maxLine": 42,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释只解释了「为何手写 SQL」（Wrapper 无法在子查询过滤 hidden=0），但遗漏了该重算最关键的并发前置条件：必须在持有 consult_session 行锁、且与屏蔽/恢复消息同一事务内执行，否则重算结果会基于旧快照或与他人写入交错。这是仅凭方法名与 SQL 字面无法推导的高风险约束。",
+            "suggestion": "补一句前置约束与幂等语义，如「须在 selectByIdForUpdate 会话行锁内、与屏蔽/恢复同一事务调用；采用绝对值重算而非增量，可重复执行」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/mapper/DepartmentMapper.java",
+        "line": 13,
+        "minLine": 13,
+        "maxLine": 13,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "READABILITY_NOISE"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "READABILITY_NOISE",
+            "severity": "Nit",
+            "message": "Javadoc 以「两条路径原本各自做…现在双方都先取这一把行锁」的变更前后叙事组织内容，属于历史变更日记式表述；竞态本身的说明有价值，但「原本/现在」的对比会随时间失效并增加阅读噪音。",
+            "suggestion": "改为现在时的不变量陈述，例如：「删除科室与写入医生归属必须共用本行锁：否则两侧的先查后写落在不同事务可同时通过，留下指向已删科室的医生。必须是当前读，selectById 的快照读在等锁后仍返回旧版本；返回 null 表示科室已删除，调用方须中止。」删去「原本…现在…」句式。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/mapper/DoctorScheduleMapper.java",
+        "line": 12,
+        "minLine": 12,
+        "maxLine": 12,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释把返回 0 唯一解释为「已满」，但 L17 的守卫是 status = 1 AND remain_num > 0：排班被停诊（status != 1）或行已被物理删除时同样返回 0。调用方若按注释只提示「号源已满」，会掩盖停诊/排班不存在这两类失败原因，且掩盖了必须回滚的另外两种前置失败。",
+            "suggestion": "改为「返回 1 成功；返回 0 表示号源已满、排班已停诊(status<>1)或排班不存在，调用方一律回滚事务并中止下单；如需区分提示，请在持锁的 selectByIdForUpdate 结果上判定原因」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/AccountGuard.java",
+        "line": 29,
+        "minLine": 29,
+        "maxLine": 29,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该方法注释基本是按代码行罗列校验项（未过期/启用/角色与医生绑定/版本一致），未给出鉴权入口最需要的失败语义：任何身份或过期字段为 null、typ 未知、库中无记录、缺版本声明一律 fail-closed 返回 false（不抛异常），且每次调用都会实打实读库、无缓存。",
+            "suggestion": "补充失败语义与成本约定，例如「fail-closed：字段缺失/未知 typ/查无此人/版本缺失或不等均返回 false，不抛异常；每次调用一次主键查询，不缓存，调用方不得以签名有效替代本校验」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/AuthInterceptor.java",
+        "line": 20,
+        "minLine": 20,
+        "maxLine": 20,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释量化声称「代价是每请求两次索引查询」，但可见实现中 preHandle 只做 jwtUtils.parse（无 DB）+ accountGuard.active，而 AccountGuard.active 每次仅执行一次 selectById（sys_user 或 admin_user 二选一），@RequireRole 校验亦不查库。该数字与当前实现不符，易误导后续性能评估。",
+            "suggestion": "核实实际查询次数后改为准确表述，如「代价是每请求一次主键/索引回查（AccountGuard.active），本项目量级下可接受」；若确有第二次查询，请在注释中指明其来源方法。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/JwtUtils.java",
+        "line": 68,
+        "minLine": 68,
+        "maxLine": 68,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "签发方法的 Javadoc 基本复述字面行为（按身份/版本签发、过期取配置项），未说明 Pass 1 归纳的关键不变量：iat 与 exp 复用同一个 Instant now 以避免时钟偏移、exp 必然写入（parse 对缺失 exp 的令牌直接拒绝）、avatar/doctorId/ver 为 null 时省略而非写 null。",
+            "suggestion": "补充 Why/契约，例如：「iat/exp 复用同一 Instant 防偏移；exp 必填，parse 拒绝无 exp 令牌；可选 claim 为 null 时省略；调用方须传入已认证的 LoginUser」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/JwtUtils.java",
+        "line": 118,
+        "minLine": 118,
+        "maxLine": 118,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN",
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「从 \"Bearer xxx\" 里取出裸 token」仅复述方法名与字面逻辑，未给出真正的调用契约：null/空白返回 null 而不抛异常、前缀缺失时容忍裸 token（原样 trim 返回）、此处不做任何验签/合法性校验。这些是调用方必须知道的边界语义。",
+            "suggestion": "改写为说明契约与容错原因，如「null/空白→null 不抛异常；前缀缺失时按裸 token 容忍（历史客户端兼容）；仅做字符串剥离，验签交由 parse」。"
+          },
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释把前缀写死为 \"Bearer\"，实现却从 props.getJwt().getPrefix() 读取可配置前缀，且匹配是大小写敏感的 startsWith；读者可能误以为前缀固定且大小写不敏感。",
+            "suggestion": "将示例标注为「配置前缀（默认 Bearer）」并明确大小写敏感匹配，避免与可配置实现漂移。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/LoginUser.java",
+        "line": 39,
+        "minLine": 39,
+        "maxLine": 39,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "isDoctor 的注释只是把 `TYP_ADMIN.equals(typ) && ROLE_DOCTOR.equals(role)` 翻译成中文，未点出真正的安全动机：用户端（CLIENT）令牌即便携带 role=DOCTOR 也不算后台医生，且常量前置 equals 使 null typ/role 一律 false（fail-closed），doctorId 绑定需另行校验。",
+            "suggestion": "补充「CLIENT 令牌带 DOCTOR 角色不视为后台医生；typ/role 为 null 时 fail-closed 返回 false；医生归属仍须校验 doctorId 绑定」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/LoginUser.java",
+        "line": 44,
+        "minLine": 44,
+        "maxLine": 44,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「判定当前登录态是否属于用户端登录体系（typ=CLIENT）」是对单行 equals 的逐字复述，零信息增益；未说明该方法只看登录体系不看 role、null typ 返回 false，且它本身不构成授权授予。",
+            "suggestion": "改为说明语义边界，如「仅判定登录体系（不检查 role），null typ 视为非用户端；用于 /admin/** 隔离，不等同于权限通过」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/security/UserContext.java",
+        "line": 49,
+        "minLine": 49,
+        "maxLine": 49,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释称「管理员调用则抛 403」，但实现的判定条件是 `u.getDoctorId() == null`，与角色无关：绑定了 doctorId 的管理员会正常返回，未绑定的 CLIENT 账号同样 403；且未登录时先由 require() 抛 401。注释把失败条件错误地绑定到角色上。",
+            "suggestion": "改为「未登录先抛 401；doctorId 未绑定（无论 ADMIN/CLIENT）抛 403，避免无绑定账号被当作医生做归属过滤」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+        "line": 43,
+        "minLine": 43,
+        "maxLine": 43,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释声称订单号「总长 27 字符」，但 yyyyMMddHHmmssSSS 只有 17 位，加 8 位随机为 25 位；若确有固定前缀（如 2 位业务前缀）则注释未提及，读者按注释核算列宽会得到错误结论。",
+            "suggestion": "核对生成逻辑后写明构成，如「前缀 X(2) + 毫秒时间戳(17) + 随机(8) = 27 字符，需与 order_no 列宽一致」，或直接修正为实际长度。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+        "line": 189,
+        "minLine": 189,
+        "maxLine": 189,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "pay 的 Javadoc 未覆盖两条关键语义：已支付时直接返回原详情（幂等重放而非报错），以及 lockOwned 对非本人订单抛 404 而非 403（隐藏订单存在性）；仅写「校验超时与状态」偏泛。",
+            "suggestion": "补充「已 PAID 幂等返回原详情；非本人订单按 404 处理以免泄露存在性；支付窗口自创建时间起算 props.payTimeoutMinutes」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+        "line": 370,
+        "minLine": 370,
+        "maxLine": 370,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "lockForWrite 是并发临界区入口，但注释只说「先锁预约行…锁顺序：预约在前」，未解释该方法为何必须是 public @Transactional 包装（私有/自调用 @Transactional 不生效，需经 Spring 代理），也未声明调用方必须已处于/加入同一事务，否则锁在方法返回时即释放，下游「判空再插库」失去保护。",
+            "suggestion": "补充前置约束与动机：「public @Transactional 以走 Spring 代理（自调用不生效）；调用方须在同一事务内（REQUIRED 加入），锁持有至外层事务提交；锁序与取消/下单路径保持一致以防死锁」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/ConsultService.java",
+        "line": 57,
+        "minLine": 57,
+        "maxLine": 57,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "该 Javadoc 位于事务 + 鉴权高风险入口，却只复述了代码字面可见的校验步骤（requireOwned、doctor.status != 1），未给出任何仅凭代码无法直观推导的 Why：会话 userId 取自宠物主人 pet.getUserId() 而非请求体（防越权代建）、医生不存在走 notFound 而停诊走业务错误的区分、会话初始 ST_PENDING 与双侧未读计数 0 必须与 save 处于同一事务。",
+            "suggestion": "改写为说明约束与原因，例如：「单事务创建问诊会话：宠物须为调用者本人所有（requireOwned 失败即 403/notFound），医生不存在按 notFound、停诊按业务错误拒绝；会话 userId 强制取自宠物主人而非请求参数，防止代他人建单；初始 ST_PENDING 且双侧未读为 0，与会话落库同事务保证一致。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DepartmentService.java",
+        "line": 52,
+        "minLine": 52,
+        "maxLine": 52,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释主体「校验编码唯一后新建科室」复述了 L60-L62 的字面行为，默认值 99/启用也只是 setter 的直译；真正需要提示的 Why——check-then-insert 并非原子，并发下的编码唯一性最终依赖数据库唯一索引——完全缺失。",
+            "suggestion": "补一句并发前提，例如：「编码唯一性为先查后插，非原子；并发重复最终由 department.code 唯一索引兜底（插入冲突需按业务错误透出）。默认 sort=99、status=启用。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DepartmentService.java",
+        "line": 74,
+        "minLine": 74,
+        "maxLine": 74,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「校验科室存在与编码唯一后更新科室配置」是对 require(id)/exists(...) 的逐句翻译，零信息增益。未说明关键语义：编码唯一性检查在编码未变更时跳过且用 ne(id) 排除自身；构造仅含部分字段的 row 走 updateById，null 字段不写回（部分更新语义），这些是调用方极易误解的约束。",
+            "suggestion": "补充 Why 与边界，例如：「更新科室：require 不存在即 notFound；编码唯一性仅在编码变更时校验并排除自身（并发唯一性最终由 DB 唯一索引兜底）；使用仅填充可编辑字段的实体走 updateById，null 字段保持原值，避免整行覆盖。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorReviewService.java",
+        "line": 93,
+        "minLine": 93,
+        "maxLine": 93,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「医生（或管理员）回复评价」只是方法名翻译，属于鉴权边界 Javadoc 写空泛套话。未描述失败语义与前置约束：回复非空且 ≤500 字、评价不存在走 notFound、医生只能回复 doctorId 与自身一致的评价否则 403（fail-closed），以及同时写入 replyTime。",
+            "suggestion": "改为：「回复评价：内容非空且 ≤500 字；评价不存在 notFound；医生侧鉴权 fail-closed——仅当 review.doctorId 等于当前医生业务 id 才允许，否则 403；写入回复正文与 replyTime，同一事务提交。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+        "line": 84,
+        "minLine": 84,
+        "maxLine": 84,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「校验医生在诊、时段范围与唯一性后新建排班，初始余量等于总量」逐项复述 L87-L98 的字面调用，未揭示不可从签名推导的约束：(doctorId, workDate, period) 的先查后插在并发下不原子、需 DB 唯一约束兜底，以及 period 必须与起止时间匹配这一非直观校验目的。",
+            "suggestion": "补充 Why，例如：「新建排班：医生须可排班；period 必须与 startTime/endTime 匹配（防止上下午与时间自相矛盾）；(医生,日期,时段) 先查后插非原子，并发重复由 DB 唯一约束兜底；初始化 remainNum=totalNum 表示尚未放号占用。」"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+        "line": 196,
+        "minLine": 196,
+        "maxLine": 196,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "batchCreate 的 Javadoc 说明了 skipped 口径（已存在三元组计数、日期筛选未命中不计），信息增益到位，但遗漏了调用方必须知道的前置约束：医生须在诊（requireSchedulable）、start ≤ end、一次跨度上限 90 天、periods 需唯一且时间合法，这些都是会直接抛 BizException 的失败语义。",
+            "suggestion": "在 @param 或正文补一句前置约束与失败语义，例如「医生须在诊；start ≤ end 且跨度 ≤ 90 天；periods 不得重复且时间需合法，违反即抛 BizException 整批回滚」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+        "line": 280,
+        "minLine": 280,
+        "maxLine": 280,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "READABILITY_NOISE"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "READABILITY_NOISE",
+            "severity": "Nit",
+            "message": "stopClinic 注释中「之前这里会把 remain_num 一并清零、恢复时再按存活订单重算…（跟踪表 I07/D2）」属于历史变更日记 + 内部跟踪单号，对当前读者是噪音；真正需要保留的是「余量是事实状态，不得被状态开关改写」这一不变量。",
+            "suggestion": "压缩为不变量式表述，如「remain_num 为事实余量，停诊/恢复均不得清零或重算，否则页面无法区分真余量与停诊清零」，删除历史行为叙述与 I07/D2 跟踪表编号（放到提交信息或缺陷系统）。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+        "line": 302,
+        "minLine": 302,
+        "maxLine": 302,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "resumeClinic 的 Javadoc 只写了「开状态、保余量、UPDATE 行锁、0 行抛 404」，但实现第 310 行还有 requireSchedulable(s.getDoctorId()) 这一非直观前置条件：医生本身停诊时恢复排班会失败。该约束与 stopClinic（不校验医生在诊）不对称，恰是最需要注释解释的 Why，缺失后调用方会误判失败原因。",
+            "suggestion": "补充前置条件与不对称原因，例如「恢复前要求医生档案处于出诊状态（requireSchedulable），避免医生已停诊却放出可约号；停诊方向不做此校验以便随时关号」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+        "line": 114,
+        "minLine": 114,
+        "maxLine": 114,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "「状态不在通用更新里写」易被读成 update 忽略 status，但实现第 123-126 行会读取并校验 form.getStatus()，且第 142 行在 status != null 时调用 applyStatus(id, status) 实际改状态。注释与代码并非完全相悖（确实不在通用 SET 里写），但表述歧义会误导调用方以为编辑接口无法改状态。",
+            "suggestion": "改为明确表述：「status 不进通用行 SET；若表单显式带 status，则校验后委托 applyStatus 同步 onlineStatus，避免通用更新把在线标志写脏」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+        "line": 147,
+        "minLine": 147,
+        "maxLine": 147,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "changeStatus 注释解释了「只挡将来的号、已约单与排班行不动」的业务 Why，但漏掉最不可从字面推导的副作用：applyStatus 会按 socketRegistry.doctorConnected(id) 重算 onlineStatus = (status==1 && 已连接)，即停诊会同时下线在线标志。",
+            "suggestion": "补一句「委托 applyStatus：status 与 onlineStatus 一并写入，onlineStatus = (status==1 && WebSocket 已连接)，保证停诊后不再展示为在线」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+        "line": 170,
+        "minLine": 170,
+        "maxLine": 170,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "该 Javadoc「校验医生不存在关联排班、业务记录与后台账号后才允许删除」只是把下方 selectCount 判断链翻译成中文，未提供任何 Why：为何禁止硬删（保留历史档案、应改用停诊）、计数是否含已取消/逻辑存活行、以及 check-then-delete 未加行锁（依赖事务与低并发）这一并发前提。删除属高风险边界，需要失败语义与前置约束。",
+            "suggestion": "改写为「有任一引用即拒删并提示改用停诊以保留档案；计数含已取消预约等业务痕迹；引用统计未加行锁，check-then-delete 依赖同一事务与低并发，必要时对医生行加锁」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+        "line": 185,
+        "minLine": 185,
+        "maxLine": 185,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「事务内重算医生评分、评价数与已完成接诊数」基本是方法名与 @Transactional 的复述，未说明为何两条 refresh 必须同事务提交（评分/评价数与接诊量需一致快照）、统计由 SQL 侧重算而非客户端传入、以及可重复调用的幂等性。",
+            "suggestion": "补充「两条聚合 SQL 必须同事务提交，避免评分与接诊量出现半更新；计数全部由 DB 重算、不接受外部入参，评价/完诊后可幂等重复调用」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/NoticeService.java",
+        "line": 98,
+        "minLine": 98,
+        "maxLine": 98,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「阅读量由更新策略保留」表述含糊，未点明依赖 MyBatis-Plus NOT_NULL 字段策略（row 未 set viewCount 故不进 SET），也未说明 status/type/topFlag 省略时回落当前值的部分更新语义——这两点恰是调用方判断「省略字段会不会被清空」的关键。",
+            "suggestion": "明确写「未 set 的 viewCount/发布元数据依赖 MP NOT_NULL 策略不进 SET；status/type/topFlag 省略时回落库中当前值，校验作用于合并后的行」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/PetService.java",
+        "line": 40,
+        "minLine": 40,
+        "maxLine": 40,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「事务内校验并创建当前登录用户的宠物档案，有生日时按生日推算月龄」几乎逐行复述实现（validate / setUserId / deriveAgeMonth），未揭示安全相关的 Why：userId 强制取自 UserContext.requireId() 而非请求体，防止伪造归属；未认证即 fail-closed。",
+            "suggestion": "改为「归属强制取自 UserContext.requireId()，忽略请求体中的 userId 以防越权建档；有生日时以生日推算月龄覆盖入参，避免前端传入不一致月龄」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/PetService.java",
+        "line": 124,
+        "minLine": 124,
+        "maxLine": 124,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "updateByAdmin 是刻意绕过归属校验的鉴权敏感入口，注释仅写「不校验归属，其余校验与用户端一致」，未说明鉴权前提（管理员身份/权限在 Admin 控制器或路由层已强制校验，服务层只做存在性检查 → 404），也未说明 userId 从既有行保留、管理员不得借此转移归属。缺失这些前置约束会让后续调用方误以为该方法可安全暴露给普通用户。",
+            "suggestion": "补充「仅供已鉴权的后台接口调用（管理员校验在控制器层）；服务层只校验存在性并返回 404；userId 沿用库中原值，禁止通过本方法变更归属」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/PetService.java",
+        "line": 161,
+        "minLine": 161,
+        "maxLine": 161,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "removeByAdmin 注释保留了「历史业务单仍展示末次宠物信息」的 Why，但与 updateByAdmin 一样未声明鉴权前提：不校验本人归属的安全性依赖上游后台管理员鉴权，服务层仅存在性检查（404）。",
+            "suggestion": "补一句「管理员鉴权由后台控制器层保证；此处仅存在性校验（不存在返回 404），逻辑删除不影响历史单据展示」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/service/SysUserService.java",
+        "line": 34,
+        "minLine": 34,
+        "maxLine": 34,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "register 注释复述了唯一性校验与签发令牌，并补充了初始 token_version=1，但未点明并发关键前提：check-then-insert 本身不能防并发重复注册，真正的兜底是 username/phone 的数据库唯一索引；同时密码经 passwordEncoder 编码、状态与默认值一律服务端设定。",
+            "suggestion": "补充「唯一性预检仅为友好提示，并发重复由 DB 唯一索引兜底（冲突时事务回滚）；密码仅存编码值，status/token_version 等系统字段不接受请求体传入」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultDeliveryGuard.java",
+        "line": 38,
+        "minLine": 38,
+        "maxLine": 38,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "checkBusiness 的注释列出了四项校验与 status=2 放行的理由，但未记录 sessionId == null 直接返回 OK 的短路分支。鉴权方法中的「无会话即放行」是刻意的 fail-open 例外（供无会话上下文复用），不写清楚容易被误读为漏校验或被后续维护者当作 bug 修改。",
+            "suggestion": "补一句「sessionId 为 null 时只校验账号后放行（无会话上下文的调用），会话相关判定仅在传入 sessionId 时生效」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultPush.java",
+        "line": 60,
+        "minLine": 60,
+        "maxLine": 60,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "注释把 send() 描述为「单条连接的普通业务帧」，但实现中 sessionId == null 会转走 sendControl()，即降级为「只核对账号与令牌」的弱校验路径，非 null 才走 deliver(..., true) 的会话准入。这条鉴权强度分叉是安全边界上最不可直观推导的信息，注释完全未提，调用方可能误以为传入 null 也受会话准入保护。",
+            "suggestion": "补充分支与校验强度，如「sessionId 非空走会话准入（checkBusiness）；sessionId==null 视为控制帧转 sendControl，仅校验账号/令牌，故业务调用方必须显式传 sessionId，不得用 null 绕过会话准入」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultPush.java",
+        "line": 69,
+        "minLine": 69,
+        "maxLine": 69,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "sendControl 的注释只写了「只核对账号与令牌」，未记录两条失败/前置语义：底层 ws 为 null 时静默丢弃（不抛异常），以及 ACCOUNT_INVALID 时直接 closeForAccount 而不回错误帧（避免类注释所述的写错误帧递归）。这两点是调用方判断「控制帧是否一定送达」的关键。",
+            "suggestion": "补充「ws 为 null 直接静默返回；账号失效则关闭连接且不发错误帧（防递归），控制帧为 best-effort，不保证送达」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 39,
+        "minLine": 39,
+        "maxLine": 39,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「生成账号维度的唯一连接键（体系:主键）」基本是 u.getTyp() + \":\" + u.getId() 的字面复述。真正的 Why 是命名空间隔离：用户端与医生/后台的数字主键可能相同，不加 typ 前缀会串号顶替；同时该键的稳定性是「一账号一连接」顶替策略的基础。",
+            "suggestion": "补充碰撞与顶替动机，如「必须带 typ 前缀：不同体系的自增 id 可能相同，纯 id 作键会跨角色串号顶替；该键稳定不变，是 open() 同账号顶替与 close() 条件删除的依据」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 44,
+        "minLine": 44,
+        "maxLine": 44,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释说明了返回被顶掉的旧连接，但漏掉了所有权移交这一非直观契约：open() 只做原子 put 交换，并不关闭旧连接，关闭责任在调用方（Handler 的 closeQuietly(stale)），漏关会造成连接与推送泄漏。",
+            "suggestion": "在注释中明确「put 为原子交换，本方法不关闭旧连接；调用方必须负责关闭返回的非 null 旧连接，否则旧连接会继续留在客户端并占用资源」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 61,
+        "minLine": 61,
+        "maxLine": 61,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「按连接键查询当前有效连接，不存在时返回 null」只是把 conns.get(key) 的字面行为翻译成中文，没有任何 Why。此处真正不可直观推导的语义是：无锁弱一致读取，返回的 Conn 可能在返回瞬间已被顶号或关闭，因此调用方不能把它当作「连接仍可用/仍有权接收」的证明，必须再经 ConsultDeliveryGuard 校验。",
+            "suggestion": "补充并发语义与使用约束，如「无锁快照读：返回值可能刚被 open() 顶替或已关闭，仅代表查询瞬间的登记状态；能否写帧仍须由 ConsultDeliveryGuard 判定，勿据此做在线/鉴权结论」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 66,
+        "minLine": 66,
+        "maxLine": 66,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "「将指定连接加入会话房间订阅集合」等价于复述 conn.getRooms().add(roomId)。房间订阅是 WS 广播的鉴权边界，注释却未说明关键前置约束：本方法不做任何参与方校验，鉴权必须由调用方（Handler 的 join 包装）先完成；也未说明基于并发 Set 的幂等重复加入语义。仅凭字面无法得知误用会导致越权订阅。",
+            "suggestion": "改为说明契约与前置条件，例如「幂等加入房间订阅（并发 Set，重复加入无副作用）。本方法不做参与方鉴权：调用方必须先校验 receiver 仍是会话当事人，否则会造成越权订阅并收到他人正文」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+        "line": 79,
+        "minLine": 79,
+        "maxLine": 79,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "「返回当前订阅了指定会话房间的连接快照列表」中的「快照」未解释一致性级别：实现是对 ConcurrentHashMap.values() 全量弱一致遍历，可能漏掉并发 join/leave，且返回的 Conn 可能随后被清退或关闭；快照的意义在于让 pushModeration 的「先发送后 finally 清退」不受遍历期变更影响。",
+            "suggestion": "补充「弱一致全表扫描：无锁，可能漏掉并发加入/退出的连接；返回后连接状态仍可能变化，故每帧写出前仍需 Guard 校验。快照用于保证发送与随后清退互不干扰」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java",
+        "line": 31,
+        "minLine": 31,
+        "maxLine": 31,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "类注释写「四类上行 / 五类下行」，但紧接着枚举的下行帧有 7 种（READY / HISTORY / MSG / READ / PRESENCE / ERROR / PONG），与 Pass 1 盲测得到的 4 上行 / 7 下行协议不符。协议数量是客户端对接的契约信息，数字漂移会误导后续维护者以为还有两类未列出或已废弃。",
+            "suggestion": "改为「四类上行 / 七类下行」，或直接删除计数只保留枚举清单（避免以后新增帧时再次漂移），例如「上行 SUBSCRIBE/CHAT/READ/PING；下行 READY/HISTORY/MSG/READ/PRESENCE/ERROR/PONG」。"
+          }
+        ]
+      },
+      {
+        "file": "backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java",
+        "line": 59,
+        "minLine": 59,
+        "maxLine": 59,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该行解释了串行化包装的动机，但下一行的两个魔法值 5000 与 256 * 1024 无任何说明。它们是很有信息量的弱网/慢消费者约束：发送超时 5s、缓冲上限 256KB，超限会由 Decorator 直接关闭会话（SESSION_LIMIT_EXCEEDED），属于仅凭字面无法推导的行为。",
+            "suggestion": "在该注释中补充参数含义与后果，如「5000ms 发送超时 + 256KB 缓冲上限用于限制慢消费者背压，超限由 Decorator 主动关闭连接，避免内存被单条慢连接拖垮」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/api/http.js",
+        "line": 131,
+        "minLine": 131,
+        "maxLine": 131,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "put 的注释写「自动序列化请求体为 JSON」，无 FormData 例外；但 buildRequestInit 对任意 method 都会把 FormData 原样透传（并删除 Content-Type），字符串体也原样发送。相邻 post 的注释已正确写为「非 FormData」，同一契约两处措辞不一致，易让调用方以为 PUT 不能上传 FormData。",
+            "suggestion": "与 post 保持一致，改为「自动序列化非 FormData 请求体为 JSON（FormData 原样透传、字符串体不二次序列化）；遵循统一超时中止、401 强制重登与业务码异常抛出契约」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/api/http.js",
+        "line": 136,
+        "minLine": 136,
+        "maxLine": 136,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "首行「发起 DELETE 请求并解包 Result.data」完全可由 `unwrap(http.delete(url, cfg))` 字面推导；第二行契约句与相邻 put/post 文档（L131）逐字重复，未补充 DELETE 特有约束（无请求体、cfg 透传用途、失败不自动重试/幂等无保证）。",
+            "suggestion": "删除复述行，改为指向统一契约并补充 DELETE 特有信息，例如：「DELETE 无请求体，cfg 可覆盖 silent/kind；契约同 request（超时中止、401 强制重登、非 200 业务码抛错），失败不自动重试，调用方需自行保证幂等。」"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/api/httpError.js",
+        "line": 4,
+        "minLine": 4,
+        "maxLine": 4,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "「必须返回 reauth 清空登录态并跳转」易被读成该函数自身执行清 token 与路由跳转；实现（L7-L18）是纯决策函数，仅返回 {type:'reauth'|'silent'|'notify', message}，清态/跳转/弹窗均由调用方执行。",
+            "suggestion": "明确纯函数边界，例如：「纯决策函数，无副作用；业务 401 无视 silent 返回 reauth（由调用方清 token 并跳转），防止失效会话继续后台轮询；非 401 且 silent 返回 silent；其余返回 notify，业务错误用 msg 兜底『操作未成功』，传输层区分超时/连接失败文案。」"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/components/EntryIcon.vue",
+        "line": 4,
+        "minLine": 4,
+        "maxLine": 4,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "注释硬编码「内联 11 个固定路径」，但可见上下文（L5-L18）仅能确认 HomeFilled/Search/ChatDotRound/User 等键，数量无法核实且随图标增删即刻漂移；同时未说明键名必须与调用方图标名一致这一真实前置约束。",
+            "suggestion": "去掉易漂移的具体数量，改为：「@element-plus/icons-vue 为桶模块，按需内联少量固定 path（1024 viewBox）避免全站图标进入入口 chunk；键名必须与调用方使用的图标名严格一致，新增图标需同步补 path。」"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/components/LoginForm.vue",
+        "line": 6,
+        "minLine": 6,
+        "maxLine": 6,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该注释挂在 defineProps 之上，却只讲模板/打包取舍（原生控件 + Element Plus 同名类名），未说明此处真正不可从类型推导的注入契约：login/onSuccess 为必填回调，鉴权请求与登录后跳转归父组件，本组件只负责校验、预填与 busy/错误展示。",
+            "suggestion": "将打包取舍说明移至模板或组件顶部，并在 defineProps 处补契约：「login/onSuccess 必填：鉴权请求与登录后导航由父组件负责；initialUsername/Password 仅用于预填，组件自身只维护校验、busy 与错误展示，失败提示由请求层统一给出。」"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/router/index.js",
+        "line": 86,
+        "minLine": 86,
+        "maxLine": 86,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释称角色越界时「退回各自工作台首页」，暗示按角色分流到不同首页；但 L87 实现是无条件 return { path: '/admin/dashboard' }，ADMIN 与 DOCTOR 越界均落到同一个固定路由，不存在「各自」的分支逻辑。",
+            "suggestion": "改为与实现一致的表述，例如「原因: 角色越界统一退回 /admin/dashboard（该页对所有后台角色开放，不会形成重定向环），避免渲染空白页；未登录已在上一分支先行拦截并保留 redirect」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/stores/client.js",
+        "line": 13,
+        "minLine": 13,
+        "maxLine": 13,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "READABILITY_NOISE"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "READABILITY_NOISE",
+            "severity": "Nit",
+            "message": "该注释解释的是 nickname 的取值优先级（nickname → name → username），但物理位置紧贴 L14 的 logged 与 L15 的 userId 声明，真正相关的 computed 在 L16-18，读者会把「必须优先读取」误解为 logged/userId 的语义。",
+            "suggestion": "将注释下移到 L16 的 nickname computed 正上方（或并入其表达式行尾），使说明与被解释的 fallback 链紧邻；logged/userId 无需该说明。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/stores/session.js",
+        "line": 9,
+        "minLine": 9,
+        "maxLine": 9,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "READABILITY_NOISE"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "READABILITY_NOISE",
+            "severity": "Nit",
+            "message": "「公开形状（token/user + apply/refresh/logout）保持与原两份实现一致」属于重构历史叙述，对当前代码行为没有信息增益，且随时间推移会失去指代对象（原两份实现已不存在）。",
+            "suggestion": "删除历史对比句，改为陈述当前契约与前置约束，例如「返回 { token, user, apply, refresh, logout }；refresh 在无 token 时直接返回 null；user 由 localStorage JSON 反序列化，调用方需保证写入内容合法」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/utils/messageBox.js",
+        "line": 21,
+        "minLine": 21,
+        "maxLine": 21,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释仅说明「兼容两参调用形式」，但同一分支还隐含了更不直观的语义：当第三个参数存在时它被当作 appContext 处理，标题被强制置为空串并升格为四参调用（L24-L26）。这一参数移位约定无法从「兼容两参」一句推导，读者容易误以为第三参仍是 options。",
+            "suggestion": "补充一句说明参数移位约定，例如：「原因: 兼容 Element Plus 两参调用（第二参为配置对象）；此时若存在第三参则视为 appContext，升格为四参调用并将 title 置空，避免把 appContext 误当 options 合并」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/utils/token.js",
+        "line": 5,
+        "minLine": 5,
+        "maxLine": 5,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "getToken 文档中「缺失时返回空串」基本是 `|| ''` 的字面翻译；真正的调用契约未点明：永不返回 null/undefined，调用方可直接用真值判断「未登录」；传入未知 kind 时 KEYS[kind] 为 undefined，查找失败同样归一为 ''，即 fail-closed 退化为匿名而不是串到另一端身份。",
+            "suggestion": "在文档中明确「返回值恒为字符串（缺失/未知 kind 均为 ''），调用方可直接用真值判断登录态；未知 kind 不会回落到另一端令牌」，弱化对 `|| ''` 的字面复述。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/utils/token.js",
+        "line": 14,
+        "minLine": 14,
+        "maxLine": 14,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "setToken 的 Javadoc「写入指定端（client/admin）的登录令牌至 localStorage」只是对 `localStorage.setItem(KEYS[kind], token)` 的字面复述，零信息增益。该函数处于鉴权边界，却未说明任何非直观约束：覆盖写入（last-write-wins、幂等）、此处不做校验/续期（过期与 401 由请求层处理）、同步 API 在配额超限或隐私模式会抛异常且由调用方兜底、以及未知 kind 会写入 undefined 键的风险。",
+            "suggestion": "改写为说明「为什么/约束」，例如：覆盖式写入，同一端后写覆盖先写；不在此做过期校验与刷新，401/续期统一由请求层处理；localStorage 为同步 API，配额不足或隐私模式会抛错，调用方需自行 try/catch；kind 必须是 KEYS 中已定义的端，避免身份键串写。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/AppointmentDetail.vue",
+        "line": 22,
+        "minLine": 22,
+        "maxLine": 22,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "注释只解释了功能动机（可从评价管理页返回来源页），完全未提及下一行真正的高风险语义：`/^\\/admin\\/(?:appointments|reviews)(?:\\?|$)/` 是白名单而非黑名单，用于 fail-closed 阻断开放重定向（外链、`//host`、其他 admin 路由一律拒绝），非法值回退到恒定可用的 `/admin/appointments`，且 backLabel 与 returnTo 读同一份已消毒值以保证文案与目标一致。安全校验的「为什么」缺失，后续维护者极易把正则放宽成黑名单或任意 returnTo。",
+            "suggestion": "补充安全约束，例如：returnTo 走白名单（仅 /admin/appointments 与 /admin/reviews，且必须路径边界匹配）而非黑名单，防止开放重定向与外链/协议相对 URL 注入；不匹配一律 fail-closed 回退 /admin/appointments，保证返回按钮不落空；backLabel 复用同一已校验值以避免文案与跳转目标不一致。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Appointments.vue",
+        "line": 136,
+        "minLine": 136,
+        "maxLine": 136,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释「单行执行期间加锁」容易被读成按行加锁，而实现 `if (actingId.value) return` 是全局单飞：任意一行动作在途时，其他行的接诊/结束/取消同样被早退拒绝；同时未说明 actingId 在 finally 中释放（失败不会永久锁死 UI）以及异常向调用方冒泡（成功 toast 与 load() 只在 await 成功后执行）。",
+            "suggestion": "补充锁粒度与失败语义，例如：全局单飞锁，任一行动作在途即拒绝其他行提交；actingId 在 finally 释放，失败不会卡死按钮；异常向上抛出，成功提示与列表刷新仅在 await 成功后执行；actingId 同时驱动行内按钮 loading/disabled。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Appointments.vue",
+        "line": 183,
+        "minLine": 183,
+        "maxLine": 183,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释解释了「默认今日 + 写入地址栏便于分享刷新」，但遗漏了本段最关键的非直观控制流：使用 router.replace 而非 push（不污染历史），且写入后立即 return，把唯一一次首屏加载交给 route.query watcher 执行，避免与 L191 的 load() 造成重复首屏请求。",
+            "suggestion": "追加一句说明：用 replace 保持历史干净，写入查询后立刻 return，由 query watcher 触发唯一一次 load()，避免初始化重复拉取。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/ConsultRecords.vue",
+        "line": 18,
+        "minLine": 18,
+        "maxLine": 18,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释只给出「沿用已提交筛选快照、避免草稿生效」的意图，未说明 applied 的实际判定规则这一非直观部分：applied 与当前 q 逐字段比较用于区分「改筛选」与「纯翻页」，筛选变化必须把 pageNum 重置为 1（否则会请求越界页得到空列表），且快照仅在请求真正发出后更新，代表 applied 而非 pending 状态。",
+            "suggestion": "补充判定与更新时机，例如：applied 记录上一次真正发出的查询；与当前 q 比较，若筛选字段变化则强制 pageNum=1，防止停留在越界页返回空列表；快照只在请求发出后更新，避免把未提交的表单草稿当成已应用状态。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Doctors.vue",
+        "line": 65,
+        "minLine": 65,
+        "maxLine": 65,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释锚点与实现不符：该行下方是 `let editSeq = 0`（openEdit 的单调请求序号计数器），但注释讲的是「列表行手机号脱敏所以编辑前必须拉详情」，属于 doctorDetail 调用（L72）的理由，完全没有解释 editSeq 的并发语义（最后一次点击生效、序号只增不减、旧响应静默丢弃）。高风险异步竞态点被无关理由覆盖，读者会误以为 editSeq 与手机号脱敏有关。",
+            "suggestion": "将手机号脱敏/防覆写的理由移到 L72 `detail = await doctorDetail(row.id)` 上方；在 L65 改为说明计数器契约，例如「单调递增请求序号：每次 openEdit 先自增再 await，仅最新序号可写 editing/form/open，旧响应静默丢弃（last-click-wins），计数器永不重置」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Schedules.vue",
+        "line": 60,
+        "minLine": 60,
+        "maxLine": 60,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Nit",
+            "message": "失败机制描述不准确：JS 中数组「下标越界」只会得到 undefined，不会抛异常；`periodTimes[v] || []` 真正防的是调用方对 undefined 解构（如 onPeriod 的 `const [s, e] = ...`）抛 TypeError。「防止本地异常」也含义含糊，且未点明 periodTimes（默认填充时间）与 periodRanges（更宽的校验窗口）是两套不可混用的映射。",
+            "suggestion": "改为「原因: 未知时段 key 回退为空数组，避免调用方解构 undefined 抛 TypeError（字段被清空而非崩溃）；此处 periodTimes 是默认填充时间，勿与校验窗口 periodRanges 混用」。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/admin/Workbench.vue",
+        "line": 75,
+        "minLine": 75,
+        "maxLine": 75,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "该 catch 属于「接诊」流程（L71 accept → L72 order.value.status = 1），流程中并不涉及病历表单内容；注释「保留当前表单内容以便重试」是从保存失败分支照搬的描述，与本处真实不变量（失败时不做乐观状态翻转、status 仍为 0、按钮可再次点击、action 在 finally 清空避免 busy 卡死）不一致。",
+            "suggestion": "改为描述接诊失败语义，例如「原因: 接诊失败不做乐观状态翻转（status 仍为待接诊），错误提示由请求层统一给出；action 在 finally 清空以便直接重试」。表单保留的说明留在 save/doFinish 的 catch 中。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/Booking.vue",
+        "line": 78,
+        "minLine": 78,
+        "maxLine": 78,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "该注释挂在 nextHint computed 首部，却只解释了第一条分支（停诊文案为何简写），未说明整个 computed 的关键不变量：停诊 → 无排班 → 已约满 → 未选时段 → 未选宠物 → 就绪摘要 的降序优先级、首个命中即返回的互斥语义（存在上游阻塞时绝不展示『就绪』）。读者仅看代码需自行推断分支顺序不可随意调换。",
+            "suggestion": "改为说明优先级契约，例如：『按阻塞优先级降序首个命中即返回，保证上游阻塞未解除时不会展示就绪摘要；停诊细节已在医生卡片展示，此处只给结果文案避免重复』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/Booking.vue",
+        "line": 143,
+        "minLine": 143,
+        "maxLine": 143,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释解释了『不阻塞医生/号源展示、区块级重试』，但遗漏了本失败分支最关键的 fail-closed 语义：同时清空 myPets 与 form.petId，是为了避免把上次加载残留、本次未校验的 petId 带入提交；此外未说明为何此处不再弹提示（请求层已统一提示）。",
+            "suggestion": "补充一句：『同时清空列表与 form.petId 做 fail-closed，防止提交未校验的旧 petId；失败提示由请求层统一给出，此处只置 petsFailed 驱动局部重试』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/ConsultRoom.vue",
+        "line": 24,
+        "minLine": 24,
+        "maxLine": 24,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "CONSISTENCY_DRIFT"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "CONSISTENCY_DRIFT",
+            "severity": "Major",
+            "message": "注释把 panelKey 递增的触发点限定为『关闭问诊后』，并断言重挂是为了『从库中拉取最新系统消息』。但上下文只显示 L53 在某个重载/重连处理函数末尾执行 panelKey.value += 1，Pass 1 归纳的语义是『重载/重连时通过递增强制重挂以重置面板局部状态与连接』；注释描述的触发范围偏窄，且『从库中拉取』是前端代码无法证实的后端取数机制断言。",
+            "suggestion": "改为与实现一致的描述：『key 单调递增用作 :key，重载/重连（含问诊关闭后刷新）时强制面板重挂，以重置面板内部状态与消息连接；key 不复用』，删除对后端数据来源的断言或改为『重新拉取最新消息』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/ConsultRoom.vue",
+        "line": 57,
+        "minLine": 57,
+        "maxLine": 57,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释解释了为何要手动同步 visualViewport.height（软键盘 + dvh 不更新），但代码中最不直观的 `scale === 1` 守卫没有任何说明——即 pinch-zoom（scale ≠ 1）时刻意忽略 resize 以避免布局跳动。这属于仅凭字面无法推导的 Why，缺失后易被误当作冗余判断而删除。",
+            "suggestion": "在同一注释追加：『仅在 scale === 1 时同步，捏合缩放引起的 viewport 变化不参与布局，避免高度抖动；visualViewport 不支持时保持 dvh 兜底』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/OrderDetail.vue",
+        "line": 223,
+        "minLine": 223,
+        "maxLine": 223,
+        "voteCount": 1,
+        "blockingVoteCount": 0,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Nit",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Nit",
+            "message": "注释只覆盖了『医生未写病历 → 空 data → 降级 null』这一半语义，未解释 `.catch(() => null)` 的关键意图：病历是附属可选资源（可能不存在或无权限），其请求失败必须被吞掉，不能进入外层 catch 把整页标记为 failed（主详情失败才是唯一失败路径）。",
+            "suggestion": "补充：『病历为附属资源，不存在/无权限/请求失败一律降级为 null 渲染空态，不得让整页 failed；仅 appointmentDetail 失败才走外层 catch』。"
+          }
+        ]
+      },
+      {
+        "file": "frontend/src/views/client/OrderDetail.vue",
+        "line": 264,
+        "minLine": 264,
+        "maxLine": 264,
+        "voteCount": 1,
+        "blockingVoteCount": 1,
+        "totalReviewers": 3,
+        "reviewers": [
+          "R2"
+        ],
+        "dimensions": [
+          "INFO_GAIN"
+        ],
+        "severity": "Major",
+        "isBlocking": false,
+        "messages": [
+          {
+            "reviewerId": "R2",
+            "dimension": "INFO_GAIN",
+            "severity": "Major",
+            "message": "该空 catch 的覆盖范围不止接口失败：ElMessageBox.prompt 在用户点『再想想』/关闭时也会 reject 并落入此处，属于正常无操作路径。注释只写『请求层已提示失败原因』，把 catch 语义窄化为接口异常，后续维护者很可能在此补一个错误提示，从而对用户的正常取消操作弹出误报。",
+            "suggestion": "明确双重语义，例如：『此处同时吞掉用户关闭/「再想想」的 prompt reject（正常无操作，不得提示）与取消接口失败（请求层已提示）；保留当前预约状态，action 在 finally 统一复位』。"
+          }
+        ]
+      }
+    ]
+  },
+  "reviewerResults": [
+    {
+      "reviewerId": "R1",
+      "ok": false,
+      "prompt_injection_detected": false,
+      "prompt_injection_evidence": "",
+      "findings": [
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/AuthInterceptor.java",
+          "line": 20,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释称『每请求两次索引查询』，但可见实现中 AccountGuard.active 对单个请求只执行一次 selectById（客户端走 sysUserMapper、后台走 adminUserMapper，二者分支互斥且各自提前 return），因此每个受保护请求仅一次索引查询，与『两次』的数量描述不符。",
+          "suggestion": "将『每请求两次索引查询』更正为『每请求一次主键索引查询』，或补充说明何种场景会触发第二次查询，避免维护者按错误成本评估改动。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/mapper/AppointmentMapper.java",
+          "line": 20,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "此查询为普通 SELECT（无 FOR UPDATE），在 REPEATABLE READ 下是快照读而非『当前读』；本文件 L16 已用『当前读』专指锁定读，此处沿用同一术语会让读者误以为会对幂等键行加锁，实际并发安全依赖 idem_key 唯一索引。",
+          "suggestion": "将『幂等键当前读』改为『幂等键普通查询（快照读，靠 idem_key 唯一约束兜底并发）』，或若确需加锁改为 SELECT ... FOR UPDATE 后保留『当前读』措辞。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/JwtUtils.java",
+          "line": 118,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "该 Javadoc 仅复述「取出裸 token」这一字面行为，未给出任何仅凭实现无法推导的契约：其前缀实际取自 props.getJwt().getPrefix()（可配置，并非固化为 \"Bearer\"），且 header 为 null/空白时返回 null、不匹配前缀时返回 trim 后的原值而非报错。注释把前缀写死成 \"Bearer\" 会误导读者以为只支持该固定前缀，并遗漏失败/降级语义。",
+          "suggestion": "改为说明契约与边界，例如：「剥离配置项 yuzhua.jwt.prefix 指定前缀（默认 Bearer）后返回裸 token；header 为 null/空白返回 null，未命中前缀时返回 trim 后的原串且不校验 token 内容」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorReviewService.java",
+          "line": 93,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "该方法是鉴权敏感入口（仅允许评价所属医生回复，非医生角色直接放行、依赖 controller 侧再做管理员把关），但 JSDoc 仅有一句「医生（或管理员）回复评价」，未说明 404（评价不存在）、403（回复他人评价）、非空与 500 字上限等失败语义，也未提示本方法内部并不校验管理员身份，读者容易误解为方法自带管理员校验。",
+          "suggestion": "改为说明约束与失败语义，例如：仅评价所属医生可回复，回复内容非空且不超过 500 字，评价不存在返回 404、越权回复返回 403；本方法不校验管理员身份，管理员调用需由 controller 层鉴权。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/ConsultService.java",
+          "line": 57,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释基本复述了 create 的代码流程（校验归属、校验在诊、创建会话），未点出两个非字面可推导的关键约束：session.userId 取自宠物归属而非请求参数（防伪造他人身份发起问诊），以及医生停诊时以业务异常而非 404 返回。",
+          "suggestion": "补充 Why：userId 一律从已校验归属的宠物实体取，避免请求体伪造；医生不存在 404、status!=1 抛「已停诊」业务错误，因此失败语义与权限边界是显式的。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DepartmentService.java",
+          "line": 52,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "「校验编码唯一后新建科室；默认排序 99、默认状态启用」属于对代码字面行为的复述，未说明编码唯一校验是先查后写、并发下真正的唯一性保障来自 code 上的数据库唯一索引；也未解释默认排序 99 的意图（新科室排在列表末尾）。",
+          "suggestion": "改为说明约束来源与意图，例如：编码唯一为应用层先查后写，并发重复由 code 唯一索引兜底；排序默认 99 使新科室排在既有科室之后，status 为空时默认启用。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DepartmentService.java",
+          "line": 74,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释称「校验编码唯一后更新」，与实际实现不完全贴合：仅在编码发生变化时才做唯一性校验（排除自身），且未说明科室不存在时抛 404。该描述会让读者以为每次更新都会执行唯一性查询。",
+          "suggestion": "明确条件与失败语义，例如：科室不存在抛 404；仅当编码变更时校验新编码唯一（排除自身），未变更则跳过重复查询以免无谓开销。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+          "line": 280,
+          "dimension": "READABILITY_NOISE",
+          "severity": "Major",
+          "message": "注释大段复述历史实现（“之前这里会把 remain_num 一并清零、恢复时再按存活订单重算，页面就分不出……”）并引用内部跟踪编号（跟踪表 I07/D2），属于变更日记与流程噪音；真正有用的不变式（余量是事实、不得被状态开关改写）反被这些叙述淹没。",
+          "suggestion": "删除“之前这里会……”及“跟踪表 I07/D2”等历史/流程信息，只保留不变式，例如：“停诊只把 status 置 0，禁止改写 remain_num；余量是事实，停诊期间的取消由 release 自行回补，故恢复时也不重算。”"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+          "line": 170,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释仅把 if 中的引用计数条件复述为“不存在关联排班、业务记录与后台账号才允许删除”，未给出为何这样做的信息（fail-closed 语义、应改用停诊保留档案），也未提示此处计数无行锁、属“先查后删”的非原子检查，并发窗口依赖外键/重试兜底。",
+          "suggestion": "补充语义与并发约束，例如：“任一关联即拒绝删除（fail-closed），请改用停诊保留档案；此处计数无行锁，为先查后删的非原子检查，并发窗口依赖外键兜底。”"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java",
+          "line": 31,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "注释写“四类上行 / 五类下行”，但紧随其下列出的下行帧有 READY / HISTORY / MSG / READ / PRESENCE / ERROR / PONG 共 7 类，数量与实际枚举自相矛盾，读者无法据此判断协议集合边界。",
+          "suggestion": "改为中性的“上行四类（SUBSCRIBE/CHAT/READ/PING）与下行若干类”，或直接按当前实现改为“下行七类”，避免硬编码数量与列表脱节。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java",
+          "line": 128,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "注释称“仅当该医生无其余活动连接时才广播离线并更新在线状态”，但实现先无条件遍历 conn.getRooms() 逐房间 broadcast PRESENCE(doctorOnline=false)，只有 markDoctorOnline(false) 被 registry.doctorConnected 守护。多连接/多标签页场景下会向房间广播仍在线的医生“离线”，注释掩盖了这一差异。",
+          "suggestion": "改写为“条件注销成功后才继续；对已订阅房间逐房间广播离线 PRESENCE，仅当 doctorConnected 为 false 时才更新医生在线态”，或同步修正广播逻辑使其与注释一致。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+          "line": 66,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "join 的注释只复述“将连接加入会话房间订阅集合”，未揭示关键前置约束：登记表本身不做鉴权，调用方（handler 的 join）必须先完成参与方权限校验；也未说明集合为并发 Set、重复加入幂等。这是鉴权边界上的高风险遗漏。",
+          "suggestion": "补充“调用前必须已完成参与方权限校验（本类不做鉴权）；重复加入幂等”等前置条件与幂等语义。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+          "line": 39,
+          "dimension": "READABILITY_NOISE",
+          "severity": "Nit",
+          "message": "“（体系:主键）”表述含糊且疑似笔误，既未解释 typ 含义，也未说明 key 必须非空，读者难以据此理解键的构造契约。",
+          "suggestion": "改为“连接键 = typ + \":\" + id，按用户类型与主键唯一确定账号，key 不可为空”，去掉含糊的“体系:主键”。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+          "line": 61,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "find 注释仅复述“按键查询、不存在返回 null”，缺少返回值是瞬时快照、调用后可能已被顶替、不应据此做写操作决策的语义约束。",
+          "suggestion": "补充“返回值为快照，返回后连接可能已被顶替，不要据此做写入或注销决策”。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+          "line": 79,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "inRoom 注释仅复述“返回连接快照列表”，未说明遍历 ConcurrentHashMap 为弱一致、结果仅供本轮投递/清退使用、遍历期间集合可能变化。",
+          "suggestion": "补充弱一致快照语义与“仅用于本轮投递/清退，不可作为长期视图”的使用约束。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/task/AppointmentSweepTask.java",
+          "line": 50,
+          "dimension": "READABILITY_NOISE",
+          "severity": "Nit",
+          "message": "该行注释与下一处 finally 前的注释（L53）重复叙述“finally 释放租约”，且“仅候选查询异常会冒泡并在 finally 释放租约”易被读成只有候选查询异常才释放租约，与 finally 无条件释放的事实表述混淆。",
+          "suggestion": "本行仅说明 action.run() 的异常语义（sweep 内部逐单捕获、仅候选查询异常冒泡），把租约释放原因集中保留在 finally 处一句。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultPush.java",
+          "line": 60,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释只列了 Handler 的业务帧用途，未指出 sessionId == null 时会降级走 sendControl（仅校验账号、跳过会话准入）这一安全相关分支，读者会误以为 send 始终执行完整业务校验。",
+          "suggestion": "补充“sessionId 为 null 时降级为控制帧路径（仅核对账号），非 null 才执行完整业务准入校验”。"
+        },
+        {
+          "file": "frontend/src/router/index.js",
+          "line": 86,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释称角色越界时退回「各自」工作台首页，暗示按角色区分跳转目标；但实现中无论越界角色是 ADMIN 还是 DOCTOR，都固定重定向到同一个 /admin/dashboard，与「各自」的表述不符。",
+          "suggestion": "改为「角色越界访问管理或临床页面时统一退回 /admin/dashboard（该页不设 roles 限制），避免空白页」。"
+        },
+        {
+          "file": "frontend/src/stores/session.js",
+          "line": 9,
+          "dimension": "READABILITY_NOISE",
+          "severity": "Nit",
+          "message": "文档块末尾「公开形状（token/user + apply/refresh/logout）保持与原两份实现一致」属于重构变更叙述（引用旧的「两份实现」），随代码演进会失效，且对当前读者无增量信息。",
+          "suggestion": "删除「保持与原两份实现一致」，直接声明契约：「对外暴露 token/user 两个 ref 与 apply/refresh/logout 三个方法」。"
+        },
+        {
+          "file": "frontend/src/utils/demoPreset.js",
+          "line": 11,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "注释声称口令「缺失时降级为空串」，但实现中默认参数直接取 `import.meta.env?.VITE_DEMO_PASSWORD`，环境变量或 env 对象缺失时得到的是 `undefined`，并非空字符串。调用方若直接写回表单，可能把 `undefined` 带入输入框/请求体，与注释描述的行为不一致。",
+          "suggestion": "二选一并保持一致：要么把注释改为「缺失时为 undefined，由调用方按空串处理」，要么在实现中显式兜底，如 `demoPassword = import.meta.env?.VITE_DEMO_PASSWORD ?? ''`。"
+        },
+        {
+          "file": "frontend/src/utils/token.js",
+          "line": 14,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "该 JSDoc 仅复述函数字面行为「写入指定端令牌至 localStorage」，未提供凭据持久化（鉴权域）所需的前置约束：无 token 形态校验、覆盖写（last-write-wins）语义，以及调用方必须先判空否则会让 getToken 返回「存在但为假」的模糊状态。",
+          "suggestion": "补充语义性说明，例如：直接覆盖写入，不做去重或有效期校验；调用方须保证 token 非空且合法，否则 getToken 将返回 falsy-but-present 状态导致登录态判断歧义。"
+        },
+        {
+          "file": "frontend/src/utils/token.js",
+          "line": 21,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释只说明「用于登出或 401 强制重登」，未点明 removeItem 的幂等性（无令牌时调用安全）以及「只清一端、不得动另一端键名」的隔离约束，也未提示调用方还需同步重置内存中的 store 状态。",
+          "suggestion": "补一句：removeItem 幂等，可重复调用；仅移除本端键、不影响另一端登录态；本函数不触碰内存状态，调用方需自行重置 store。"
+        },
+        {
+          "file": "frontend/src/views/admin/AppointmentDetail.vue",
+          "line": 22,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释解释了「返回来源页」的产品动机，但这是开放重定向敏感点：代码实际用锚定正则白名单仅放行 /admin/appointments 与 /admin/reviews，其余一律回退预约列表。该安全前置约束与 fail-closed 回退语义未在注释中体现，后续改动易误放宽正则。",
+          "suggestion": "在注释中补充：returnTo 仅接受 /admin/(appointments|reviews) 前缀（可带 query），其余非法值一律回退 /admin/appointments，禁止承载外部跳转以避免开放重定向。"
+        },
+        {
+          "file": "frontend/src/views/admin/Pets.vue",
+          "line": 61,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释声称「显式 null 表示清空、省略键才表示保持原值」，但 payload 由 EDITABLE 全量投影构建，任何键都不会被省略；且 weight 用 `?? null` 只能拦截 null/undefined，一旦组件清空后给出空串 `''`，会原样提交而非转成 null，与「显式 null 表示清空」的契约相悖（birthday 用的是 `||`，两者归一策略也不一致）。",
+          "suggestion": "统一归一写法（如 weight 也改成 `payload.weight === '' || payload.weight == null ? null : payload.weight`），并在注释中只保留与实际发送语义一致的一句：「空值统一显式传 null 以清空字段，避免空串导致日期/数值绑定失败」，删去代码中不存在的「省略键保持原值」描述。"
+        },
+        {
+          "file": "frontend/src/views/admin/Workbench.vue",
+          "line": 75,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "accept() 的 catch 中注释给的理由是「保留当前表单内容以便重试」，但该流程只做接诊状态流转、完全不读写 form，这条理由在此处不成立；真正需要说明的失败语义（order.status 仅在接口成功后才置 1，失败不改本地状态、由请求层提示）反而没有写出。",
+          "suggestion": "改写为：「原因: 失败时不推进 order.status，错误提示已由请求层统一处理，action 在 finally 中复位」，与状态流转的实际约束对齐。"
+        }
+      ],
+      "errors": [
+        "OpenAI-compat HTTP 402: {\"error\":{\"message\":\"Insufficient Balance (request_id: 988ba9bc-87dc-4cd5-9a12-b6fac8db3e4a)\",\"type\":\"insufficient_balance_error\",\"param\":null,\"code\":\"invalid_request_error\"}}",
+        "OpenAI-compat HTTP 402: {\"error\":{\"message\":\"Insufficient Balance (request_id: 1b1ce26f-0fb6-42c1-88be-fd9fb7680265)\",\"type\":\"insufficient_balance_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+      ],
+      "error": "OpenAI-compat HTTP 402: {\"error\":{\"message\":\"Insufficient Balance (request_id: 988ba9bc-87dc-4cd5-9a12-b6fac8db3e4a)\",\"type\":\"insufficient_balance_error\",\"param\":null,\"code\":\"invalid_request_error\"}}; OpenAI-compat HTTP 402: {\"error\":{\"message\":\"Insufficient Balance (request_id: 1b1ce26f-0fb6-42c1-88be-fd9fb7680265)\",\"type\":\"insufficient_balance_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+    },
+    {
+      "reviewerId": "R2",
+      "ok": true,
+      "prompt_injection_detected": false,
+      "prompt_injection_evidence": "",
+      "findings": [
+        {
+          "file": "backend/src/main/java/com/yuzhua/config/SlowSqlInterceptor.java",
+          "line": 54,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "该方法级 Javadoc 基本是对 L59 `thresholdMs <= 0` 与 L74 `elapsedMs >= thresholdMs` 两处字面条件的复述，且与 L58、L73 的行内「原因」注释信息重叠；未补充盲测归纳出的关键失败语义——计时/日志纯属观测，catch 中置 failed 后原样 rethrow 原 Throwable，finally 中的日志不得改变或吞掉查询结果与异常。",
+          "suggestion": "精简为契约要点并补齐失败语义，例如：「纯观测：阈值取自配置（每次调用读取，可热更新），<=0 关闭监控；计时与 WARN 日志不改变返回值，原异常原样抛出，日志自身失败不得影响查询链路。」避免与 L58/L73 行内注释重复表述同一条件。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/config/WebMvcConfig.java",
+          "line": 69,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释以「短缓存」「永久不可变」概括缓存策略，与实现的具体取值存在措辞偏差：seed 为 max-age=1 天 public，兜底为 max-age=365 天 public + immutable，365 天并非「永久」，读者据此可能误判缓存有效期无上限。",
+          "suggestion": "改为与代码一致的量化表述，例如：「按路径特异度先注册 /seed/**（可覆盖更新，max-age=1 天 public），再注册兜底 /**（UUID 命名内容不变，max-age=365 天 public+immutable）；顺序颠倒会被兜底模式抢先匹配。」"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/mapper/AppointmentMapper.java",
+          "line": 20,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "注释称该查询为「幂等键当前读」，但 L21 的 SQL 是普通 SELECT（WHERE user_id/idem_key/deleted=0 LIMIT 1），没有 FOR UPDATE 或 LOCK IN SHARE MODE。在 REPEATABLE READ 下这是一致性快照读，看不到本事务快照建立之后并发插入的同键预约，与注释宣称的当前读语义相悖，会让调用方误以为仅靠此查询即可防重复下单。",
+          "suggestion": "二选一并保持文实一致：若确需当前读，SQL 补 FOR UPDATE（并说明与唯一索引/插入冲突回滚的配合）；若保持快照读，注释改为「快照读预检，最终去重依赖 (user_id, idem_key) 唯一索引与插入冲突回滚」，并保留 raw @Select 必须显式 deleted=0 的原因说明。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/mapper/DoctorScheduleMapper.java",
+          "line": 12,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "注释把返回 0 唯一解释为「已满」，但 L17 的守卫是 status = 1 AND remain_num > 0：排班被停诊（status != 1）或行已被物理删除时同样返回 0。调用方若按注释只提示「号源已满」，会掩盖停诊/排班不存在这两类失败原因，且掩盖了必须回滚的另外两种前置失败。",
+          "suggestion": "改为「返回 1 成功；返回 0 表示号源已满、排班已停诊(status<>1)或排班不存在，调用方一律回滚事务并中止下单；如需区分提示，请在持锁的 selectByIdForUpdate 结果上判定原因」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/mapper/DepartmentMapper.java",
+          "line": 13,
+          "dimension": "READABILITY_NOISE",
+          "severity": "Nit",
+          "message": "Javadoc 以「两条路径原本各自做…现在双方都先取这一把行锁」的变更前后叙事组织内容，属于历史变更日记式表述；竞态本身的说明有价值，但「原本/现在」的对比会随时间失效并增加阅读噪音。",
+          "suggestion": "改为现在时的不变量陈述，例如：「删除科室与写入医生归属必须共用本行锁：否则两侧的先查后写落在不同事务可同时通过，留下指向已删科室的医生。必须是当前读，selectById 的快照读在等锁后仍返回旧版本；返回 null 表示科室已删除，调用方须中止。」删去「原本…现在…」句式。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/mapper/ConsultSessionMapper.java",
+          "line": 42,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释只解释了「为何手写 SQL」（Wrapper 无法在子查询过滤 hidden=0），但遗漏了该重算最关键的并发前置条件：必须在持有 consult_session 行锁、且与屏蔽/恢复消息同一事务内执行，否则重算结果会基于旧快照或与他人写入交错。这是仅凭方法名与 SQL 字面无法推导的高风险约束。",
+          "suggestion": "补一句前置约束与幂等语义，如「须在 selectByIdForUpdate 会话行锁内、与屏蔽/恢复同一事务调用；采用绝对值重算而非增量，可重复执行」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/AccountGuard.java",
+          "line": 29,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "该方法注释基本是按代码行罗列校验项（未过期/启用/角色与医生绑定/版本一致），未给出鉴权入口最需要的失败语义：任何身份或过期字段为 null、typ 未知、库中无记录、缺版本声明一律 fail-closed 返回 false（不抛异常），且每次调用都会实打实读库、无缓存。",
+          "suggestion": "补充失败语义与成本约定，例如「fail-closed：字段缺失/未知 typ/查无此人/版本缺失或不等均返回 false，不抛异常；每次调用一次主键查询，不缓存，调用方不得以签名有效替代本校验」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/AuthInterceptor.java",
+          "line": 20,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释量化声称「代价是每请求两次索引查询」，但可见实现中 preHandle 只做 jwtUtils.parse（无 DB）+ accountGuard.active，而 AccountGuard.active 每次仅执行一次 selectById（sys_user 或 admin_user 二选一），@RequireRole 校验亦不查库。该数字与当前实现不符，易误导后续性能评估。",
+          "suggestion": "核实实际查询次数后改为准确表述，如「代价是每请求一次主键/索引回查（AccountGuard.active），本项目量级下可接受」；若确有第二次查询，请在注释中指明其来源方法。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/JwtUtils.java",
+          "line": 68,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "签发方法的 Javadoc 基本复述字面行为（按身份/版本签发、过期取配置项），未说明 Pass 1 归纳的关键不变量：iat 与 exp 复用同一个 Instant now 以避免时钟偏移、exp 必然写入（parse 对缺失 exp 的令牌直接拒绝）、avatar/doctorId/ver 为 null 时省略而非写 null。",
+          "suggestion": "补充 Why/契约，例如：「iat/exp 复用同一 Instant 防偏移；exp 必填，parse 拒绝无 exp 令牌；可选 claim 为 null 时省略；调用方须传入已认证的 LoginUser」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/JwtUtils.java",
+          "line": 118,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "「从 \"Bearer xxx\" 里取出裸 token」仅复述方法名与字面逻辑，未给出真正的调用契约：null/空白返回 null 而不抛异常、前缀缺失时容忍裸 token（原样 trim 返回）、此处不做任何验签/合法性校验。这些是调用方必须知道的边界语义。",
+          "suggestion": "改写为说明契约与容错原因，如「null/空白→null 不抛异常；前缀缺失时按裸 token 容忍（历史客户端兼容）；仅做字符串剥离，验签交由 parse」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/JwtUtils.java",
+          "line": 118,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释把前缀写死为 \"Bearer\"，实现却从 props.getJwt().getPrefix() 读取可配置前缀，且匹配是大小写敏感的 startsWith；读者可能误以为前缀固定且大小写不敏感。",
+          "suggestion": "将示例标注为「配置前缀（默认 Bearer）」并明确大小写敏感匹配，避免与可配置实现漂移。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/LoginUser.java",
+          "line": 39,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "isDoctor 的注释只是把 `TYP_ADMIN.equals(typ) && ROLE_DOCTOR.equals(role)` 翻译成中文，未点出真正的安全动机：用户端（CLIENT）令牌即便携带 role=DOCTOR 也不算后台医生，且常量前置 equals 使 null typ/role 一律 false（fail-closed），doctorId 绑定需另行校验。",
+          "suggestion": "补充「CLIENT 令牌带 DOCTOR 角色不视为后台医生；typ/role 为 null 时 fail-closed 返回 false；医生归属仍须校验 doctorId 绑定」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/LoginUser.java",
+          "line": 44,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "「判定当前登录态是否属于用户端登录体系（typ=CLIENT）」是对单行 equals 的逐字复述，零信息增益；未说明该方法只看登录体系不看 role、null typ 返回 false，且它本身不构成授权授予。",
+          "suggestion": "改为说明语义边界，如「仅判定登录体系（不检查 role），null typ 视为非用户端；用于 /admin/** 隔离，不等同于权限通过」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/security/UserContext.java",
+          "line": 49,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "注释称「管理员调用则抛 403」，但实现的判定条件是 `u.getDoctorId() == null`，与角色无关：绑定了 doctorId 的管理员会正常返回，未绑定的 CLIENT 账号同样 403；且未登录时先由 require() 抛 401。注释把失败条件错误地绑定到角色上。",
+          "suggestion": "改为「未登录先抛 401；doctorId 未绑定（无论 ADMIN/CLIENT）抛 403，避免无绑定账号被当作医生做归属过滤」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+          "line": 43,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释声称订单号「总长 27 字符」，但 yyyyMMddHHmmssSSS 只有 17 位，加 8 位随机为 25 位；若确有固定前缀（如 2 位业务前缀）则注释未提及，读者按注释核算列宽会得到错误结论。",
+          "suggestion": "核对生成逻辑后写明构成，如「前缀 X(2) + 毫秒时间戳(17) + 随机(8) = 27 字符，需与 order_no 列宽一致」，或直接修正为实际长度。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+          "line": 189,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "pay 的 Javadoc 未覆盖两条关键语义：已支付时直接返回原详情（幂等重放而非报错），以及 lockOwned 对非本人订单抛 404 而非 403（隐藏订单存在性）；仅写「校验超时与状态」偏泛。",
+          "suggestion": "补充「已 PAID 幂等返回原详情；非本人订单按 404 处理以免泄露存在性；支付窗口自创建时间起算 props.payTimeoutMinutes」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+          "line": 370,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "lockForWrite 是并发临界区入口，但注释只说「先锁预约行…锁顺序：预约在前」，未解释该方法为何必须是 public @Transactional 包装（私有/自调用 @Transactional 不生效，需经 Spring 代理），也未声明调用方必须已处于/加入同一事务，否则锁在方法返回时即释放，下游「判空再插库」失去保护。",
+          "suggestion": "补充前置约束与动机：「public @Transactional 以走 Spring 代理（自调用不生效）；调用方须在同一事务内（REQUIRED 加入），锁持有至外层事务提交；锁序与取消/下单路径保持一致以防死锁」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/ConsultService.java",
+          "line": 57,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "该 Javadoc 位于事务 + 鉴权高风险入口，却只复述了代码字面可见的校验步骤（requireOwned、doctor.status != 1），未给出任何仅凭代码无法直观推导的 Why：会话 userId 取自宠物主人 pet.getUserId() 而非请求体（防越权代建）、医生不存在走 notFound 而停诊走业务错误的区分、会话初始 ST_PENDING 与双侧未读计数 0 必须与 save 处于同一事务。",
+          "suggestion": "改写为说明约束与原因，例如：「单事务创建问诊会话：宠物须为调用者本人所有（requireOwned 失败即 403/notFound），医生不存在按 notFound、停诊按业务错误拒绝；会话 userId 强制取自宠物主人而非请求参数，防止代他人建单；初始 ST_PENDING 且双侧未读为 0，与会话落库同事务保证一致。」"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DepartmentService.java",
+          "line": 74,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "「校验科室存在与编码唯一后更新科室配置」是对 require(id)/exists(...) 的逐句翻译，零信息增益。未说明关键语义：编码唯一性检查在编码未变更时跳过且用 ne(id) 排除自身；构造仅含部分字段的 row 走 updateById，null 字段不写回（部分更新语义），这些是调用方极易误解的约束。",
+          "suggestion": "补充 Why 与边界，例如：「更新科室：require 不存在即 notFound；编码唯一性仅在编码变更时校验并排除自身（并发唯一性最终由 DB 唯一索引兜底）；使用仅填充可编辑字段的实体走 updateById，null 字段保持原值，避免整行覆盖。」"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorReviewService.java",
+          "line": 93,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "「医生（或管理员）回复评价」只是方法名翻译，属于鉴权边界 Javadoc 写空泛套话。未描述失败语义与前置约束：回复非空且 ≤500 字、评价不存在走 notFound、医生只能回复 doctorId 与自身一致的评价否则 403（fail-closed），以及同时写入 replyTime。",
+          "suggestion": "改为：「回复评价：内容非空且 ≤500 字；评价不存在 notFound；医生侧鉴权 fail-closed——仅当 review.doctorId 等于当前医生业务 id 才允许，否则 403；写入回复正文与 replyTime，同一事务提交。」"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DepartmentService.java",
+          "line": 52,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释主体「校验编码唯一后新建科室」复述了 L60-L62 的字面行为，默认值 99/启用也只是 setter 的直译；真正需要提示的 Why——check-then-insert 并非原子，并发下的编码唯一性最终依赖数据库唯一索引——完全缺失。",
+          "suggestion": "补一句并发前提，例如：「编码唯一性为先查后插，非原子；并发重复最终由 department.code 唯一索引兜底（插入冲突需按业务错误透出）。默认 sort=99、status=启用。」"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+          "line": 84,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "「校验医生在诊、时段范围与唯一性后新建排班，初始余量等于总量」逐项复述 L87-L98 的字面调用，未揭示不可从签名推导的约束：(doctorId, workDate, period) 的先查后插在并发下不原子、需 DB 唯一约束兜底，以及 period 必须与起止时间匹配这一非直观校验目的。",
+          "suggestion": "补充 Why，例如：「新建排班：医生须可排班；period 必须与 startTime/endTime 匹配（防止上下午与时间自相矛盾）；(医生,日期,时段) 先查后插非原子，并发重复由 DB 唯一约束兜底；初始化 remainNum=totalNum 表示尚未放号占用。」"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+          "line": 196,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "batchCreate 的 Javadoc 说明了 skipped 口径（已存在三元组计数、日期筛选未命中不计），信息增益到位，但遗漏了调用方必须知道的前置约束：医生须在诊（requireSchedulable）、start ≤ end、一次跨度上限 90 天、periods 需唯一且时间合法，这些都是会直接抛 BizException 的失败语义。",
+          "suggestion": "在 @param 或正文补一句前置约束与失败语义，例如「医生须在诊；start ≤ end 且跨度 ≤ 90 天；periods 不得重复且时间需合法，违反即抛 BizException 整批回滚」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+          "line": 280,
+          "dimension": "READABILITY_NOISE",
+          "severity": "Nit",
+          "message": "stopClinic 注释中「之前这里会把 remain_num 一并清零、恢复时再按存活订单重算…（跟踪表 I07/D2）」属于历史变更日记 + 内部跟踪单号，对当前读者是噪音；真正需要保留的是「余量是事实状态，不得被状态开关改写」这一不变量。",
+          "suggestion": "压缩为不变量式表述，如「remain_num 为事实余量，停诊/恢复均不得清零或重算，否则页面无法区分真余量与停诊清零」，删除历史行为叙述与 I07/D2 跟踪表编号（放到提交信息或缺陷系统）。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+          "line": 302,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "resumeClinic 的 Javadoc 只写了「开状态、保余量、UPDATE 行锁、0 行抛 404」，但实现第 310 行还有 requireSchedulable(s.getDoctorId()) 这一非直观前置条件：医生本身停诊时恢复排班会失败。该约束与 stopClinic（不校验医生在诊）不对称，恰是最需要注释解释的 Why，缺失后调用方会误判失败原因。",
+          "suggestion": "补充前置条件与不对称原因，例如「恢复前要求医生档案处于出诊状态（requireSchedulable），避免医生已停诊却放出可约号；停诊方向不做此校验以便随时关号」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+          "line": 114,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "「状态不在通用更新里写」易被读成 update 忽略 status，但实现第 123-126 行会读取并校验 form.getStatus()，且第 142 行在 status != null 时调用 applyStatus(id, status) 实际改状态。注释与代码并非完全相悖（确实不在通用 SET 里写），但表述歧义会误导调用方以为编辑接口无法改状态。",
+          "suggestion": "改为明确表述：「status 不进通用行 SET；若表单显式带 status，则校验后委托 applyStatus 同步 onlineStatus，避免通用更新把在线标志写脏」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+          "line": 147,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "changeStatus 注释解释了「只挡将来的号、已约单与排班行不动」的业务 Why，但漏掉最不可从字面推导的副作用：applyStatus 会按 socketRegistry.doctorConnected(id) 重算 onlineStatus = (status==1 && 已连接)，即停诊会同时下线在线标志。",
+          "suggestion": "补一句「委托 applyStatus：status 与 onlineStatus 一并写入，onlineStatus = (status==1 && WebSocket 已连接)，保证停诊后不再展示为在线」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+          "line": 170,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "该 Javadoc「校验医生不存在关联排班、业务记录与后台账号后才允许删除」只是把下方 selectCount 判断链翻译成中文，未提供任何 Why：为何禁止硬删（保留历史档案、应改用停诊）、计数是否含已取消/逻辑存活行、以及 check-then-delete 未加行锁（依赖事务与低并发）这一并发前提。删除属高风险边界，需要失败语义与前置约束。",
+          "suggestion": "改写为「有任一引用即拒删并提示改用停诊以保留档案；计数含已取消预约等业务痕迹；引用统计未加行锁，check-then-delete 依赖同一事务与低并发，必要时对医生行加锁」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorService.java",
+          "line": 185,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "「事务内重算医生评分、评价数与已完成接诊数」基本是方法名与 @Transactional 的复述，未说明为何两条 refresh 必须同事务提交（评分/评价数与接诊量需一致快照）、统计由 SQL 侧重算而非客户端传入、以及可重复调用的幂等性。",
+          "suggestion": "补充「两条聚合 SQL 必须同事务提交，避免评分与接诊量出现半更新；计数全部由 DB 重算、不接受外部入参，评价/完诊后可幂等重复调用」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/NoticeService.java",
+          "line": 98,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "「阅读量由更新策略保留」表述含糊，未点明依赖 MyBatis-Plus NOT_NULL 字段策略（row 未 set viewCount 故不进 SET），也未说明 status/type/topFlag 省略时回落当前值的部分更新语义——这两点恰是调用方判断「省略字段会不会被清空」的关键。",
+          "suggestion": "明确写「未 set 的 viewCount/发布元数据依赖 MP NOT_NULL 策略不进 SET；status/type/topFlag 省略时回落库中当前值，校验作用于合并后的行」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/PetService.java",
+          "line": 40,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "「事务内校验并创建当前登录用户的宠物档案，有生日时按生日推算月龄」几乎逐行复述实现（validate / setUserId / deriveAgeMonth），未揭示安全相关的 Why：userId 强制取自 UserContext.requireId() 而非请求体，防止伪造归属；未认证即 fail-closed。",
+          "suggestion": "改为「归属强制取自 UserContext.requireId()，忽略请求体中的 userId 以防越权建档；有生日时以生日推算月龄覆盖入参，避免前端传入不一致月龄」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/PetService.java",
+          "line": 124,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "updateByAdmin 是刻意绕过归属校验的鉴权敏感入口，注释仅写「不校验归属，其余校验与用户端一致」，未说明鉴权前提（管理员身份/权限在 Admin 控制器或路由层已强制校验，服务层只做存在性检查 → 404），也未说明 userId 从既有行保留、管理员不得借此转移归属。缺失这些前置约束会让后续调用方误以为该方法可安全暴露给普通用户。",
+          "suggestion": "补充「仅供已鉴权的后台接口调用（管理员校验在控制器层）；服务层只校验存在性并返回 404；userId 沿用库中原值，禁止通过本方法变更归属」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/PetService.java",
+          "line": 161,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "removeByAdmin 注释保留了「历史业务单仍展示末次宠物信息」的 Why，但与 updateByAdmin 一样未声明鉴权前提：不校验本人归属的安全性依赖上游后台管理员鉴权，服务层仅存在性检查（404）。",
+          "suggestion": "补一句「管理员鉴权由后台控制器层保证；此处仅存在性校验（不存在返回 404），逻辑删除不影响历史单据展示」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/SysUserService.java",
+          "line": 34,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "register 注释复述了唯一性校验与签发令牌，并补充了初始 token_version=1，但未点明并发关键前提：check-then-insert 本身不能防并发重复注册，真正的兜底是 username/phone 的数据库唯一索引；同时密码经 passwordEncoder 编码、状态与默认值一律服务端设定。",
+          "suggestion": "补充「唯一性预检仅为友好提示，并发重复由 DB 唯一索引兜底（冲突时事务回滚）；密码仅存编码值，status/token_version 等系统字段不接受请求体传入」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java",
+          "line": 31,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "类注释写「四类上行 / 五类下行」，但紧接着枚举的下行帧有 7 种（READY / HISTORY / MSG / READ / PRESENCE / ERROR / PONG），与 Pass 1 盲测得到的 4 上行 / 7 下行协议不符。协议数量是客户端对接的契约信息，数字漂移会误导后续维护者以为还有两类未列出或已废弃。",
+          "suggestion": "改为「四类上行 / 七类下行」，或直接删除计数只保留枚举清单（避免以后新增帧时再次漂移），例如「上行 SUBSCRIBE/CHAT/READ/PING；下行 READY/HISTORY/MSG/READ/PRESENCE/ERROR/PONG」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+          "line": 61,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "「按连接键查询当前有效连接，不存在时返回 null」只是把 conns.get(key) 的字面行为翻译成中文，没有任何 Why。此处真正不可直观推导的语义是：无锁弱一致读取，返回的 Conn 可能在返回瞬间已被顶号或关闭，因此调用方不能把它当作「连接仍可用/仍有权接收」的证明，必须再经 ConsultDeliveryGuard 校验。",
+          "suggestion": "补充并发语义与使用约束，如「无锁快照读：返回值可能刚被 open() 顶替或已关闭，仅代表查询瞬间的登记状态；能否写帧仍须由 ConsultDeliveryGuard 判定，勿据此做在线/鉴权结论」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+          "line": 66,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "「将指定连接加入会话房间订阅集合」等价于复述 conn.getRooms().add(roomId)。房间订阅是 WS 广播的鉴权边界，注释却未说明关键前置约束：本方法不做任何参与方校验，鉴权必须由调用方（Handler 的 join 包装）先完成；也未说明基于并发 Set 的幂等重复加入语义。仅凭字面无法得知误用会导致越权订阅。",
+          "suggestion": "改为说明契约与前置条件，例如「幂等加入房间订阅（并发 Set，重复加入无副作用）。本方法不做参与方鉴权：调用方必须先校验 receiver 仍是会话当事人，否则会造成越权订阅并收到他人正文」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultPush.java",
+          "line": 60,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "注释把 send() 描述为「单条连接的普通业务帧」，但实现中 sessionId == null 会转走 sendControl()，即降级为「只核对账号与令牌」的弱校验路径，非 null 才走 deliver(..., true) 的会话准入。这条鉴权强度分叉是安全边界上最不可直观推导的信息，注释完全未提，调用方可能误以为传入 null 也受会话准入保护。",
+          "suggestion": "补充分支与校验强度，如「sessionId 非空走会话准入（checkBusiness）；sessionId==null 视为控制帧转 sendControl，仅校验账号/令牌，故业务调用方必须显式传 sessionId，不得用 null 绕过会话准入」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+          "line": 39,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "「生成账号维度的唯一连接键（体系:主键）」基本是 u.getTyp() + \":\" + u.getId() 的字面复述。真正的 Why 是命名空间隔离：用户端与医生/后台的数字主键可能相同，不加 typ 前缀会串号顶替；同时该键的稳定性是「一账号一连接」顶替策略的基础。",
+          "suggestion": "补充碰撞与顶替动机，如「必须带 typ 前缀：不同体系的自增 id 可能相同，纯 id 作键会跨角色串号顶替；该键稳定不变，是 open() 同账号顶替与 close() 条件删除的依据」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+          "line": 44,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释说明了返回被顶掉的旧连接，但漏掉了所有权移交这一非直观契约：open() 只做原子 put 交换，并不关闭旧连接，关闭责任在调用方（Handler 的 closeQuietly(stale)），漏关会造成连接与推送泄漏。",
+          "suggestion": "在注释中明确「put 为原子交换，本方法不关闭旧连接；调用方必须负责关闭返回的非 null 旧连接，否则旧连接会继续留在客户端并占用资源」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultSocketRegistry.java",
+          "line": 79,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "「返回当前订阅了指定会话房间的连接快照列表」中的「快照」未解释一致性级别：实现是对 ConcurrentHashMap.values() 全量弱一致遍历，可能漏掉并发 join/leave，且返回的 Conn 可能随后被清退或关闭；快照的意义在于让 pushModeration 的「先发送后 finally 清退」不受遍历期变更影响。",
+          "suggestion": "补充「弱一致全表扫描：无锁，可能漏掉并发加入/退出的连接；返回后连接状态仍可能变化，故每帧写出前仍需 Guard 校验。快照用于保证发送与随后清退互不干扰」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultDeliveryGuard.java",
+          "line": 38,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "checkBusiness 的注释列出了四项校验与 status=2 放行的理由，但未记录 sessionId == null 直接返回 OK 的短路分支。鉴权方法中的「无会话即放行」是刻意的 fail-open 例外（供无会话上下文复用），不写清楚容易被误读为漏校验或被后续维护者当作 bug 修改。",
+          "suggestion": "补一句「sessionId 为 null 时只校验账号后放行（无会话上下文的调用），会话相关判定仅在传入 sessionId 时生效」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultPush.java",
+          "line": 69,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "sendControl 的注释只写了「只核对账号与令牌」，未记录两条失败/前置语义：底层 ws 为 null 时静默丢弃（不抛异常），以及 ACCOUNT_INVALID 时直接 closeForAccount 而不回错误帧（避免类注释所述的写错误帧递归）。这两点是调用方判断「控制帧是否一定送达」的关键。",
+          "suggestion": "补充「ws 为 null 直接静默返回；账号失效则关闭连接且不发错误帧（防递归），控制帧为 best-effort，不保证送达」。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java",
+          "line": 59,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "该行解释了串行化包装的动机，但下一行的两个魔法值 5000 与 256 * 1024 无任何说明。它们是很有信息量的弱网/慢消费者约束：发送超时 5s、缓冲上限 256KB，超限会由 Decorator 直接关闭会话（SESSION_LIMIT_EXCEEDED），属于仅凭字面无法推导的行为。",
+          "suggestion": "在该注释中补充参数含义与后果，如「5000ms 发送超时 + 256KB 缓冲上限用于限制慢消费者背压，超限由 Decorator 主动关闭连接，避免内存被单条慢连接拖垮」。"
+        },
+        {
+          "file": "frontend/src/api/http.js",
+          "line": 131,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "put 的注释写「自动序列化请求体为 JSON」，无 FormData 例外；但 buildRequestInit 对任意 method 都会把 FormData 原样透传（并删除 Content-Type），字符串体也原样发送。相邻 post 的注释已正确写为「非 FormData」，同一契约两处措辞不一致，易让调用方以为 PUT 不能上传 FormData。",
+          "suggestion": "与 post 保持一致，改为「自动序列化非 FormData 请求体为 JSON（FormData 原样透传、字符串体不二次序列化）；遵循统一超时中止、401 强制重登与业务码异常抛出契约」。"
+        },
+        {
+          "file": "frontend/src/api/http.js",
+          "line": 136,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "首行「发起 DELETE 请求并解包 Result.data」完全可由 `unwrap(http.delete(url, cfg))` 字面推导；第二行契约句与相邻 put/post 文档（L131）逐字重复，未补充 DELETE 特有约束（无请求体、cfg 透传用途、失败不自动重试/幂等无保证）。",
+          "suggestion": "删除复述行，改为指向统一契约并补充 DELETE 特有信息，例如：「DELETE 无请求体，cfg 可覆盖 silent/kind；契约同 request（超时中止、401 强制重登、非 200 业务码抛错），失败不自动重试，调用方需自行保证幂等。」"
+        },
+        {
+          "file": "frontend/src/api/httpError.js",
+          "line": 4,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "「必须返回 reauth 清空登录态并跳转」易被读成该函数自身执行清 token 与路由跳转；实现（L7-L18）是纯决策函数，仅返回 {type:'reauth'|'silent'|'notify', message}，清态/跳转/弹窗均由调用方执行。",
+          "suggestion": "明确纯函数边界，例如：「纯决策函数，无副作用；业务 401 无视 silent 返回 reauth（由调用方清 token 并跳转），防止失效会话继续后台轮询；非 401 且 silent 返回 silent；其余返回 notify，业务错误用 msg 兜底『操作未成功』，传输层区分超时/连接失败文案。」"
+        },
+        {
+          "file": "frontend/src/components/EntryIcon.vue",
+          "line": 4,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释硬编码「内联 11 个固定路径」，但可见上下文（L5-L18）仅能确认 HomeFilled/Search/ChatDotRound/User 等键，数量无法核实且随图标增删即刻漂移；同时未说明键名必须与调用方图标名一致这一真实前置约束。",
+          "suggestion": "去掉易漂移的具体数量，改为：「@element-plus/icons-vue 为桶模块，按需内联少量固定 path（1024 viewBox）避免全站图标进入入口 chunk；键名必须与调用方使用的图标名严格一致，新增图标需同步补 path。」"
+        },
+        {
+          "file": "frontend/src/components/LoginForm.vue",
+          "line": 6,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "该注释挂在 defineProps 之上，却只讲模板/打包取舍（原生控件 + Element Plus 同名类名），未说明此处真正不可从类型推导的注入契约：login/onSuccess 为必填回调，鉴权请求与登录后跳转归父组件，本组件只负责校验、预填与 busy/错误展示。",
+          "suggestion": "将打包取舍说明移至模板或组件顶部，并在 defineProps 处补契约：「login/onSuccess 必填：鉴权请求与登录后导航由父组件负责；initialUsername/Password 仅用于预填，组件自身只维护校验、busy 与错误展示，失败提示由请求层统一给出。」"
+        },
+        {
+          "file": "frontend/src/router/index.js",
+          "line": 86,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "注释称角色越界时「退回各自工作台首页」，暗示按角色分流到不同首页；但 L87 实现是无条件 return { path: '/admin/dashboard' }，ADMIN 与 DOCTOR 越界均落到同一个固定路由，不存在「各自」的分支逻辑。",
+          "suggestion": "改为与实现一致的表述，例如「原因: 角色越界统一退回 /admin/dashboard（该页对所有后台角色开放，不会形成重定向环），避免渲染空白页；未登录已在上一分支先行拦截并保留 redirect」。"
+        },
+        {
+          "file": "frontend/src/stores/client.js",
+          "line": 13,
+          "dimension": "READABILITY_NOISE",
+          "severity": "Nit",
+          "message": "该注释解释的是 nickname 的取值优先级（nickname → name → username），但物理位置紧贴 L14 的 logged 与 L15 的 userId 声明，真正相关的 computed 在 L16-18，读者会把「必须优先读取」误解为 logged/userId 的语义。",
+          "suggestion": "将注释下移到 L16 的 nickname computed 正上方（或并入其表达式行尾），使说明与被解释的 fallback 链紧邻；logged/userId 无需该说明。"
+        },
+        {
+          "file": "frontend/src/stores/session.js",
+          "line": 9,
+          "dimension": "READABILITY_NOISE",
+          "severity": "Nit",
+          "message": "「公开形状（token/user + apply/refresh/logout）保持与原两份实现一致」属于重构历史叙述，对当前代码行为没有信息增益，且随时间推移会失去指代对象（原两份实现已不存在）。",
+          "suggestion": "删除历史对比句，改为陈述当前契约与前置约束，例如「返回 { token, user, apply, refresh, logout }；refresh 在无 token 时直接返回 null；user 由 localStorage JSON 反序列化，调用方需保证写入内容合法」。"
+        },
+        {
+          "file": "frontend/src/utils/messageBox.js",
+          "line": 21,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释仅说明「兼容两参调用形式」，但同一分支还隐含了更不直观的语义：当第三个参数存在时它被当作 appContext 处理，标题被强制置为空串并升格为四参调用（L24-L26）。这一参数移位约定无法从「兼容两参」一句推导，读者容易误以为第三参仍是 options。",
+          "suggestion": "补充一句说明参数移位约定，例如：「原因: 兼容 Element Plus 两参调用（第二参为配置对象）；此时若存在第三参则视为 appContext，升格为四参调用并将 title 置空，避免把 appContext 误当 options 合并」。"
+        },
+        {
+          "file": "frontend/src/utils/token.js",
+          "line": 14,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "setToken 的 Javadoc「写入指定端（client/admin）的登录令牌至 localStorage」只是对 `localStorage.setItem(KEYS[kind], token)` 的字面复述，零信息增益。该函数处于鉴权边界，却未说明任何非直观约束：覆盖写入（last-write-wins、幂等）、此处不做校验/续期（过期与 401 由请求层处理）、同步 API 在配额超限或隐私模式会抛异常且由调用方兜底、以及未知 kind 会写入 undefined 键的风险。",
+          "suggestion": "改写为说明「为什么/约束」，例如：覆盖式写入，同一端后写覆盖先写；不在此做过期校验与刷新，401/续期统一由请求层处理；localStorage 为同步 API，配额不足或隐私模式会抛错，调用方需自行 try/catch；kind 必须是 KEYS 中已定义的端，避免身份键串写。"
+        },
+        {
+          "file": "frontend/src/views/admin/AppointmentDetail.vue",
+          "line": 22,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "注释只解释了功能动机（可从评价管理页返回来源页），完全未提及下一行真正的高风险语义：`/^\\/admin\\/(?:appointments|reviews)(?:\\?|$)/` 是白名单而非黑名单，用于 fail-closed 阻断开放重定向（外链、`//host`、其他 admin 路由一律拒绝），非法值回退到恒定可用的 `/admin/appointments`，且 backLabel 与 returnTo 读同一份已消毒值以保证文案与目标一致。安全校验的「为什么」缺失，后续维护者极易把正则放宽成黑名单或任意 returnTo。",
+          "suggestion": "补充安全约束，例如：returnTo 走白名单（仅 /admin/appointments 与 /admin/reviews，且必须路径边界匹配）而非黑名单，防止开放重定向与外链/协议相对 URL 注入；不匹配一律 fail-closed 回退 /admin/appointments，保证返回按钮不落空；backLabel 复用同一已校验值以避免文案与跳转目标不一致。"
+        },
+        {
+          "file": "frontend/src/utils/token.js",
+          "line": 5,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "getToken 文档中「缺失时返回空串」基本是 `|| ''` 的字面翻译；真正的调用契约未点明：永不返回 null/undefined，调用方可直接用真值判断「未登录」；传入未知 kind 时 KEYS[kind] 为 undefined，查找失败同样归一为 ''，即 fail-closed 退化为匿名而不是串到另一端身份。",
+          "suggestion": "在文档中明确「返回值恒为字符串（缺失/未知 kind 均为 ''），调用方可直接用真值判断登录态；未知 kind 不会回落到另一端令牌」，弱化对 `|| ''` 的字面复述。"
+        },
+        {
+          "file": "frontend/src/views/admin/Appointments.vue",
+          "line": 136,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释「单行执行期间加锁」容易被读成按行加锁，而实现 `if (actingId.value) return` 是全局单飞：任意一行动作在途时，其他行的接诊/结束/取消同样被早退拒绝；同时未说明 actingId 在 finally 中释放（失败不会永久锁死 UI）以及异常向调用方冒泡（成功 toast 与 load() 只在 await 成功后执行）。",
+          "suggestion": "补充锁粒度与失败语义，例如：全局单飞锁，任一行动作在途即拒绝其他行提交；actingId 在 finally 释放，失败不会卡死按钮；异常向上抛出，成功提示与列表刷新仅在 await 成功后执行；actingId 同时驱动行内按钮 loading/disabled。"
+        },
+        {
+          "file": "frontend/src/views/admin/Appointments.vue",
+          "line": 183,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释解释了「默认今日 + 写入地址栏便于分享刷新」，但遗漏了本段最关键的非直观控制流：使用 router.replace 而非 push（不污染历史），且写入后立即 return，把唯一一次首屏加载交给 route.query watcher 执行，避免与 L191 的 load() 造成重复首屏请求。",
+          "suggestion": "追加一句说明：用 replace 保持历史干净，写入查询后立刻 return，由 query watcher 触发唯一一次 load()，避免初始化重复拉取。"
+        },
+        {
+          "file": "frontend/src/views/admin/ConsultRecords.vue",
+          "line": 18,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释只给出「沿用已提交筛选快照、避免草稿生效」的意图，未说明 applied 的实际判定规则这一非直观部分：applied 与当前 q 逐字段比较用于区分「改筛选」与「纯翻页」，筛选变化必须把 pageNum 重置为 1（否则会请求越界页得到空列表），且快照仅在请求真正发出后更新，代表 applied 而非 pending 状态。",
+          "suggestion": "补充判定与更新时机，例如：applied 记录上一次真正发出的查询；与当前 q 比较，若筛选字段变化则强制 pageNum=1，防止停留在越界页返回空列表；快照只在请求发出后更新，避免把未提交的表单草稿当成已应用状态。"
+        },
+        {
+          "file": "frontend/src/views/admin/Doctors.vue",
+          "line": 65,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "注释锚点与实现不符：该行下方是 `let editSeq = 0`（openEdit 的单调请求序号计数器），但注释讲的是「列表行手机号脱敏所以编辑前必须拉详情」，属于 doctorDetail 调用（L72）的理由，完全没有解释 editSeq 的并发语义（最后一次点击生效、序号只增不减、旧响应静默丢弃）。高风险异步竞态点被无关理由覆盖，读者会误以为 editSeq 与手机号脱敏有关。",
+          "suggestion": "将手机号脱敏/防覆写的理由移到 L72 `detail = await doctorDetail(row.id)` 上方；在 L65 改为说明计数器契约，例如「单调递增请求序号：每次 openEdit 先自增再 await，仅最新序号可写 editing/form/open，旧响应静默丢弃（last-click-wins），计数器永不重置」。"
+        },
+        {
+          "file": "frontend/src/views/admin/Workbench.vue",
+          "line": 75,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "该 catch 属于「接诊」流程（L71 accept → L72 order.value.status = 1），流程中并不涉及病历表单内容；注释「保留当前表单内容以便重试」是从保存失败分支照搬的描述，与本处真实不变量（失败时不做乐观状态翻转、status 仍为 0、按钮可再次点击、action 在 finally 清空避免 busy 卡死）不一致。",
+          "suggestion": "改为描述接诊失败语义，例如「原因: 接诊失败不做乐观状态翻转（status 仍为待接诊），错误提示由请求层统一给出；action 在 finally 清空以便直接重试」。表单保留的说明留在 save/doFinish 的 catch 中。"
+        },
+        {
+          "file": "frontend/src/views/admin/Schedules.vue",
+          "line": 60,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "失败机制描述不准确：JS 中数组「下标越界」只会得到 undefined，不会抛异常；`periodTimes[v] || []` 真正防的是调用方对 undefined 解构（如 onPeriod 的 `const [s, e] = ...`）抛 TypeError。「防止本地异常」也含义含糊，且未点明 periodTimes（默认填充时间）与 periodRanges（更宽的校验窗口）是两套不可混用的映射。",
+          "suggestion": "改为「原因: 未知时段 key 回退为空数组，避免调用方解构 undefined 抛 TypeError（字段被清空而非崩溃）；此处 periodTimes 是默认填充时间，勿与校验窗口 periodRanges 混用」。"
+        },
+        {
+          "file": "frontend/src/views/client/Booking.vue",
+          "line": 78,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "该注释挂在 nextHint computed 首部，却只解释了第一条分支（停诊文案为何简写），未说明整个 computed 的关键不变量：停诊 → 无排班 → 已约满 → 未选时段 → 未选宠物 → 就绪摘要 的降序优先级、首个命中即返回的互斥语义（存在上游阻塞时绝不展示『就绪』）。读者仅看代码需自行推断分支顺序不可随意调换。",
+          "suggestion": "改为说明优先级契约，例如：『按阻塞优先级降序首个命中即返回，保证上游阻塞未解除时不会展示就绪摘要；停诊细节已在医生卡片展示，此处只给结果文案避免重复』。"
+        },
+        {
+          "file": "frontend/src/views/client/Booking.vue",
+          "line": 143,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释解释了『不阻塞医生/号源展示、区块级重试』，但遗漏了本失败分支最关键的 fail-closed 语义：同时清空 myPets 与 form.petId，是为了避免把上次加载残留、本次未校验的 petId 带入提交；此外未说明为何此处不再弹提示（请求层已统一提示）。",
+          "suggestion": "补充一句：『同时清空列表与 form.petId 做 fail-closed，防止提交未校验的旧 petId；失败提示由请求层统一给出，此处只置 petsFailed 驱动局部重试』。"
+        },
+        {
+          "file": "frontend/src/views/client/ConsultRoom.vue",
+          "line": 24,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Major",
+          "message": "注释把 panelKey 递增的触发点限定为『关闭问诊后』，并断言重挂是为了『从库中拉取最新系统消息』。但上下文只显示 L53 在某个重载/重连处理函数末尾执行 panelKey.value += 1，Pass 1 归纳的语义是『重载/重连时通过递增强制重挂以重置面板局部状态与连接』；注释描述的触发范围偏窄，且『从库中拉取』是前端代码无法证实的后端取数机制断言。",
+          "suggestion": "改为与实现一致的描述：『key 单调递增用作 :key，重载/重连（含问诊关闭后刷新）时强制面板重挂，以重置面板内部状态与消息连接；key 不复用』，删除对后端数据来源的断言或改为『重新拉取最新消息』。"
+        },
+        {
+          "file": "frontend/src/views/client/ConsultRoom.vue",
+          "line": 57,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释解释了为何要手动同步 visualViewport.height（软键盘 + dvh 不更新），但代码中最不直观的 `scale === 1` 守卫没有任何说明——即 pinch-zoom（scale ≠ 1）时刻意忽略 resize 以避免布局跳动。这属于仅凭字面无法推导的 Why，缺失后易被误当作冗余判断而删除。",
+          "suggestion": "在同一注释追加：『仅在 scale === 1 时同步，捏合缩放引起的 viewport 变化不参与布局，避免高度抖动；visualViewport 不支持时保持 dvh 兜底』。"
+        },
+        {
+          "file": "frontend/src/views/client/OrderDetail.vue",
+          "line": 223,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释只覆盖了『医生未写病历 → 空 data → 降级 null』这一半语义，未解释 `.catch(() => null)` 的关键意图：病历是附属可选资源（可能不存在或无权限），其请求失败必须被吞掉，不能进入外层 catch 把整页标记为 failed（主详情失败才是唯一失败路径）。",
+          "suggestion": "补充：『病历为附属资源，不存在/无权限/请求失败一律降级为 null 渲染空态，不得让整页 failed；仅 appointmentDetail 失败才走外层 catch』。"
+        },
+        {
+          "file": "frontend/src/views/client/OrderDetail.vue",
+          "line": 264,
+          "dimension": "INFO_GAIN",
+          "severity": "Major",
+          "message": "该空 catch 的覆盖范围不止接口失败：ElMessageBox.prompt 在用户点『再想想』/关闭时也会 reject 并落入此处，属于正常无操作路径。注释只写『请求层已提示失败原因』，把 catch 语义窄化为接口异常，后续维护者很可能在此补一个错误提示，从而对用户的正常取消操作弹出误报。",
+          "suggestion": "明确双重语义，例如：『此处同时吞掉用户关闭/「再想想」的 prompt reject（正常无操作，不得提示）与取消接口失败（请求层已提示）；保留当前预约状态，action 在 finally 统一复位』。"
+        }
+      ],
+      "errors": [],
+      "error": ""
+    },
+    {
+      "reviewerId": "R3",
+      "ok": false,
+      "prompt_injection_detected": false,
+      "prompt_injection_evidence": "",
+      "findings": [
+        {
+          "file": "backend/src/main/java/com/yuzhua/config/SlowSqlInterceptor.java",
+          "line": 58,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释写「阈值为 0 表示关闭慢 SQL 监控」，但代码判断为 thresholdMs <= 0，负值同样关闭监控；注释口径窄于实现（上方 L54 Javadoc 已正确表述为「大于 0 时」计时）。",
+          "suggestion": "改为「阈值 ≤ 0（含 0 或负数）表示关闭慢 SQL 监控，直接放行避免额外计时开销」，与 L54 Javadoc 和 L59 的 <= 0 判断保持一致。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/mapper/DoctorScheduleMapper.java",
+          "line": 12,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释称 tryOccupy「返回 1 成功、0 已满」，但 WHERE 条件为 status = 1 AND remain_num > 0，返回 0 也可能表示排班已停诊（status != 1），调用方无法从返回值区分「已满」与「已停诊」。",
+          "suggestion": "改为「返回 1 成功，0 表示已满或已停诊（调用方须回滚事务）」，与 status = 1 AND remain_num > 0 双重守卫保持一致。"
+        },
+        {
+          "file": "backend/src/main/java/com/yuzhua/service/DoctorScheduleService.java",
+          "line": 280,
+          "dimension": "READABILITY_NOISE",
+          "severity": "Nit",
+          "message": "注释夹带实现变更历史：「之前这里会把 remain_num 一并清零、恢复时再按存活订单重算」属于对旧实现的回溯叙述，且引用跟踪表编号 I07/D2 属于外部上下文噪音；这些内容不描述当前代码行为，随实现演进会失真。",
+          "suggestion": "删除对旧实现的回溯与跟踪表编号，只保留当前语义的 Why：停诊只写 status、不动 remain_num（余量是事实，不应被状态开关改写），已成交订单由前台线下改约。"
+        },
+        {
+          "file": "frontend/src/layouts/ClientLayout.vue",
+          "line": 61,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释只解释了 /consult 聊天路由触发轮询的原因，但代码对 /me 开头的路由同样立即调用 pollUnread()，该分支的动机（如个人中心的资料/问诊状态变化）未被说明，读者需自行推断为何 /me 也要即时刷新。",
+          "suggestion": "补充说明 /me 路由触发即时轮询的原因，例如「聊天页与个人中心的已读/状态变更需立刻同步到底栏未读角标」。"
+        },
+        {
+          "file": "frontend/src/router/index.js",
+          "line": 86,
+          "dimension": "CONSISTENCY_DRIFT",
+          "severity": "Nit",
+          "message": "注释写「退回各自工作台首页」暗示按角色回到不同目标页，但实现固定返回 { path: '/admin/dashboard' }，对所有越界角色都是同一路径，并非「各自的」首页。",
+          "suggestion": "改为与实现一致的表述，如「退回统一的 /admin/dashboard 首页，避免空白页」，或按角色映射到各自首页。"
+        },
+        {
+          "file": "frontend/src/utils/listScroll.js",
+          "line": 3,
+          "dimension": "INFO_GAIN",
+          "severity": "Nit",
+          "message": "注释仅解释了等待异步渲染后再恢复滚动的时序原因，但同一函数中 `window.location.pathname === path` 的路由变更守卫（第 9 行）这一非直观光行为没有说明其意图，读者难以判断为何恢复前要校验路径。",
+          "suggestion": "在注释中补一句守卫原因，例如：『另在恢复前比对 pathname，导航已切换路由时放弃恢复，避免把上一页的滚动值写到新页面』。"
+        }
+      ],
+      "errors": [
+        "The operation was aborted due to timeout",
+        "The operation was aborted due to timeout",
+        "The operation was aborted due to timeout",
+        "The operation was aborted due to timeout",
+        "The operation was aborted due to timeout",
+        "The operation was aborted due to timeout",
+        "The operation was aborted due to timeout"
+      ],
+      "error": "The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout; The operation was aborted due to timeout"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+TAP version 13
+# Subtest: dimensionless clustering & 2/3 majority vote across differing dimensions
+ok 1 - dimensionless clustering & 2/3 majority vote across differing dimensions
+  ---
+  duration_ms: 58.715
+  type: 'test'
+  ...
+# Subtest: 429 exponential backoff retry + json_schema fallback to json_object + repair retry
+ok 2 - 429 exponential backoff retry + json_schema fallback to json_object + repair retry
+  ---
+  duration_ms: 66.9753
+  type: 'test'
+  ...
+# Subtest: Prompt Injection zero-tolerance: 1/3 reviewer or precheck fails non-overridable even in advisory mode
+ok 3 - Prompt Injection zero-tolerance: 1/3 reviewer or precheck fails non-overridable even in advisory mode
+  ---
+  duration_ms: 12.037
+  type: 'test'
+  ...
+# Subtest: Anthropic /v1/messages endpoint compatibility and Fail-Closed on >=2/3 reviewer failure
+ok 4 - Anthropic /v1/messages endpoint compatibility and Fail-Closed on >=2/3 reviewer failure
+  ---
+  duration_ms: 14.202
+  type: 'test'
+  ...
+# warning: in the working copy of 'frontend/src/api/http.js', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'frontend/src/api/http.js', LF will be replaced by CRLF the next time Git touches it
+# Subtest: verify-label-actor: 4 adversarial cases (bot actor, self-label, stale pre-HEAD, valid post-HEAD)
+ok 5 - verify-label-actor: 4 adversarial cases (bot actor, self-label, stale pre-HEAD, valid post-HEAD)
+  ---
+  duration_ms: 49.6189
+  type: 'test'
+  ...
+# Subtest: check-gate-integrity blocks skip flags, negative test deletions, and unapproved budget increase
+ok 6 - check-gate-integrity blocks skip flags, negative test deletions, and unapproved budget increase
+  ---
+  duration_ms: 1.1656
+  type: 'test'
+  ...
+# Subtest: extract-comment-diff extracts added, adjacent <=5, high-risk fn, excludes .guardrails/**
+ok 7 - extract-comment-diff extracts added, adjacent <=5, high-risk fn, excludes .guardrails/**
+  ---
+  duration_ms: 1004.0773
+  type: 'test'
+  ...
+# Subtest: check-issue-refs validates open + human guardrail:tracked and blocks closed/bot issues
+ok 8 - check-issue-refs validates open + human guardrail:tracked and blocks closed/bot issues
+  ---
+  duration_ms: 28.3239
+  type: 'test'
+  ...
+# Subtest: batching, sanitization, and line whitelist helpers
+ok 9 - batching, sanitization, and line whitelist helpers
+  ---
+  duration_ms: 0.4693
+  type: 'test'
+  ...
+# Subtest: 55 redteam + 20 golden fixtures integrity & mock evaluation thresholds
+ok 10 - 55 redteam + 20 golden fixtures integrity & mock evaluation thresholds
+  ---
+  duration_ms: 27.7838
+  type: 'test'
+  ...
+# Subtest: Vue SFC full-template splitter & lexical scanner ignore string literals
+ok 11 - Vue SFC full-template splitter & lexical scanner ignore string literals
+  ---
+  duration_ms: 0.3101
+  type: 'test'
+  ...
+# Subtest: scanCodeLexical handles JS RegExp literals with \\/ without false comment detection
+ok 12 - scanCodeLexical handles JS RegExp literals with \\/ without false comment detection
+  ---
+  duration_ms: 0.2451
+  type: 'test'
+  ...
+# Subtest: fetchWithRetry attaches AbortSignal.timeout and retries stalled calls
+ok 13 - fetchWithRetry attaches AbortSignal.timeout and retries stalled calls
+  ---
+  duration_ms: 4052.1626
+  type: 'test'
+  ...
+# Subtest: aggregateReviewerResults keeps 1 Major + 1 Nit cluster non-blocking in advisoryClusters
+ok 14 - aggregateReviewerResults keeps 1 Major + 1 Nit cluster non-blocking in advisoryClusters
+  ---
+  duration_ms: 0.424
+  type: 'test'
+  ...
+# Subtest: 分组更新
+ok 15 - 分组更新
+  ---
+  duration_ms: 1.9436
+  type: 'test'
+  ...
+# Subtest: 分组更新，带目录数量
+ok 16 - 分组更新，带目录数量
+  ---
+  duration_ms: 1.6591
+  type: 'test'
+  ...
+# Subtest: 单个依赖，带版本区间
+ok 17 - 单个依赖，带版本区间
+  ---
+  duration_ms: 0.9483
+  type: 'test'
+  ...
+# Subtest: 单个依赖，只有目标版本
+ok 18 - 单个依赖，只有目标版本
+  ---
+  duration_ms: 0.3445
+  type: 'test'
+  ...
+# Subtest: 已经是中文时返回 null
+ok 19 - 已经是中文时返回 null
+  ---
+  duration_ms: 0.4445
+  type: 'test'
+  ...
+# Subtest: 不认识的格式返回 null
+ok 20 - 不认识的格式返回 null
+  ---
+  duration_ms: 0.2041
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5895.8554

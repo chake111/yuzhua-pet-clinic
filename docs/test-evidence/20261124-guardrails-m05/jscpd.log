@@ -1,0 +1,50 @@
+Using config from .jscpd.json
+[1mClone found (java)[22m
+ - [1m[32mcom\yuzhua\controller\admin\AdminConsultController.java[39m[22m [10:39 - 20:48] (11 lines, 109 tokens)
+   com\yuzhua\controller\client\ConsultController.java [8:40 - 18:48]
+[1mClone found (java)[22m
+ - [1m[32mcom\yuzhua\dto\ScheduleEditForm.java[39m[22m [11:31 - 30:30] (20 lines, 78 tokens)
+   com\yuzhua\dto\ScheduleForm.java [12:27 - 31:30]
+[1mClone found (java)[22m
+ - [1m[32mcom\yuzhua\service\AppointmentService.java[39m[22m [1:1 - 10:19] (10 lines, 97 tokens)
+   com\yuzhua\service\ConsultService.java [1:1 - 10:19]
+[1mClone found (java)[22m
+ - [1m[32mcom\yuzhua\service\DoctorReviewService.java[39m[22m [1:13 - 11:23] (11 lines, 105 tokens)
+   com\yuzhua\service\DoctorScheduleService.java [1:13 - 11:23]
+[1mClone found (java)[22m
+ - [1m[32mcom\yuzhua\service\DoctorReviewService.java[39m[22m [1:13 - 10:23] (10 lines, 96 tokens)
+   com\yuzhua\service\DoctorService.java [1:13 - 10:23]
+[1mClone found (java)[22m
+ - [1m[32mcom\yuzhua\service\DoctorReviewService.java[39m[22m [1:13 - 10:23] (10 lines, 96 tokens)
+   com\yuzhua\service\PetService.java [1:13 - 10:23]
+[1mClone found (java)[22m
+ - [1m[32mcom\yuzhua\service\DoctorReviewService.java[39m[22m [14:38 - 23:22] (10 lines, 80 tokens)
+   com\yuzhua\service\StatsService.java [7:29 - 16:22]
+[1mClone found (css)[22m
+ - [1m[32mstyles\admin.css[39m[22m [40:11 - 49:4] (10 lines, 175 tokens)
+   styles\main.css [462:12 - 471:4]
+[1mClone found (css)[22m
+ - [1m[32mstyles\admin.css[39m[22m [51:11 - 60:5] (10 lines, 125 tokens)
+   styles\main.css [429:12 - 438:3]
+[1mClone found (html)[22m
+ - [1m[32mviews\admin\Departments.vue:html[39m[22m [121:57 - 157:85] (5 lines, 70 tokens)
+   views\admin\Notices.vue:html [154:115 - 196:85]
+[90m┌────────────┬────────────────┬─────────────┬──────────────┬──────────────┬──────────────────┬───────────────────┐[39m
+[90m│[39m[31m Format     [39m[90m│[39m[31m Files analyzed [39m[90m│[39m[31m Total lines [39m[90m│[39m[31m Total tokens [39m[90m│[39m[31m Clones found [39m[90m│[39m[31m Duplicated lines [39m[90m│[39m[31m Duplicated tokens [39m[90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m css        [90m│[39m 52             [90m│[39m 3419        [90m│[39m 56714        [90m│[39m 2            [90m│[39m 20 (0.58%)       [90m│[39m 300 (0.53%)       [90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m html       [90m│[39m 52             [90m│[39m 1838        [90m│[39m 25643        [90m│[39m 1            [90m│[39m 5 (0.27%)        [90m│[39m 70 (0.27%)        [90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m java       [90m│[39m 100            [90m│[39m 7839        [90m│[39m 63098        [90m│[39m 7            [90m│[39m 82 (1.05%)       [90m│[39m 661 (1.05%)       [90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m javascript [90m│[39m 74             [90m│[39m 4964        [90m│[39m 39325        [90m│[39m 0            [90m│[39m 0 (0.00%)        [90m│[39m 0 (0.00%)         [90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m markup     [90m│[39m 1              [90m│[39m 11          [90m│[39m 146          [90m│[39m 0            [90m│[39m 0 (0.00%)        [90m│[39m 0 (0.00%)         [90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m vue        [90m│[39m 56             [90m│[39m 9995        [90m│[39m 96978        [90m│[39m 0            [90m│[39m 0 (0.00%)        [90m│[39m 0 (0.00%)         [90m│[39m
+[90m├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤[39m
+[90m│[39m [1mTotal:[22m     [90m│[39m 335            [90m│[39m 28066       [90m│[39m 281904       [90m│[39m 10           [90m│[39m 107 (0.38%)      [90m│[39m 1031 (0.37%)      [90m│[39m
+[90m└────────────┴────────────────┴─────────────┴──────────────┴──────────────┴──────────────────┴───────────────────┘[39m
+[90mFound 10 clones.[39m
+[90mtime: 64.584ms[39m
