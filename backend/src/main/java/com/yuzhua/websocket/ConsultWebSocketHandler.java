@@ -1,7 +1,7 @@
 package com.yuzhua.websocket;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.yuzhua.common.BizException;
 import com.yuzhua.entity.ConsultMessage;
 import com.yuzhua.security.LoginUser;
