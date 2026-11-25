@@ -7,11 +7,12 @@ import com.yuzhua.domain.enums.NoticeStatus;
 import com.yuzhua.domain.enums.NoticeType;
 import com.yuzhua.dto.NoticeForm;
 import com.yuzhua.dto.PageQuery;
-import com.yuzhua.entity.Notice;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.NoticeService;
+import com.yuzhua.vo.NoticeVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,28 +36,28 @@ public class NoticeController {
 
     @Operation(summary = "公告分页。status: 0 草稿 1 已发布 2 已下架")
     @GetMapping("/page")
-    public Result<PageResult<Notice>> page(PageQuery query,
-                                           @RequestParam(required = false) @Nullable NoticeStatus status,
-                                           @RequestParam(required = false) @Nullable NoticeType type,
-                                           @RequestParam(required = false) @Nullable String keyword) {
+    public Result<PageResult<NoticeVo>> page(PageQuery query,
+                                             @RequestParam(required = false) @Nullable NoticeStatus status,
+                                             @RequestParam(required = false) @Nullable NoticeType type,
+                                             @RequestParam(required = false) @Nullable String keyword) {
         return Result.ok(noticeService.pageAdmin(query, status, type, keyword));
     }
 
     @Operation(summary = "公告详情")
     @GetMapping("/{id}")
-    public Result<Notice> detail(@PathVariable Long id) {
-        return Result.ok(noticeService.require(id));
+    public Result<NoticeVo> detail(@PathVariable Long id) {
+        return Result.ok(noticeService.detail(id));
     }
 
     @Operation(summary = "新增公告。不传 status 时按草稿保存")
     @PostMapping
-    public Result<Notice> create(@RequestBody NoticeForm req) {
+    public Result<NoticeVo> create(@Valid @RequestBody NoticeForm req) {
         return Result.ok("已保存", noticeService.create(req));
     }
 
     @Operation(summary = "修改公告")
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody NoticeForm req) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody NoticeForm req) {
         noticeService.update(id, req);
         return Result.ok("已保存", null);
     }

@@ -28,12 +28,12 @@ import com.yuzhua.mapper.SysUserMapper;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.consult.ws.ConsultPushGateway;
 import com.yuzhua.security.UserContext;
+import com.yuzhua.vo.ConsultMessageVo;
 import com.yuzhua.vo.ConsultSessionVo;
 import com.yuzhua.vo.PetDisplayVo;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,21 +69,21 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
      */
     @Transactional
     public ConsultSessionVo create(ConsultForm req) {
-        if (req.getPetId() == null) {
+        if (req.petId() == null) {
             throw new BizException("请选择问诊宠物");
         }
-        Pet pet = petService.requireOwned(req.getPetId());
-        if (req.getDoctorId() == null) {
+        Pet pet = petService.requireOwned(req.petId());
+        if (req.doctorId() == null) {
             throw new BizException("请选择医生");
         }
-        Doctor doctor = doctorMapper.selectById(req.getDoctorId());
+        Doctor doctor = doctorMapper.selectById(req.doctorId());
         if (doctor == null) {
             throw BizException.notFound("医生");
         }
         if (doctor.getStatus() != EnableStatus.ENABLED) {
             throw new BizException("该医生已停诊，请换个医生");
         }
-        String symptom = req.getSymptom();
+        String symptom = req.symptom();
         if (symptom == null || symptom.isBlank()) {
             throw new BizException("请描述症状");
         }
@@ -92,15 +92,14 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         s.setDoctorId(doctor.getId());
         s.setPetId(pet.getId());
         s.setSymptom(symptom.trim());
-        s.setImages(blankToNull(req.getImages()));
+        s.setImages(blankToNull(req.images()));
         s.setStatus(ConsultSessionStatus.PENDING);
         s.setUserUnread(0);
         s.setDoctorUnread(0);
         save(s);
         // 原因: 新建时宠物档案必未删除，直接复用刚校验的实体构建展示摘要；历史列表再走含已删档案查询
-        PetDisplayVo brief = new PetDisplayVo();
-        BeanUtils.copyProperties(pet, brief);
-        return buildVo(s, false, brief, doctor, null);
+        PetDisplayVo brief = new PetDisplayVo(pet.getId(), pet.getName(), pet.getSpecies(), pet.getBreed(), pet.getAvatar());
+        return toVo(s, false, brief, doctor, null);
     }
 
     /**
@@ -232,22 +231,22 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         if (rows.isEmpty()) {
             return List.of();
         }
-        Map<Long, PetDisplayVo> pets = BatchLookup.mapByIds(petMapper::selectHistoryDisplay, BatchLookup.ids(rows, ConsultSession::getPetId), PetDisplayVo::getId);
+        Map<Long, PetDisplayVo> pets = BatchLookup.mapByIds(petMapper::selectHistoryDisplay, BatchLookup.ids(rows, ConsultSession::getPetId), PetDisplayVo::id);
         Map<Long, Doctor> doctors = BatchLookup.mapByIds(doctorMapper::selectBatchIds, BatchLookup.ids(rows, ConsultSession::getDoctorId), Doctor::getId);
         Map<Long, SysUser> users = BatchLookup.mapByIds(sysUserMapper::selectBatchIds, BatchLookup.ids(rows, ConsultSession::getUserId), SysUser::getId);
         List<ConsultSessionVo> out = new ArrayList<>(rows.size());
         for (ConsultSession s : rows) {
-            out.add(buildVo(s, asDoctor, pets.get(s.getPetId()), doctors.get(s.getDoctorId()), users.get(s.getUserId())));
+            out.add(toVo(s, asDoctor, pets.get(s.getPetId()), doctors.get(s.getDoctorId()), users.get(s.getUserId())));
         }
         return out;
     }
 
-    public PageResult<ConsultMessage> history(Long sessionId, ConsultMessageQuery q) {
+    public PageResult<ConsultMessageVo> history(Long sessionId, ConsultMessageQuery q) {
         requireMember(sessionId);
         return pageHistory(sessionId, q, false);
     }
 
-    public PageResult<ConsultMessage> historyForViewer(Long sessionId, ConsultMessageQuery q) {
+    public PageResult<ConsultMessageVo> historyForViewer(Long sessionId, ConsultMessageQuery q) {
         boolean admin = UserContext.require().isAdmin();
         if (admin) {
             if (getById(sessionId) == null) {
@@ -259,7 +258,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return pageHistory(sessionId, q, admin);
     }
 
-    private PageResult<ConsultMessage> pageHistory(Long sessionId, ConsultMessageQuery q, boolean includeHidden) {
+    private PageResult<ConsultMessageVo> pageHistory(Long sessionId, ConsultMessageQuery q, boolean includeHidden) {
         Page<ConsultMessage> page = messageMapper.selectPage(new Page<>(q.getPageNum(), q.getPageSize()),
                 Wrappers.<ConsultMessage>lambdaQuery()
                         .eq(ConsultMessage::getSessionId, sessionId)
@@ -267,7 +266,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
                         // 原因: 管理员审计视图保留已屏蔽消息便于合规追溯，参与方视图过滤屏蔽行
                         .eq(!includeHidden, ConsultMessage::getHidden, ConsultMessage.HIDE_NO)
                         .orderByDesc(ConsultMessage::getId));
-        return PageResult.of(page);
+        return PageResult.of(page, ConsultService::toMessageVo);
     }
 
     public List<ConsultMessage> recent(Long sessionId, int limit) {
@@ -537,23 +536,55 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return frame;
     }
 
-    private ConsultSessionVo buildVo(ConsultSession s, boolean asDoctor,
-                                   @Nullable PetDisplayVo pet, @Nullable Doctor doctor, @Nullable SysUser patient) {
-        ConsultSessionVo vo = new ConsultSessionVo();
-        BeanUtils.copyProperties(s, vo);
-        if (pet != null) {
-            vo.setPetName(pet.getName());
-        }
-        if (doctor != null) {
-            vo.setDoctorName(doctor.getName());
-            vo.setDoctorAvatar(doctor.getAvatar());
-        }
-        if (patient != null) {
-            vo.setUserNickname(patient.getNickname());
-            vo.setUserPhone(patient.getPhone());
-        }
-        vo.setMyUnread(asDoctor ? s.getDoctorUnread() : s.getUserUnread());
-        return vo;
+    private static ConsultSessionVo toVo(ConsultSession s, boolean asDoctor,
+                                         @Nullable PetDisplayVo pet, @Nullable Doctor doctor, @Nullable SysUser patient) {
+        return new ConsultSessionVo(
+                s.getId(),
+                s.getAppointmentId(),
+                s.getUserId(),
+                s.getDoctorId(),
+                s.getPetId(),
+                s.getSymptom(),
+                s.getImages(),
+                s.getSummary(),
+                s.getStatus(),
+                s.getModerateStatus(),
+                s.getModerateReason(),
+                s.getModerateBy(),
+                s.getModerateTime(),
+                s.getLastMessage(),
+                s.getLastMessageTime(),
+                s.getUserUnread(),
+                s.getDoctorUnread(),
+                s.getStartTime(),
+                s.getEndTime(),
+                s.getCreateTime(),
+                pet == null ? null : pet.name(),
+                doctor == null ? null : doctor.getName(),
+                doctor == null ? null : doctor.getAvatar(),
+                patient == null ? null : patient.getNickname(),
+                patient == null ? null : patient.getPhone(),
+                asDoctor ? s.getDoctorUnread() : s.getUserUnread()
+        );
+    }
+
+    public static ConsultMessageVo toMessageVo(ConsultMessage m) {
+        return new ConsultMessageVo(
+                m.getId(),
+                m.getSessionId(),
+                m.getSenderId(),
+                m.getSenderRole(),
+                m.getSenderName(),
+                m.getSenderAvatar(),
+                m.getMsgType(),
+                m.getContent(),
+                m.getIsRead(),
+                m.getHidden(),
+                m.getHiddenReason(),
+                m.getHiddenBy(),
+                m.getHiddenTime(),
+                m.getCreateTime()
+        );
     }
 
     private String preview(ConsultMsgType type, String text) {

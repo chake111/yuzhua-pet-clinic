@@ -39,7 +39,6 @@ import com.yuzhua.vo.PetDisplayVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -136,7 +135,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     private AppointmentVo doCreate(AppointmentForm req, @Nullable String key, @Nullable Long userId) {
         // 原因: 同 scheduleId 并发时先锁排班再查幂等键以直接收敛（空或跨排班并发由外层唯一键冲突兜底）；
         // 幂等回读置于参数校验前可避免参数微调触发误拒，且新建仅插新行而不锁既有预约，与取消路径不构成 AB-BA 死锁环
-        DoctorSchedule sch = req.getScheduleId() == null ? null : scheduleMapper.selectByIdForUpdate(req.getScheduleId());
+        DoctorSchedule sch = req.scheduleId() == null ? null : scheduleMapper.selectByIdForUpdate(req.scheduleId());
         if (key != null && userId != null) {
             Appointment existing = baseMapper.selectByUserAndIdemKey(userId, key);
             if (existing != null) {
@@ -144,10 +143,10 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
             }
         }
 
-        if (req.getPetId() == null) {
+        if (req.petId() == null) {
             throw BizException.notFound("宠物档案");
         }
-        Pet pet = petService.requireOwned(req.getPetId());
+        Pet pet = petService.requireOwned(req.petId());
         Doctor doctor = validateCreateTarget(req, sch, pet);
         DoctorSchedule validSch = Objects.requireNonNull(sch);
         Long schId = Objects.requireNonNull(validSch.getId());
@@ -167,20 +166,20 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     }
 
     private Doctor validateCreateTarget(AppointmentForm req, @Nullable DoctorSchedule sch, Pet pet) {
-        Doctor doctor = req.getDoctorId() == null ? null : doctorMapper.selectById(req.getDoctorId());
+        Doctor doctor = req.doctorId() == null ? null : doctorMapper.selectById(req.doctorId());
         if (doctor == null) {
             throw BizException.notFound("医生");
         }
         if (doctor.getStatus() != EnableStatus.ENABLED) {
             throw new BizException("该医生已停诊，请改约其他医生");
         }
-        if (req.getSymptom() == null || req.getSymptom().isBlank()) {
+        if (req.symptom() == null || req.symptom().isBlank()) {
             throw new BizException("请描述症状");
         }
         if (sch == null) {
             throw BizException.notFound("排班时段");
         }
-        if (!Objects.equals(sch.getDoctorId(), req.getDoctorId())) {
+        if (!Objects.equals(sch.getDoctorId(), req.doctorId())) {
             throw new BizException("所选时段不属于该医生");
         }
         if (sch.getStatus() != EnableStatus.ENABLED) {
@@ -211,8 +210,8 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         a.setPeriod(sch.getPeriod());
         a.setStartTime(sch.getStartTime());
         a.setEndTime(sch.getEndTime());
-        a.setSymptom(Objects.requireNonNull(req.getSymptom()).trim());
-        a.setImages(blankToNull(req.getImages()));
+        a.setSymptom(Objects.requireNonNull(req.symptom()).trim());
+        a.setImages(blankToNull(req.images()));
         DoctorService.requireFee(doctor.getConsultationFee());
         a.setAmount(doctor.getConsultationFee());
         a.setPayStatus(PayStatus.UNPAID);
@@ -500,11 +499,11 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         if (!Objects.equals(existing.getUserId(), UserContext.requireId())) {
             throw BizException.notFound("预约记录");
         }
-        if (!Objects.equals(existing.getPetId(), req.getPetId())
-                || !Objects.equals(existing.getScheduleId(), req.getScheduleId())) {
+        if (!Objects.equals(existing.getPetId(), req.petId())
+                || !Objects.equals(existing.getScheduleId(), req.scheduleId())) {
             log.warn("幂等键重放参数不一致，返回原单：appointment={} 首次 pet={} schedule={} 本次 pet={} schedule={}",
                     existing.getId(), existing.getPetId(), existing.getScheduleId(),
-                    req.getPetId(), req.getScheduleId());
+                    req.petId(), req.scheduleId());
         }
         return detailOf(existing, false);
     }
@@ -605,7 +604,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     private VoLookup loadVoLookup(List<Appointment> rows, boolean withPatient) {
         // 原因: 宠物档案逻辑删除后旧单据仍需展示宠物信息，走历史查询而非普通 selectBatchIds
         Map<Long, PetDisplayVo> pets = BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
-                BatchLookup.ids(rows, Appointment::getPetId), PetDisplayVo::getId);
+                BatchLookup.ids(rows, Appointment::getPetId), PetDisplayVo::id);
         Map<Long, Doctor> doctors = BatchLookup.mapByIds(doctorMapper::selectBatchIds,
                 BatchLookup.ids(rows, Appointment::getDoctorId), Doctor::getId);
         Set<Long> deptIds = new HashSet<>(BatchLookup.ids(doctors.values(), Doctor::getDepartmentId));
@@ -637,36 +636,55 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     }
 
     private AppointmentVo toVo(Appointment a, VoLookup lookup, boolean withPatient) {
-        AppointmentVo vo = new AppointmentVo();
-        BeanUtils.copyProperties(a, vo);
-        if (a.getCreateTime() != null) {
-            vo.setPayDeadline(a.getCreateTime().plusMinutes(props.getPayTimeoutMinutes()));
-        }
+        LocalDateTime payDeadline = a.getCreateTime() == null
+                ? null
+                : a.getCreateTime().plusMinutes(props.getPayTimeoutMinutes());
         PetDisplayVo pet = lookup.pets().get(a.getPetId());
-        if (pet != null) {
-            vo.setPetName(pet.getName());
-            vo.setPetSpecies(pet.getSpecies());
-            vo.setPetBreed(pet.getBreed());
-            vo.setPetAvatar(pet.getAvatar());
-        }
         Doctor d = lookup.doctors().get(a.getDoctorId());
-        if (d != null) {
-            vo.setDoctorName(d.getName());
-            vo.setDoctorTitle(d.getTitle());
-            vo.setDoctorAvatar(d.getAvatar());
-        }
         Department dept = lookup.depts().get(a.getDepartmentId());
-        vo.setDepartmentName(dept == null ? null : dept.getName());
-        if (withPatient) {
-            SysUser u = lookup.users().get(a.getUserId());
-            if (u != null) {
-                vo.setUserNickname(u.getNickname());
-                vo.setUserPhone(u.getPhone());
-            }
-        }
-        vo.setSessionId(lookup.sessionIds().get(a.getId()));
-        vo.setRecordId(lookup.recordIds().get(a.getId()));
-        return vo;
+        SysUser u = withPatient ? lookup.users().get(a.getUserId()) : null;
+        return new AppointmentVo(
+                a.getId(),
+                a.getOrderNo(),
+                a.getUserId(),
+                a.getPetId(),
+                a.getDoctorId(),
+                a.getDepartmentId(),
+                a.getScheduleId(),
+                a.getConsultType(),
+                a.getAppointmentDate(),
+                a.getPeriod(),
+                a.getStartTime(),
+                a.getEndTime(),
+                a.getQueueNo(),
+                a.getSymptom(),
+                a.getImages(),
+                a.getAmount(),
+                a.getPayStatus(),
+                a.getPayTime(),
+                a.getPayType(),
+                a.getStatus(),
+                a.getAcceptTime(),
+                a.getFinishTime(),
+                a.getCancelReason(),
+                a.getCancelTime(),
+                a.getCancelBy(),
+                a.getIsReviewed(),
+                a.getCreateTime(),
+                pet == null ? null : pet.name(),
+                pet == null ? null : pet.species(),
+                pet == null ? null : pet.breed(),
+                pet == null ? null : pet.avatar(),
+                d == null ? null : d.getName(),
+                d == null ? null : d.getTitle(),
+                d == null ? null : d.getAvatar(),
+                dept == null ? null : dept.getName(),
+                payDeadline,
+                lookup.sessionIds().get(a.getId()),
+                lookup.recordIds().get(a.getId()),
+                u == null ? null : u.getNickname(),
+                u == null ? null : u.getPhone()
+        );
     }
 
     private record VoLookup(

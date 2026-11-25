@@ -6,12 +6,13 @@ import com.yuzhua.domain.enums.AdminRole;
 import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.DoctorForm;
 import com.yuzhua.dto.DoctorQuery;
-import com.yuzhua.entity.Doctor;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.DoctorService;
+import com.yuzhua.vo.AdminDoctorDetailVo;
 import com.yuzhua.vo.DoctorVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,19 +42,19 @@ public class DoctorController {
 
     @Operation(summary = "医生详情（编辑表单用，含手机号）")
     @GetMapping("/{id}")
-    public Result<Doctor> detail(@PathVariable Long id) {
-        return Result.ok(doctorService.require(id));
+    public Result<AdminDoctorDetailVo> detail(@PathVariable Long id) {
+        return Result.ok(doctorService.detailForAdmin(id));
     }
 
     @Operation(summary = "新增医生")
     @PostMapping
-    public Result<Doctor> create(@RequestBody DoctorForm req) {
+    public Result<DoctorVo> create(@Valid @RequestBody DoctorForm req) {
         return Result.ok("已新增", doctorService.create(req));
     }
 
     @Operation(summary = "修改医生（评分/接诊量/在线状态由系统维护，不在请求表单里）")
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody DoctorForm req) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody DoctorForm req) {
         doctorService.update(id, req);
         return Result.ok("已保存", null);
     }

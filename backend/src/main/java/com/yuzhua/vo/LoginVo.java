@@ -2,24 +2,20 @@ package com.yuzhua.vo;
 
 import com.yuzhua.domain.enums.TokenType;
 import com.yuzhua.domain.enums.UserRole;
-import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
-@Data
-public class LoginVo {
-
-    private @Nullable String token;
-
-    private @Nullable Long id;
-    private @Nullable String username;
-    private @Nullable String name;
-    private @Nullable String avatar;
-    private @Nullable String phone;
-    private @Nullable String email;
-
-    private @Nullable TokenType typ;
-    private @Nullable UserRole role;
-    private @Nullable Long doctorId;
-    private @Nullable String doctorName;
-    private @Nullable String departmentName;
+public record LoginVo(
+        @Nullable String token,
+        @Nullable Long id,
+        @Nullable String username,
+        @Nullable String name,
+        @Nullable String avatar,
+        @Nullable String phone,
+        @Nullable String email,
+        @Nullable TokenType typ,
+        @Nullable UserRole role,
+        @Nullable Long doctorId,
+        @Nullable String doctorName,
+        @Nullable String departmentName
+) {
 }

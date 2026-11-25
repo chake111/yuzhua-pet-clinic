@@ -1,14 +1,31 @@
 package com.yuzhua.vo;
 
-import com.yuzhua.entity.Pet;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
-public class PetVo extends Pet {
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
-    private @Nullable String userNickname;
-    private @Nullable String userPhone;
+public record PetVo(
+        @Nullable Long id,
+        @Nullable Long userId,
+        @Nullable String name,
+        @Nullable String species,
+        @Nullable String breed,
+        @Nullable Integer gender,
+        @Nullable LocalDate birthday,
+        @Nullable Integer ageMonth,
+        @Nullable BigDecimal weight,
+        @Nullable String color,
+        @Nullable Integer isNeutered,
+        @Nullable Integer vaccineStatus,
+        @Nullable Integer dewormFlag,
+        @Nullable String avatar,
+        @Nullable String allergy,
+        @Nullable String medicalHistory,
+        @Nullable String remark,
+        @Nullable LocalDateTime createTime,
+        @Nullable String userNickname,
+        @Nullable String userPhone
+) {
 }

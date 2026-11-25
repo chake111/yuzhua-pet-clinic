@@ -17,7 +17,6 @@ import com.yuzhua.security.UserContext;
 import com.yuzhua.vo.PetVo;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,15 +35,19 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
 
     private final SysUserMapper sysUserMapper;
 
-    public List<Pet> listMine() {
+    public List<PetVo> listMine() {
         return list(Wrappers.<Pet>lambdaQuery()
                 .eq(Pet::getUserId, UserContext.requireId())
-                .orderByDesc(Pet::getCreateTime)).stream().map(this::currentAge).toList();
+                .orderByDesc(Pet::getCreateTime))
+                .stream()
+                .map(this::currentAge)
+                .map(p -> toVo(p, null))
+                .toList();
     }
 
     /** 事务内校验并创建当前登录用户的宠物档案，有生日时按生日推算月龄。 */
     @Transactional
-    public Pet create(PetForm form) {
+    public PetVo create(PetForm form) {
         validate(form);
         Pet pet = new Pet();
         pet.setUserId(UserContext.requireId());
@@ -64,7 +67,7 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
         pet.setMedicalHistory(form.getMedicalHistory());
         pet.setRemark(form.getRemark());
         save(pet);
-        return pet;
+        return toVo(pet, null);
     }
 
     /** 校验本人归属后执行更新，支持生日与体重字段的三态显式清空。 */
@@ -91,10 +94,14 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
         return pet;
     }
 
-    public List<Pet> listByUser(Long userId) {
+    public List<PetVo> listByUser(Long userId) {
         return list(Wrappers.<Pet>lambdaQuery()
                 .eq(Pet::getUserId, userId)
-                .orderByDesc(Pet::getCreateTime)).stream().map(this::currentAge).toList();
+                .orderByDesc(Pet::getCreateTime))
+                .stream()
+                .map(this::currentAge)
+                .map(p -> toVo(p, null))
+                .toList();
     }
 
     public PageResult<PetVo> pageForAdmin(PetQuery q) {
@@ -114,14 +121,7 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
                 BatchLookup.ids(page.getRecords(), Pet::getUserId), SysUser::getId);
         List<PetVo> rows = page.getRecords().stream().map(p -> {
             currentAge(p);
-            PetVo vo = new PetVo();
-            BeanUtils.copyProperties(p, vo);
-            SysUser owner = owners.get(p.getUserId());
-            if (owner != null) {
-                vo.setUserNickname(owner.getNickname());
-                vo.setUserPhone(owner.getPhone());
-            }
-            return vo;
+            return toVo(p, owners.get(p.getUserId()));
         }).toList();
         return PageResult.of(page, rows);
     }
@@ -200,5 +200,30 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
     private Pet currentAge(Pet pet) {
         pet.setAgeMonth(deriveAgeMonth(pet.getBirthday(), pet.getAgeMonth()));
         return pet;
+    }
+
+    public static PetVo toVo(Pet p, @Nullable SysUser owner) {
+        return new PetVo(
+                p.getId(),
+                p.getUserId(),
+                p.getName(),
+                p.getSpecies(),
+                p.getBreed(),
+                p.getGender(),
+                p.getBirthday(),
+                p.getAgeMonth(),
+                p.getWeight(),
+                p.getColor(),
+                p.getIsNeutered(),
+                p.getVaccineStatus(),
+                p.getDewormFlag(),
+                p.getAvatar(),
+                p.getAllergy(),
+                p.getMedicalHistory(),
+                p.getRemark(),
+                p.getCreateTime(),
+                owner == null ? null : owner.getNickname(),
+                owner == null ? null : owner.getPhone()
+        );
     }
 }

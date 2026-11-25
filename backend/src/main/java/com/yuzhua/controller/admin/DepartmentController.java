@@ -6,11 +6,12 @@ import com.yuzhua.domain.enums.AdminRole;
 import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.DepartmentForm;
 import com.yuzhua.dto.PageQuery;
-import com.yuzhua.entity.Department;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.DepartmentService;
+import com.yuzhua.vo.DepartmentVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,27 +38,27 @@ public class DepartmentController {
     @Operation(summary = "科室分页")
     @GetMapping("/page")
     @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
-    public Result<PageResult<Department>> page(PageQuery query,
-                                               @RequestParam(required = false) @Nullable String keyword) {
+    public Result<PageResult<DepartmentVo>> page(PageQuery query,
+                                                 @RequestParam(required = false) @Nullable String keyword) {
         return Result.ok(departmentService.page(query, keyword));
     }
 
     @Operation(summary = "全部科室（下拉选项用）")
     @GetMapping("/list")
     @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
-    public Result<List<Department>> list() {
+    public Result<List<DepartmentVo>> list() {
         return Result.ok(departmentService.listEnabled());
     }
 
     @Operation(summary = "新增科室")
     @PostMapping
-    public Result<Department> create(@RequestBody DepartmentForm req) {
+    public Result<DepartmentVo> create(@Valid @RequestBody DepartmentForm req) {
         return Result.ok("已新增", departmentService.create(req));
     }
 
     @Operation(summary = "修改科室")
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody DepartmentForm req) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody DepartmentForm req) {
         departmentService.update(id, req);
         return Result.ok("已保存", null);
     }

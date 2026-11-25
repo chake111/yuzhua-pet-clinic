@@ -19,6 +19,7 @@ import com.yuzhua.mapper.AppointmentMapper;
 import com.yuzhua.mapper.DepartmentMapper;
 import com.yuzhua.mapper.DoctorMapper;
 import com.yuzhua.mapper.DoctorScheduleMapper;
+import com.yuzhua.vo.ScheduleBatchSummaryVo;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -386,7 +387,7 @@ class DoctorScheduleServiceTest {
     void batchCreateSkipsPastAndUnmatchedWeekdays() {
         when(doctorMapper.selectById(10L)).thenReturn(doctor(10L, 5L, 1));
 
-        DoctorScheduleService.BatchSummary past = service.batchCreate(batch(10L,
+        ScheduleBatchSummaryVo past = service.batchCreate(batch(10L,
                 LocalDate.now().minusDays(5), LocalDate.now().minusDays(1),
                 List.of(1, 2, 3, 4, 5, 6, 7),
                 List.of(template(1, 9, 11, 10)), null));
@@ -395,7 +396,7 @@ class DoctorScheduleServiceTest {
 
         LocalDate future = LocalDate.now().plusDays(1);
         int otherWeekday = future.getDayOfWeek().getValue() % 7 + 1;
-        DoctorScheduleService.BatchSummary unmatched = service.batchCreate(batch(10L, future, future,
+        ScheduleBatchSummaryVo unmatched = service.batchCreate(batch(10L, future, future,
                 List.of(otherWeekday), List.of(template(1, 9, 11, 10)), null));
         assertThat(unmatched.created()).isZero();
         assertThat(unmatched.skipped()).isZero();
@@ -408,7 +409,7 @@ class DoctorScheduleServiceTest {
         LocalDate date = LocalDate.now().plusDays(1);
         when(scheduleMapper.exists(any())).thenReturn(true);
 
-        DoctorScheduleService.BatchSummary summary = service.batchCreate(batch(10L, date, date,
+        ScheduleBatchSummaryVo summary = service.batchCreate(batch(10L, date, date,
                 List.of(date.getDayOfWeek().getValue()),
                 List.of(template(1, 9, 11, 10)), null));
 
@@ -429,7 +430,7 @@ class DoctorScheduleServiceTest {
             return true;
         }).when(service).saveBatch(anyCollection(), anyInt());
 
-        DoctorScheduleService.BatchSummary summary = service.batchCreate(batch(10L, date, date,
+        ScheduleBatchSummaryVo summary = service.batchCreate(batch(10L, date, date,
                 List.of(date.getDayOfWeek().getValue()),
                 List.of(template(1, 9, 11, 10), template(2, 13, 15, 8)), null));
 
@@ -458,7 +459,7 @@ class DoctorScheduleServiceTest {
             return true;
         }).when(service).saveBatch(anyCollection(), anyInt());
 
-        DoctorScheduleService.BatchSummary summary = service.batchCreate(batch(10L, date, date,
+        ScheduleBatchSummaryVo summary = service.batchCreate(batch(10L, date, date,
                 List.of(date.getDayOfWeek().getValue()),
                 List.of(template(1, 9, 11, 10)), 20));
 
@@ -555,15 +556,16 @@ class DoctorScheduleServiceTest {
             int before = saveCalls;
             s.create(f);
             assertThat(saveCalls).as("create 应恰好落库一次").isEqualTo(before + 1);
-            assertThat(saved.getStartTime()).as("边界时间未保存").isEqualTo(f.getStartTime());
+            assertThat(saved.getStartTime()).as("边界时间未保存").isEqualTo(f.startTime());
             assertThat(s.batchCreate(batch(f)).created()).as("批量边界失败").isEqualTo(1);
-            f.setStartTime(f.getStartTime().minusSeconds(1));
-            reject(() -> s.create(f), "排班时间须在");
-            reject(() -> s.batchCreate(batch(f)), "排班时间须在");
-            f.setStartTime(LocalTime.parse(bounds[i][0]));
-            f.setEndTime(f.getEndTime().plusSeconds(1));
-            reject(() -> s.create(f), "排班时间须在");
-            reject(() -> s.batchCreate(batch(f)), "排班时间须在");
+            ScheduleForm earlyStart = new ScheduleForm(f.doctorId(), f.workDate(), f.period(),
+                    f.startTime().minusSeconds(1), f.endTime(), f.totalNum(), f.status());
+            reject(() -> s.create(earlyStart), "排班时间须在");
+            reject(() -> s.batchCreate(batch(earlyStart)), "排班时间须在");
+            ScheduleForm lateEnd = new ScheduleForm(f.doctorId(), f.workDate(), f.period(),
+                    f.startTime(), f.endTime().plusSeconds(1), f.totalNum(), f.status());
+            reject(() -> s.create(lateEnd), "排班时间须在");
+            reject(() -> s.batchCreate(batch(lateEnd)), "排班时间须在");
         }
     }
 
@@ -614,9 +616,8 @@ class DoctorScheduleServiceTest {
         current.setEndTime(LocalTime.of(16, 0));
         current.setStatus(EnableStatus.DISABLED);
 
-        ScheduleForm base = form(1, "14:00", "16:00");
-        base.setWorkDate(current.getWorkDate());
-        base.setTotalNum(25);
+        ScheduleForm base = new ScheduleForm(1L, current.getWorkDate(), SchedulePeriod.MORNING,
+                LocalTime.of(14, 0), LocalTime.of(16, 0), 25, EnableStatus.ENABLED);
         ScheduleEditForm old = edit(base);
         for (long count : new long[]{0, 2}) {
             refs = count;
@@ -625,21 +626,23 @@ class DoctorScheduleServiceTest {
             assertThat(saved.getRemainNum()).as("旧排班保存失败").isEqualTo(25 - count);
             assertThat(saved.getStartTime()).as("旧排班保存失败").isEqualTo(current.getStartTime());
         }
-        old.setStartTime(LocalTime.of(9, 0));
-        old.setEndTime(LocalTime.of(11, 0));
-        reject(() -> s.update(9L, old), "条预约记录");
+        ScheduleEditForm changedTime = new ScheduleEditForm(old.doctorId(), old.workDate(), old.period(),
+                LocalTime.of(9, 0), LocalTime.of(11, 0), old.totalNum());
+        reject(() -> s.update(9L, changedTime), "条预约记录");
         refs = 0;
-        s.update(9L, old);
+        s.update(9L, changedTime);
         assertThat(saved.getStartTime()).as("修正时间失败").isEqualTo(LocalTime.of(9, 0));
-        old.setEndTime(LocalTime.of(13, 0));
-        reject(() -> s.update(9L, old), "排班时间须在");
-        old.setPeriod(SchedulePeriod.AFTERNOON);
-        old.setStartTime(LocalTime.of(9, 0));
-        old.setEndTime(LocalTime.of(11, 0));
-        reject(() -> s.update(9L, old), "排班时间须在");
+        ScheduleEditForm badWindow = new ScheduleEditForm(changedTime.doctorId(), changedTime.workDate(),
+                changedTime.period(), changedTime.startTime(), LocalTime.of(13, 0), changedTime.totalNum());
+        reject(() -> s.update(9L, badWindow), "排班时间须在");
+        ScheduleEditForm badPeriod = new ScheduleEditForm(changedTime.doctorId(), changedTime.workDate(),
+                SchedulePeriod.AFTERNOON, LocalTime.of(9, 0), LocalTime.of(11, 0), changedTime.totalNum());
+        reject(() -> s.update(9L, badPeriod), "排班时间须在");
 
-        ScheduleBatchForm duplicate = batch(form(1, "09:00", "11:00"));
-        duplicate.setPeriods(List.of(duplicate.getPeriods().get(0), duplicate.getPeriods().get(0)));
+        ScheduleBatchForm baseBatch = batch(form(1, "09:00", "11:00"));
+        ScheduleBatchForm duplicate = new ScheduleBatchForm(
+                baseBatch.doctorId(), baseBatch.startDate(), baseBatch.endDate(), baseBatch.weekDays(),
+                List.of(baseBatch.periods().get(0), baseBatch.periods().get(0)), baseBatch.overrideTotalNum());
         reject(() -> s.batchCreate(duplicate), "每个时段只能配置一次");
     }
 
@@ -657,9 +660,8 @@ class DoctorScheduleServiceTest {
         current.setStatus(EnableStatus.ENABLED);
 
         doctorStatus = 0;
-        ScheduleForm base = form(1, "14:00", "16:00");
-        base.setWorkDate(current.getWorkDate());
-        base.setTotalNum(25);
+        ScheduleForm base = new ScheduleForm(1L, current.getWorkDate(), SchedulePeriod.MORNING,
+                LocalTime.of(14, 0), LocalTime.of(16, 0), 25, EnableStatus.ENABLED);
         ScheduleEditForm maintenance = edit(base);
         s.update(9L, maintenance);
         assertThat(saved.getTotalNum()).as("停诊医生调整号源失败").isEqualTo(25);
@@ -672,8 +674,8 @@ class DoctorScheduleServiceTest {
         assertThat(saved.getStatus()).as("编辑路径不应写 status").isNull();
 
         // 停诊中改容量可以，但恢复出诊只能走 resumeClinic，且要求医生仍在诊
-        ScheduleForm restoreBase = form(1, "14:00", "16:00");
-        restoreBase.setWorkDate(current.getWorkDate());
+        ScheduleForm restoreBase = new ScheduleForm(1L, current.getWorkDate(), SchedulePeriod.MORNING,
+                LocalTime.of(14, 0), LocalTime.of(16, 0), 20, EnableStatus.ENABLED);
         ScheduleEditForm restore = edit(restoreBase);
         reject(() -> s.resumeClinic(9L), "该医生处于停诊状态");
         reject(() -> s.create(form(1, "09:00", "11:00")), "该医生处于停诊状态");
@@ -701,8 +703,8 @@ class DoctorScheduleServiceTest {
                 Doctor d = new Doctor();
                 d.setId(1L);
                 d.setStatus(doctorStatus == 1 ? EnableStatus.ENABLED : EnableStatus.DISABLED);
-                return d;
-            }), mapper(AppointmentMapper.class, name -> refs), null);
+                return "selectBatchIds".equals(name) ? List.of(d) : d;
+            }), mapper(AppointmentMapper.class, name -> refs), mapper(DepartmentMapper.class, name -> List.of()));
             baseMapper = mapper(DoctorScheduleMapper.class, name -> current);
         }
 
@@ -788,91 +790,82 @@ class DoctorScheduleServiceTest {
 
     private static ScheduleForm form(Long doctorId, LocalDate date, Integer period,
                                      LocalTime start, LocalTime end, Integer total, Integer status) {
-        ScheduleForm form = new ScheduleForm();
-        form.setDoctorId(doctorId);
-        form.setWorkDate(date);
-        form.setPeriod(period == null ? null : CodedEnum.fromCode(SchedulePeriod.class, period));
-        form.setStartTime(start);
-        form.setEndTime(end);
-        form.setTotalNum(total);
-        form.setStatus(status == null ? null : CodedEnum.fromCode(EnableStatus.class, status));
-        return form;
+        return new ScheduleForm(
+                doctorId,
+                date,
+                period == null ? null : CodedEnum.fromCode(SchedulePeriod.class, period),
+                start,
+                end,
+                total,
+                status == null ? null : CodedEnum.fromCode(EnableStatus.class, status)
+        );
     }
 
     /** 内存替身用的边界入参：日期固定为明天，号源 20 */
     static ScheduleForm form(int period, String start, String end) {
-        ScheduleForm f = new ScheduleForm();
-        f.setDoctorId(1L);
-        f.setWorkDate(LocalDate.now().plusDays(1));
-        f.setPeriod(CodedEnum.fromCode(SchedulePeriod.class, period));
-        f.setStartTime(LocalTime.parse(start));
-        f.setEndTime(LocalTime.parse(end));
-        f.setTotalNum(20);
-        f.setStatus(EnableStatus.ENABLED);
-        return f;
+        return new ScheduleForm(
+                1L,
+                LocalDate.now().plusDays(1),
+                CodedEnum.fromCode(SchedulePeriod.class, period),
+                LocalTime.parse(start),
+                LocalTime.parse(end),
+                20,
+                EnableStatus.ENABLED
+        );
     }
 
     private static ScheduleEditForm edit(Long doctorId, LocalDate date, Integer period,
                                          LocalTime start, LocalTime end, Integer total) {
-        ScheduleEditForm form = new ScheduleEditForm();
-        form.setDoctorId(doctorId);
-        form.setWorkDate(date);
-        form.setPeriod(period == null ? null : CodedEnum.fromCode(SchedulePeriod.class, period));
-        form.setStartTime(start);
-        form.setEndTime(end);
-        form.setTotalNum(total);
-        return form;
+        return new ScheduleEditForm(
+                doctorId,
+                date,
+                period == null ? null : CodedEnum.fromCode(SchedulePeriod.class, period),
+                start,
+                end,
+                total
+        );
     }
 
     /** 编辑入参：字段与 ScheduleForm 相同，唯独没有 status——状态不在这条写入路径上 */
     static ScheduleEditForm edit(ScheduleForm f) {
-        ScheduleEditForm e = new ScheduleEditForm();
-        e.setDoctorId(f.getDoctorId());
-        e.setWorkDate(f.getWorkDate());
-        e.setPeriod(f.getPeriod());
-        e.setStartTime(f.getStartTime());
-        e.setEndTime(f.getEndTime());
-        e.setTotalNum(f.getTotalNum());
-        return e;
+        return new ScheduleEditForm(
+                f.doctorId(),
+                f.workDate(),
+                f.period(),
+                f.startTime(),
+                f.endTime(),
+                f.totalNum()
+        );
     }
 
     private static ScheduleBatchForm batch(Long doctorId, LocalDate start, LocalDate end,
                                            List<Integer> weekDays,
                                            List<ScheduleBatchForm.PeriodTemplate> periods,
                                            Integer overrideTotalNum) {
-        ScheduleBatchForm form = new ScheduleBatchForm();
-        form.setDoctorId(doctorId);
-        form.setStartDate(start);
-        form.setEndDate(end);
-        form.setWeekDays(weekDays);
-        form.setPeriods(periods);
-        form.setOverrideTotalNum(overrideTotalNum);
-        return form;
+        return new ScheduleBatchForm(doctorId, start, end, weekDays, periods, overrideTotalNum);
     }
 
     static ScheduleBatchForm batch(ScheduleForm f) {
-        ScheduleBatchForm b = new ScheduleBatchForm();
-        b.setDoctorId(f.getDoctorId());
-        b.setStartDate(f.getWorkDate());
-        b.setEndDate(f.getWorkDate());
-        b.setWeekDays(List.of(f.getWorkDate().getDayOfWeek().getValue()));
-        ScheduleBatchForm.PeriodTemplate p = new ScheduleBatchForm.PeriodTemplate();
-        p.setPeriod(f.getPeriod());
-        p.setStartTime(f.getStartTime());
-        p.setEndTime(f.getEndTime());
-        p.setTotalNum(20);
-        b.setPeriods(List.of(p));
-        return b;
+        ScheduleBatchForm.PeriodTemplate p = new ScheduleBatchForm.PeriodTemplate(
+                f.period(), f.startTime(), f.endTime(), 20);
+        return new ScheduleBatchForm(
+                f.doctorId(),
+                f.workDate(),
+                f.workDate(),
+                List.of(f.workDate().getDayOfWeek().getValue()),
+                List.of(p),
+                null
+        );
     }
 
     private static ScheduleBatchForm.PeriodTemplate template(Integer period,
                                                              int startHour, int endHour, int total) {
-        ScheduleBatchForm.PeriodTemplate template = new ScheduleBatchForm.PeriodTemplate();
-        template.setPeriod(period == null ? null : CodedEnum.fromCode(SchedulePeriod.class, period));
-        template.setStartTime(LocalTime.of(startHour, 0));
-        template.setEndTime(LocalTime.of(endHour, 0));
-        template.setTotalNum(total);
-        return template;
+        return new ScheduleBatchForm.PeriodTemplate(
+                period == null ? null : CodedEnum.fromCode(SchedulePeriod.class, period),
+                LocalTime.of(startHour, 0),
+                LocalTime.of(endHour, 0),
+                total
+        );
     }
 
     private static BizException biz(Runnable action) {

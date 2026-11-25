@@ -2,10 +2,10 @@ package com.yuzhua.controller.client;
 
 import com.yuzhua.common.Result;
 import com.yuzhua.dto.AuthDto;
-import com.yuzhua.entity.SysUser;
 import com.yuzhua.security.PublicEndpoint;
 import com.yuzhua.service.SysUserService;
 import com.yuzhua.vo.LoginVo;
+import com.yuzhua.vo.UserVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -43,7 +43,7 @@ public class AuthController {
 
     @Operation(summary = "当前登录用户资料")
     @GetMapping("/profile")
-    public Result<SysUser> profile() {
+    public Result<UserVo> profile() {
         return Result.ok(sysUserService.current());
     }
 

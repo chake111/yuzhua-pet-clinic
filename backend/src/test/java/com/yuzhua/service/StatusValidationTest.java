@@ -115,11 +115,7 @@ class StatusValidationTest {
     }
 
     static DepartmentForm department(String name, String code, EnableStatus status) {
-        DepartmentForm d = new DepartmentForm();
-        d.setName(name);
-        d.setCode(code);
-        d.setStatus(status);
-        return d;
+        return new DepartmentForm(name, code, null, null, null, status);
     }
 
     void reject(Runnable action, String message) {
@@ -186,7 +182,7 @@ class StatusValidationTest {
             super(mapper(DepartmentMapper.class, name -> {
                         Department d = new Department();
                         d.setId(1L);
-                        return d;
+                        return "selectBatchIds".equals(name) ? java.util.List.of(d) : d;
                     }),
                     mapper(DoctorScheduleMapper.class, name -> null),
                     mapper(AppointmentMapper.class, name -> 0L),
@@ -223,12 +219,8 @@ class StatusValidationTest {
     }
 
     static DoctorForm doctor(EnableStatus status) {
-        DoctorForm d = new DoctorForm();
-        d.setName("陈明远");
-        d.setDepartmentId(1L);
-        d.setConsultationFee(new BigDecimal("50"));
-        d.setStatus(status);
-        return d;
+        return new DoctorForm("陈明远", null, null, null, null, 1L,
+                null, null, null, new BigDecimal("50"), status, null);
     }
 
     static Doctor doctorEntity(EnableStatus status) {
@@ -328,12 +320,7 @@ class StatusValidationTest {
     }
 
     static NoticeForm notice(String title, NoticeType type, Integer topFlag) {
-        NoticeForm f = new NoticeForm();
-        f.setTitle(title);
-        f.setType(type);
-        f.setTopFlag(topFlag);
-        f.setStatus(NoticeStatus.DRAFT);
-        return f;
+        return new NoticeForm(title, null, null, null, type, topFlag, NoticeStatus.DRAFT);
     }
 
     void assertNoWrite(NoticeSvc s) {

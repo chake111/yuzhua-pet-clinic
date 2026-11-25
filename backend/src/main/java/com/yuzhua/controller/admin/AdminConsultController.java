@@ -7,9 +7,9 @@ import com.yuzhua.domain.enums.ConsultModerationStatus;
 import com.yuzhua.dto.ConsultCloseForm;
 import com.yuzhua.dto.ConsultQuery;
 import com.yuzhua.dto.ConsultMessageQuery;
-import com.yuzhua.entity.ConsultMessage;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.ConsultService;
+import com.yuzhua.vo.ConsultMessageVo;
 import com.yuzhua.vo.ConsultSessionVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -66,15 +66,16 @@ public class AdminConsultController {
     @Operation(summary = "结束问诊，可附一段问诊小结（线上只建议、确诊要面诊）")
     @PostMapping("/{id}/close")
     @RequireRole(AdminRole.DOCTOR)
-    public Result<Void> close(@PathVariable Long id, @RequestBody(required = false) @Nullable ConsultCloseForm form) {
-        consultService.close(id, form == null ? null : form.getSummary());
+    public Result<Void> close(@PathVariable Long id,
+                              @RequestBody(required = false) @Valid @Nullable ConsultCloseForm form) {
+        consultService.close(id, form == null ? null : form.summary());
         return Result.ok("已结束", null);
     }
 
     @Operation(summary = "会话历史消息，新→旧分页（医生走参与方校验；管理员只读）")
     @GetMapping("/{id}/messages")
     @RequireRole({AdminRole.DOCTOR, AdminRole.ADMIN})
-    public Result<PageResult<ConsultMessage>> messages(@PathVariable Long id, @Valid ConsultMessageQuery query) {
+    public Result<PageResult<ConsultMessageVo>> messages(@PathVariable Long id, @Valid ConsultMessageQuery query) {
         return Result.ok(consultService.historyForViewer(id, query));
     }
 

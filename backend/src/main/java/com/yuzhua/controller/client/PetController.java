@@ -2,10 +2,11 @@ package com.yuzhua.controller.client;
 
 import com.yuzhua.common.Result;
 import com.yuzhua.dto.PetForm;
-import com.yuzhua.entity.Pet;
 import com.yuzhua.service.PetService;
+import com.yuzhua.vo.PetVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,19 +29,19 @@ public class PetController {
 
     @Operation(summary = "我的宠物列表")
     @GetMapping
-    public Result<List<Pet>> list() {
+    public Result<List<PetVo>> list() {
         return Result.ok(petService.listMine());
     }
 
     @Operation(summary = "新增宠物")
     @PostMapping
-    public Result<Pet> create(@RequestBody PetForm req) {
+    public Result<PetVo> create(@Valid @RequestBody PetForm req) {
         return Result.ok("已保存", petService.create(req));
     }
 
     @Operation(summary = "修改宠物")
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody PetForm req) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody PetForm req) {
         petService.update(id, req);
         return Result.ok("已保存", null);
     }

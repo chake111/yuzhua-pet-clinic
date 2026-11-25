@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -109,7 +110,7 @@ class ExpireAndRaceIT extends MySqlITSupport {
         UserContext.set(clientUser());
         try {
             AppointmentVo vo = appointmentService.create(appointmentForm(petId));
-            return vo.getId();
+            return Objects.requireNonNull(vo.id());
         } finally {
             UserContext.clear();
         }

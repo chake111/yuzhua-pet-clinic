@@ -2,6 +2,9 @@ package com.yuzhua.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.yuzhua.entity.Appointment;
+import com.yuzhua.vo.DailyTrendItemVo;
+import com.yuzhua.vo.NamedCountVo;
+import com.yuzhua.vo.StatusCountVo;
 import lombok.Data;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -9,8 +12,8 @@ import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 public interface AppointmentMapper extends BaseMapper<Appointment> {
 
@@ -35,14 +38,14 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
     @Select("""
             SELECT DATE_FORMAT(appointment_date, '%Y-%m-%d') AS day,
                    COUNT(*)                                  AS cnt,
-                   SUM(CASE WHEN pay_status = 1 THEN amount ELSE 0 END) AS income
+                   IFNULL(SUM(CASE WHEN pay_status = 1 THEN amount ELSE 0 END), 0) AS income
             FROM appointment
             WHERE deleted = 0
               AND (#{doctorId,jdbcType=BIGINT} IS NULL OR doctor_id = #{doctorId,jdbcType=BIGINT})
               AND appointment_date BETWEEN DATE_SUB(CURDATE(), INTERVAL #{days} DAY) AND CURDATE()
             GROUP BY day ORDER BY day
             """)
-    List<Map<String, Object>> statDaily(@Param("days") int days, @Param("doctorId") @Nullable Long doctorId);
+    List<DailyTrendItemVo> statDaily(@Param("days") int days, @Param("doctorId") @Nullable Long doctorId);
 
     @Select("""
             SELECT status, COUNT(*) AS cnt FROM appointment
@@ -51,7 +54,7 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
               AND appointment_date BETWEEN DATE_SUB(CURDATE(), INTERVAL #{days} DAY) AND CURDATE()
             GROUP BY status ORDER BY status
             """)
-    List<Map<String, Object>> statStatus(@Param("days") int days, @Param("doctorId") @Nullable Long doctorId);
+    List<StatusCountVo> statStatus(@Param("days") int days, @Param("doctorId") @Nullable Long doctorId);
 
     @Select("""
             SELECT dep.name AS name, COUNT(*) AS cnt
@@ -61,7 +64,7 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
               AND a.appointment_date BETWEEN DATE_SUB(CURDATE(), INTERVAL #{days} DAY) AND CURDATE()
             GROUP BY dep.name ORDER BY cnt DESC
             """)
-    List<Map<String, Object>> statDepartment(@Param("days") int days, @Param("doctorId") @Nullable Long doctorId);
+    List<NamedCountVo> statDepartment(@Param("days") int days, @Param("doctorId") @Nullable Long doctorId);
 
     @Select("""
             SELECT d.name AS name, COUNT(*) AS cnt
@@ -70,7 +73,27 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
               AND a.appointment_date BETWEEN DATE_SUB(CURDATE(), INTERVAL #{days} DAY) AND CURDATE()
             GROUP BY d.id, d.name ORDER BY cnt DESC LIMIT #{limit}
             """)
-    List<Map<String, Object>> statTopDoctors(@Param("days") int days, @Param("limit") int limit);
+    List<NamedCountVo> statTopDoctors(@Param("days") int days, @Param("limit") int limit);
+
+    @Select("""
+            <script>
+            SELECT schedule_id AS scheduleId, COUNT(*) AS refCount
+            FROM appointment
+            WHERE deleted = 0 AND
+            <choose>
+              <when test='scheduleIds != null and scheduleIds.size() > 0'>
+                schedule_id IN
+                <foreach collection='scheduleIds' item='sid' open='(' separator=',' close=')'>#{sid}</foreach>
+              </when>
+              <otherwise>1 = 0</otherwise>
+            </choose>
+            GROUP BY schedule_id
+            </script>
+            """)
+    List<ScheduleRefCount> countRefsByScheduleIds(@Param("scheduleIds") Collection<Long> scheduleIds);
+
+    record ScheduleRefCount(Long scheduleId, long refCount) {
+    }
 
     // 原因: 统一用 CURDATE() 与 IFNULL(SUM, 0) 一次聚合今日五格，避免 JVM/DB 时区偏差与 null 拆箱异常
     @Select("""

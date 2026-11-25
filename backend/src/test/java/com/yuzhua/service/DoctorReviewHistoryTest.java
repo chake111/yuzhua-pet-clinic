@@ -119,11 +119,7 @@ class DoctorReviewHistoryTest {
     }
 
     static PetDisplayVo pet() {
-        PetDisplayVo p = new PetDisplayVo();
-        p.setId(2L);
-        p.setName("奶糖");
-        p.setSpecies("猫");
-        return p;
+        return new PetDisplayVo(2L, "奶糖", "猫", null, null);
     }
 
     static DoctorReview review() {
@@ -152,9 +148,9 @@ class DoctorReviewHistoryTest {
         PageResult<ReviewVo> page = s.pageForStaff(null, null, new PageQuery());
         assertEquals(1, page.getRecords().size());
         ReviewVo vo = page.getRecords().get(0);
-        assertEquals("奶糖", vo.getPetName());
-        assertEquals("猫", vo.getPetSpecies());
-        assertEquals("PC202610010001", vo.getOrderNo());
+        assertEquals("奶糖", vo.petName());
+        assertEquals("猫", vo.petSpecies());
+        assertEquals("PC202610010001", vo.orderNo());
         assertTrue(holder.historyIds.contains(2L), "评价应走 selectHistoryDisplay");
         assertFalse(holder.petBatchCalled, "不应退回过滤逻辑删除的 selectBatchIds");
     }

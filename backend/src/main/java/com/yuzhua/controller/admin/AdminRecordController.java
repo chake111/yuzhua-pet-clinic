@@ -6,12 +6,12 @@ import com.yuzhua.common.Result;
 import com.yuzhua.domain.enums.AdminRole;
 import com.yuzhua.dto.MedicalRecordForm;
 import com.yuzhua.dto.RecordQuery;
-import com.yuzhua.entity.MedicalRecord;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.MedicalRecordService;
 import com.yuzhua.vo.MedicalRecordVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,7 +39,7 @@ public class AdminRecordController {
     @Operation(summary = "某张预约单上的病历，未写则为空")
     @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     @GetMapping("/appointment/{appointmentId}")
-    public Result<MedicalRecord> ofAppointment(@PathVariable Long appointmentId) {
+    public Result<MedicalRecordVo> ofAppointment(@PathVariable Long appointmentId) {
         return Result.ok(recordService.ofAppointmentForStaff(appointmentId));
     }
 
@@ -53,7 +53,7 @@ public class AdminRecordController {
     @Operation(summary = "书写 / 修订病历（诊断结论必填，仅医生账号，R4）")
     @RequireRole(AdminRole.DOCTOR)
     @PostMapping("/appointment/{appointmentId}")
-    public Result<MedicalRecord> save(@PathVariable Long appointmentId, @RequestBody MedicalRecordForm req) {
+    public Result<MedicalRecordVo> save(@PathVariable Long appointmentId, @Valid @RequestBody MedicalRecordForm req) {
         return Result.ok("病历已保存", recordService.saveOrUpdateForAppointment(appointmentId, req));
     }
 

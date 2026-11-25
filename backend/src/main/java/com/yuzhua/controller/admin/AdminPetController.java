@@ -10,6 +10,7 @@ import com.yuzhua.service.PetService;
 import com.yuzhua.vo.PetVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,7 +37,7 @@ public class AdminPetController {
 
     @Operation(summary = "修改宠物档案（纠正明显错误，归属不变）")
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody PetForm req) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody PetForm req) {
         petService.updateByAdmin(id, req);
         return Result.ok("已保存", null);
     }

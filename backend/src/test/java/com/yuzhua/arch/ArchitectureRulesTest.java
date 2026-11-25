@@ -11,6 +11,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
+import com.tngtech.archunit.core.domain.JavaParameter;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -21,11 +22,15 @@ import com.yuzhua.security.PublicEndpoint;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.task.SchedulerLease;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.BeanUtils;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -34,6 +39,7 @@ import java.util.TreeSet;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -51,6 +57,42 @@ class ArchitectureRulesTest {
                     "com.baomidou.mybatisplus.spring.service",
                     "com.baomidou.mybatisplus.spring.repository",
                     "com.baomidou.mybatisplus.extension.repository");
+
+    @Test
+    void arch01_layersAreStrictlyIsolated() {
+        ArchRule noEntityLeak = noClasses().that()
+                .resideInAnyPackage("com.yuzhua.controller..", "com.yuzhua.vo..", "com.yuzhua.dto..")
+                .should().dependOnClassesThat().resideInAPackage("com.yuzhua.entity..");
+        ArchRule noControllerMapperAccess = noClasses().that()
+                .resideInAPackage("com.yuzhua.controller..")
+                .should().dependOnClassesThat().resideInAPackage("com.yuzhua.mapper..");
+        ArchRule noReverseModelDeps = noClasses().that()
+                .resideInAnyPackage("com.yuzhua.vo..", "com.yuzhua.dto..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("com.yuzhua.service..", "com.yuzhua.mapper..", "com.yuzhua.controller..");
+        for (ArchRule rule : java.util.List.of(noEntityLeak, noControllerMapperAccess, noReverseModelDeps)) {
+            rule.check(PROD_CLASSES);
+        }
+    }
+
+    @Test
+    void arch03_noBeanUtilsCopyPropertiesAnywhere() {
+        ArchRule rule = classes().that().resideInAPackage("com.yuzhua..")
+                .should(notCallBeanUtilsCopyProperties());
+        rule.check(PROD_CLASSES);
+
+        JavaClasses fixture = new ClassFileImporter().importClasses(BeanUtilsLeakFixture.class);
+        assertThrows(AssertionError.class, () -> rule.check(fixture));
+    }
+
+    @Test
+    void arch05_everyRequestBodyHasValidOrValidated() {
+        ArchRule rule = arch05Rule();
+        rule.check(PROD_CLASSES);
+
+        JavaClasses fixture = new ClassFileImporter().importClasses(MissingValidRequestBodyControllerFixture.class);
+        assertThrows(AssertionError.class, () -> rule.check(fixture));
+    }
 
     @Test
     void arch02_controllersAndCrossServiceCallsDoNotUseGenericCrud() {
@@ -306,12 +348,62 @@ class ArchitectureRulesTest {
         }
     }
 
+    private static ArchRule arch05Rule() {
+        return methods().that().areDeclaredInClassesThat().areAnnotatedWith(RestController.class)
+                .and(annotatedAsRequestHandler())
+                .should(validateEveryRequestBodyParameter());
+    }
+
+    private static ArchCondition<JavaMethod> validateEveryRequestBodyParameter() {
+        return new ArchCondition<>("annotate every @RequestBody parameter with @Valid or @Validated") {
+            @Override
+            public void check(JavaMethod method, ConditionEvents events) {
+                for (JavaParameter param : method.getParameters()) {
+                    if (param.isAnnotatedWith(RequestBody.class)
+                            && !param.isAnnotatedWith(Valid.class)
+                            && !param.isAnnotatedWith(Validated.class)) {
+                        events.add(SimpleConditionEvent.violated(method,
+                                method.getFullName() + " has @RequestBody parameter without @Valid/@Validated"));
+                    }
+                }
+            }
+        };
+    }
+
+    private static ArchCondition<JavaClass> notCallBeanUtilsCopyProperties() {
+        return new ArchCondition<>("not invoke BeanUtils.copyProperties") {
+            @Override
+            public void check(JavaClass caller, ConditionEvents events) {
+                for (JavaMethodCall call : caller.getMethodCallsFromSelf()) {
+                    if (call.getTarget().getOwner().isEquivalentTo(BeanUtils.class)
+                            && "copyProperties".equals(call.getTarget().getName())) {
+                        events.add(SimpleConditionEvent.violated(call, call.getDescription()));
+                    }
+                }
+            }
+        };
+    }
+
     @RestController
     static class IllegalAllowMutationControllerFixture {
         @PublicEndpoint(allowMutation = true)
         @PostMapping("/client/fixture")
         public String mutate() {
             return "ok";
+        }
+    }
+
+    @RestController
+    static class MissingValidRequestBodyControllerFixture {
+        @PostMapping("/admin/fixture/unvalidated")
+        public String submit(@RequestBody String body) {
+            return body;
+        }
+    }
+
+    static class BeanUtilsLeakFixture {
+        void copy(Object src, Object dst) {
+            BeanUtils.copyProperties(src, dst);
         }
     }
 }

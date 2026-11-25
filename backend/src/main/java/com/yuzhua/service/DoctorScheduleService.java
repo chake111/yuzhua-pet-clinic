@@ -22,10 +22,10 @@ import com.yuzhua.mapper.AppointmentMapper;
 import com.yuzhua.mapper.DepartmentMapper;
 import com.yuzhua.mapper.DoctorMapper;
 import com.yuzhua.mapper.DoctorScheduleMapper;
+import com.yuzhua.vo.ScheduleBatchSummaryVo;
 import com.yuzhua.vo.ScheduleVo;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,7 +71,7 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         Doctor doctor = doctorMapper.selectById(doctorId);
         Map<Long, Doctor> doctorDict = doctor == null ? Map.of() : Map.of(Objects.requireNonNull(doctor.getId()), doctor);
         Map<Long, Department> deptDict = departmentsOf(doctorDict.values());
-        return rows.stream().map(s -> toVo(s, doctorDict, deptDict)).collect(Collectors.toList());
+        return rows.stream().map(s -> toVo(s, doctorDict, deptDict, null)).collect(Collectors.toList());
     }
 
     public PageResult<ScheduleVo> pageAdmin(@Nullable Long doctorId, @Nullable LocalDate start, @Nullable LocalDate end,
@@ -88,11 +88,7 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         Map<Long, Doctor> doctors = doctorsOf(page.getRecords());
         Map<Long, Department> depts = departmentsOf(doctors.values());
         Map<Long, Long> refs = refCounts(page.getRecords());
-        return PageResult.of(page, s -> {
-            ScheduleVo vo = toVo(s, doctors, depts);
-            vo.setRefNum(refs.getOrDefault(s.getId(), 0L));
-            return vo;
-        });
+        return PageResult.of(page, s -> toVo(s, doctors, depts, refs.getOrDefault(s.getId(), 0L)));
     }
 
     /**
@@ -100,27 +96,28 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
      * 初始余量等于总量，{@code status} 为 {@code null} 时默认 {@code EnableStatus.ENABLED}。
      */
     @Transactional
-    public DoctorSchedule create(ScheduleForm req) {
-        requireSchedulable(req.getDoctorId());
-        checkSlotSanity(req.getWorkDate(), req.getStartTime(), req.getEndTime());
-        checkPeriodTime(req.getPeriod(), req.getStartTime(), req.getEndTime());
+    public ScheduleVo create(ScheduleForm req) {
+        requireSchedulable(req.doctorId());
+        checkSlotSanity(req.workDate(), req.startTime(), req.endTime());
+        checkPeriodTime(req.period(), req.startTime(), req.endTime());
         if (exists(Wrappers.<DoctorSchedule>lambdaQuery()
-                .eq(DoctorSchedule::getDoctorId, req.getDoctorId())
-                .eq(DoctorSchedule::getWorkDate, req.getWorkDate())
-                .eq(DoctorSchedule::getPeriod, req.getPeriod()))) {
+                .eq(DoctorSchedule::getDoctorId, req.doctorId())
+                .eq(DoctorSchedule::getWorkDate, req.workDate())
+                .eq(DoctorSchedule::getPeriod, req.period()))) {
             throw new BizException("该医生在这一天的这个时段已经排过班了");
         }
         DoctorSchedule s = new DoctorSchedule();
-        s.setDoctorId(req.getDoctorId());
-        s.setWorkDate(req.getWorkDate());
-        s.setPeriod(req.getPeriod());
-        s.setStartTime(req.getStartTime());
-        s.setEndTime(req.getEndTime());
-        s.setTotalNum(req.getTotalNum());
-        s.setRemainNum(req.getTotalNum());
-        s.setStatus(req.getStatus() == null ? EnableStatus.ENABLED : req.getStatus());
+        s.setDoctorId(req.doctorId());
+        s.setWorkDate(req.workDate());
+        s.setPeriod(req.period());
+        s.setStartTime(req.startTime());
+        s.setEndTime(req.endTime());
+        s.setTotalNum(req.totalNum());
+        s.setRemainNum(req.totalNum());
+        s.setStatus(req.status() == null ? EnableStatus.ENABLED : req.status());
         save(s);
-        return s;
+        Map<Long, Doctor> doctors = doctorsOf(List.of(s));
+        return toVo(s, doctors, departmentsOf(doctors.values()), null);
     }
 
     /**
@@ -138,17 +135,17 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         int booked = appointmentMapper.selectCount(Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getScheduleId, id)
                 .ne(Appointment::getStatus, AppointmentStatus.CANCELLED)).intValue();
-        Integer totalNum = req.getTotalNum();
+        Integer totalNum = req.totalNum();
         if (totalNum == null || totalNum < booked) {
             throw new BizException("该时段已有 " + booked + " 个有效预约，总量不能改到 " + booked + " 以下");
         }
         DoctorSchedule s = new DoctorSchedule();
         s.setId(id);
-        s.setDoctorId(req.getDoctorId());
-        s.setWorkDate(req.getWorkDate());
-        s.setPeriod(req.getPeriod());
-        s.setStartTime(req.getStartTime());
-        s.setEndTime(req.getEndTime());
+        s.setDoctorId(req.doctorId());
+        s.setWorkDate(req.workDate());
+        s.setPeriod(req.period());
+        s.setStartTime(req.startTime());
+        s.setEndTime(req.endTime());
         s.setTotalNum(totalNum);
         s.setRemainNum(totalNum - booked);
         // 原因: status 仅由 stopClinic/resumeClinic 写入，避免旧编辑弹窗提交覆盖停诊状态
@@ -157,22 +154,22 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
 
     private void validateUpdateFields(Long id, DoctorSchedule cur, ScheduleEditForm req) {
         // 原因: 仅在更换日期时校验不可早于今天，历史排班仍需支持调整容量
-        if (!Objects.equals(cur.getWorkDate(), req.getWorkDate())) {
-            if (req.getWorkDate() == null) {
+        if (!Objects.equals(cur.getWorkDate(), req.workDate())) {
+            if (req.workDate() == null) {
                 throw new BizException("请选择排班日期");
             }
-            checkDateNotPast(req.getWorkDate());
+            checkDateNotPast(req.workDate());
         }
-        checkTimeOrder(req.getStartTime(), req.getEndTime());
-        checkPeriod(req.getPeriod());
+        checkTimeOrder(req.startTime(), req.endTime());
+        checkPeriod(req.period());
         boolean sameSlot = isSameSlot(cur, req);
         if (!sameSlot && existsSlot(id, req)) {
             throw new BizException("该医生在这一天的这个时段已经排过班了");
         }
         boolean movesAttribution = !sameSlot || isTimeChanged(cur, req);
-        validateAttributionAndDoctor(id, req.getDoctorId(), movesAttribution);
-        if (!Objects.equals(cur.getPeriod(), req.getPeriod()) || isTimeChanged(cur, req)) {
-            checkPeriodTime(req.getPeriod(), req.getStartTime(), req.getEndTime());
+        validateAttributionAndDoctor(id, req.doctorId(), movesAttribution);
+        if (!Objects.equals(cur.getPeriod(), req.period()) || isTimeChanged(cur, req)) {
+            checkPeriodTime(req.period(), req.startTime(), req.endTime());
         }
     }
 
@@ -192,21 +189,21 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
 
     private boolean existsSlot(Long excludeId, ScheduleEditForm req) {
         return exists(Wrappers.<DoctorSchedule>lambdaQuery()
-                .eq(DoctorSchedule::getDoctorId, req.getDoctorId())
-                .eq(DoctorSchedule::getWorkDate, req.getWorkDate())
-                .eq(DoctorSchedule::getPeriod, req.getPeriod())
+                .eq(DoctorSchedule::getDoctorId, req.doctorId())
+                .eq(DoctorSchedule::getWorkDate, req.workDate())
+                .eq(DoctorSchedule::getPeriod, req.period())
                 .ne(DoctorSchedule::getId, excludeId));
     }
 
     private static boolean isSameSlot(DoctorSchedule cur, ScheduleEditForm req) {
-        return Objects.equals(cur.getDoctorId(), req.getDoctorId())
-                && Objects.equals(cur.getWorkDate(), req.getWorkDate())
-                && Objects.equals(cur.getPeriod(), req.getPeriod());
+        return Objects.equals(cur.getDoctorId(), req.doctorId())
+                && Objects.equals(cur.getWorkDate(), req.workDate())
+                && Objects.equals(cur.getPeriod(), req.period());
     }
 
     private static boolean isTimeChanged(DoctorSchedule cur, ScheduleEditForm req) {
-        return !Objects.equals(cur.getStartTime(), req.getStartTime())
-                || !Objects.equals(cur.getEndTime(), req.getEndTime());
+        return !Objects.equals(cur.getStartTime(), req.startTime())
+                || !Objects.equals(cur.getEndTime(), req.endTime());
     }
 
     /**
@@ -217,13 +214,13 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
      * @return 新建条数与已有组合的跳过次数；日期筛选未命中的日期不计入 skipped
      */
     @Transactional
-    public BatchSummary batchCreate(ScheduleBatchForm req) {
-        requireSchedulable(req.getDoctorId());
+    public ScheduleBatchSummaryVo batchCreate(ScheduleBatchForm req) {
+        requireSchedulable(req.doctorId());
         validateBatchRequest(req);
-        LocalDate startDate = Objects.requireNonNull(req.getStartDate());
-        LocalDate endDate = Objects.requireNonNull(req.getEndDate());
-        List<ScheduleBatchForm.PeriodTemplate> templates = Objects.requireNonNull(req.getPeriods());
-        Set<Integer> weekDays = Set.copyOf(Objects.requireNonNull(req.getWeekDays()));
+        LocalDate startDate = Objects.requireNonNull(req.startDate());
+        LocalDate endDate = Objects.requireNonNull(req.endDate());
+        List<ScheduleBatchForm.PeriodTemplate> templates = Objects.requireNonNull(req.periods());
+        Set<Integer> weekDays = Set.copyOf(Objects.requireNonNull(req.weekDays()));
         List<DoctorSchedule> pending = new ArrayList<>();
         int skipped = 0;
         for (LocalDate d = startDate; !d.isAfter(endDate); d = d.plusDays(1)) {
@@ -232,9 +229,9 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
             }
             for (ScheduleBatchForm.PeriodTemplate t : templates) {
                 if (exists(Wrappers.<DoctorSchedule>lambdaQuery()
-                        .eq(DoctorSchedule::getDoctorId, req.getDoctorId())
+                        .eq(DoctorSchedule::getDoctorId, req.doctorId())
                         .eq(DoctorSchedule::getWorkDate, d)
-                        .eq(DoctorSchedule::getPeriod, t.getPeriod()))) {
+                        .eq(DoctorSchedule::getPeriod, t.period()))) {
                     skipped++;
                     continue;
                 }
@@ -244,12 +241,12 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         if (!pending.isEmpty()) {
             saveBatch(pending);
         }
-        return new BatchSummary(pending.size(), skipped);
+        return new ScheduleBatchSummaryVo(pending.size(), skipped);
     }
 
     private void validateBatchRequest(ScheduleBatchForm req) {
-        LocalDate startDate = req.getStartDate();
-        LocalDate endDate = req.getEndDate();
+        LocalDate startDate = req.startDate();
+        LocalDate endDate = req.endDate();
         if (startDate == null || endDate == null) {
             throw new BizException("请选择开始和结束日期");
         }
@@ -259,15 +256,15 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         if (endDate.toEpochDay() - startDate.toEpochDay() + 1 > MAX_BATCH_DAYS) {
             throw new BizException("一次最多批量排 90 天");
         }
-        List<ScheduleBatchForm.PeriodTemplate> templates = req.getPeriods();
-        List<Integer> weekDays = req.getWeekDays();
+        List<ScheduleBatchForm.PeriodTemplate> templates = req.periods();
+        List<Integer> weekDays = req.weekDays();
         if (templates == null || templates.isEmpty() || weekDays == null || weekDays.isEmpty()) {
             throw new BizException("请配置排班星期与时段");
         }
         Set<SchedulePeriod> periods = new HashSet<>();
         for (ScheduleBatchForm.PeriodTemplate t : templates) {
-            checkPeriodTime(t.getPeriod(), t.getStartTime(), t.getEndTime());
-            if (t.getPeriod() != null && !periods.add(t.getPeriod())) {
+            checkPeriodTime(t.period(), t.startTime(), t.endTime());
+            if (t.period() != null && !periods.add(t.period())) {
                 throw new BizException("每个时段只能配置一次");
             }
         }
@@ -276,13 +273,13 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
     private static DoctorSchedule buildBatchSchedule(ScheduleBatchForm req, LocalDate date,
                                                      ScheduleBatchForm.PeriodTemplate t) {
         DoctorSchedule s = new DoctorSchedule();
-        s.setDoctorId(req.getDoctorId());
+        s.setDoctorId(req.doctorId());
         s.setWorkDate(date);
-        s.setPeriod(t.getPeriod());
-        s.setStartTime(t.getStartTime());
-        s.setEndTime(t.getEndTime());
+        s.setPeriod(t.period());
+        s.setStartTime(t.startTime());
+        s.setEndTime(t.endTime());
         int total = Objects.requireNonNull(
-                req.getOverrideTotalNum() != null ? req.getOverrideTotalNum() : t.getTotalNum());
+                req.overrideTotalNum() != null ? req.overrideTotalNum() : t.totalNum());
         s.setTotalNum(total);
         s.setRemainNum(total);
         s.setStatus(EnableStatus.ENABLED);
@@ -429,17 +426,10 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         if (ids.isEmpty()) {
             return Map.of();
         }
-        return appointmentMapper.selectMaps(Wrappers.<Appointment>query()
-                        .select("schedule_id AS scheduleId", "COUNT(*) AS num")
-                        .in("schedule_id", ids)
-                        .groupBy("schedule_id"))
-                .stream().filter(m -> m.get("scheduleId") != null)
+        return appointmentMapper.countRefsByScheduleIds(ids).stream()
                 .collect(Collectors.toMap(
-                        m -> ((Number) Objects.requireNonNull(m.get("scheduleId"))).longValue(),
-                        m -> {
-                            Number num = (Number) m.get("num");
-                            return num == null ? 0L : num.longValue();
-                        }));
+                        AppointmentMapper.ScheduleRefCount::scheduleId,
+                        AppointmentMapper.ScheduleRefCount::refCount));
     }
 
     private Map<Long, Doctor> doctorsOf(List<DoctorSchedule> rows) {
@@ -447,32 +437,35 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
                 BatchLookup.ids(rows, DoctorSchedule::getDoctorId), Doctor::getId);
     }
 
-    private ScheduleVo toVo(DoctorSchedule s, Map<Long, Doctor> doctorDict, Map<Long, Department> deptDict) {
-        ScheduleVo vo = new ScheduleVo();
-        BeanUtils.copyProperties(s, vo);
-        Doctor d = doctorDict.get(s.getDoctorId());
-        if (d == null) {
-            vo.setDoctorAvailable(false);
-            return vo;
-        }
-        vo.setDoctorName(d.getName());
-        vo.setDoctorTitle(d.getTitle());
-        vo.setDoctorAvatar(d.getAvatar());
-        vo.setDepartmentId(d.getDepartmentId());
-        vo.setConsultationFee(d.getConsultationFee());
-        vo.setDoctorAvailable(d.getStatus() == EnableStatus.ENABLED);
-        Department dept = deptDict.get(d.getDepartmentId());
-        if (dept != null) {
-            vo.setDepartmentName(dept.getName());
-        }
-        return vo;
+    private static ScheduleVo toVo(DoctorSchedule s, Map<Long, Doctor> doctorDict,
+                                    Map<Long, Department> deptDict, @Nullable Long refNum) {
+        Doctor d = s.getDoctorId() == null ? null : doctorDict.get(s.getDoctorId());
+        Department dept = d == null || d.getDepartmentId() == null ? null : deptDict.get(d.getDepartmentId());
+        return new ScheduleVo(
+                s.getId(),
+                s.getDoctorId(),
+                s.getWorkDate(),
+                s.getPeriod(),
+                s.getStartTime(),
+                s.getEndTime(),
+                s.getTotalNum(),
+                s.getRemainNum(),
+                s.getLastQueueNo(),
+                s.getStatus(),
+                s.getCreateTime(),
+                d == null ? null : d.getName(),
+                d == null ? null : d.getTitle(),
+                d == null ? null : d.getAvatar(),
+                d == null ? null : d.getDepartmentId(),
+                dept == null ? null : dept.getName(),
+                d == null ? null : d.getConsultationFee(),
+                d != null && d.getStatus() == EnableStatus.ENABLED,
+                refNum
+        );
     }
 
     private Map<Long, Department> departmentsOf(Collection<Doctor> doctors) {
         return BatchLookup.mapByIds(departmentMapper::selectBatchIds,
                 BatchLookup.ids(doctors, Doctor::getDepartmentId), Department::getId);
-    }
-
-    public record BatchSummary(int created, int skipped) {
     }
 }

@@ -2,20 +2,21 @@ package com.yuzhua.dto;
 
 import com.yuzhua.domain.enums.NoticeStatus;
 import com.yuzhua.domain.enums.NoticeType;
-import lombok.Data;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
-@Data
-public class NoticeForm {
-
-    private @Nullable String title;
-    private @Nullable String cover;
-    private @Nullable String summary;
-    private @Nullable String content;
-
-    private @Nullable NoticeType type;
-
-    private @Nullable Integer topFlag;
-
-    private @Nullable NoticeStatus status;
+public record NoticeForm(
+        @NotBlank(message = "请填写公告标题")
+        @Size(max = 120, message = "公告标题不超过 120 字")
+        String title,
+        @Nullable String cover,
+        @Nullable String summary,
+        @Nullable String content,
+        @NotNull(message = "请选择公告类型")
+        NoticeType type,
+        @Nullable Integer topFlag,
+        @Nullable NoticeStatus status
+) {
 }

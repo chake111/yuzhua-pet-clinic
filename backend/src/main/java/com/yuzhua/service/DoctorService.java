@@ -27,10 +27,10 @@ import com.yuzhua.mapper.DoctorReviewMapper;
 import com.yuzhua.mapper.DoctorScheduleMapper;
 import com.yuzhua.mapper.MedicalRecordMapper;
 import com.yuzhua.consult.ws.DoctorPresenceGateway;
+import com.yuzhua.vo.AdminDoctorDetailVo;
 import com.yuzhua.vo.DoctorVo;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,6 +82,33 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         return toVo(d, departmentNames(List.of(d)));
     }
 
+    public AdminDoctorDetailVo detailForAdmin(Long id) {
+        Doctor d = require(id);
+        Department dept = d.getDepartmentId() == null ? null : departmentMapper.selectById(d.getDepartmentId());
+        return new AdminDoctorDetailVo(
+                d.getId(),
+                d.getName(),
+                d.getAvatar(),
+                d.getGender(),
+                d.getPhone(),
+                d.getTitle(),
+                d.getDepartmentId(),
+                d.getSpecialty(),
+                d.getIntroduction(),
+                d.getWorkYears(),
+                d.getConsultationFee(),
+                d.getRating(),
+                d.getReviewCount(),
+                d.getAppointmentCount(),
+                d.getOnlineStatus(),
+                d.getStatus(),
+                d.getSort(),
+                d.getCreateTime(),
+                dept == null ? null : dept.getName(),
+                dept == null ? null : dept.getIcon()
+        );
+    }
+
     public List<DoctorVo> listTopVisible(int limit) {
         List<Doctor> list = list(Wrappers.<Doctor>lambdaQuery()
                 .eq(Doctor::getStatus, EnableStatus.ENABLED)
@@ -105,32 +132,32 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
      * 排序默认 {@code DEFAULT_SORT}，{@code status} 默认 {@code EnableStatus.ENABLED}。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public Doctor create(DoctorForm form) {
-        requireName(form.getName());
-        requireDepartment(form.getDepartmentId());
-        requireFee(form.getConsultationFee());
-        if (form.getStatus() != null) {
-            requireStatus(form.getStatus());
+    public DoctorVo create(DoctorForm form) {
+        requireName(form.name());
+        requireDepartment(form.departmentId());
+        requireFee(form.consultationFee());
+        if (form.status() != null) {
+            requireStatus(form.status());
         }
         Doctor d = new Doctor();
-        d.setName(form.getName());
-        d.setAvatar(form.getAvatar());
-        d.setGender(form.getGender());
-        d.setPhone(form.getPhone());
-        d.setTitle(form.getTitle());
-        d.setDepartmentId(form.getDepartmentId());
-        d.setSpecialty(form.getSpecialty());
-        d.setIntroduction(form.getIntroduction());
-        d.setWorkYears(form.getWorkYears());
-        d.setConsultationFee(form.getConsultationFee());
+        d.setName(form.name());
+        d.setAvatar(form.avatar());
+        d.setGender(form.gender());
+        d.setPhone(form.phone());
+        d.setTitle(form.title());
+        d.setDepartmentId(form.departmentId());
+        d.setSpecialty(form.specialty());
+        d.setIntroduction(form.introduction());
+        d.setWorkYears(form.workYears());
+        d.setConsultationFee(form.consultationFee());
         d.setRating(new BigDecimal("5.0"));
         d.setReviewCount(0);
         d.setAppointmentCount(0);
         d.setOnlineStatus(0);
-        d.setStatus(form.getStatus() == null ? EnableStatus.ENABLED : form.getStatus());
-        d.setSort(form.getSort() == null ? DEFAULT_SORT : form.getSort());
+        d.setStatus(form.status() == null ? EnableStatus.ENABLED : form.status());
+        d.setSort(form.sort() == null ? DEFAULT_SORT : form.sort());
         save(d);
-        return d;
+        return toVo(d, departmentNames(List.of(d)));
     }
 
     /**
@@ -140,26 +167,26 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void update(Long id, DoctorForm form) {
         require(id);
-        requireName(form.getName());
-        requireDepartment(form.getDepartmentId());
-        requireFee(form.getConsultationFee());
-        EnableStatus status = form.getStatus();
+        requireName(form.name());
+        requireDepartment(form.departmentId());
+        requireFee(form.consultationFee());
+        EnableStatus status = form.status();
         if (status != null) {
             requireStatus(status);
         }
         Doctor row = new Doctor();
         row.setId(id);
-        row.setName(form.getName());
-        row.setAvatar(form.getAvatar());
-        row.setGender(form.getGender());
-        row.setPhone(form.getPhone());
-        row.setTitle(form.getTitle());
-        row.setDepartmentId(form.getDepartmentId());
-        row.setSpecialty(form.getSpecialty());
-        row.setIntroduction(form.getIntroduction());
-        row.setWorkYears(form.getWorkYears());
-        row.setConsultationFee(form.getConsultationFee());
-        row.setSort(form.getSort());
+        row.setName(form.name());
+        row.setAvatar(form.avatar());
+        row.setGender(form.gender());
+        row.setPhone(form.phone());
+        row.setTitle(form.title());
+        row.setDepartmentId(form.departmentId());
+        row.setSpecialty(form.specialty());
+        row.setIntroduction(form.introduction());
+        row.setWorkYears(form.workYears());
+        row.setConsultationFee(form.consultationFee());
+        row.setSort(form.sort());
         updateById(row);
         if (status != null) {
             applyStatus(id, status);
@@ -248,14 +275,28 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
                 BatchLookup.ids(doctors, Doctor::getDepartmentId), Department::getId);
     }
 
-    private DoctorVo toVo(Doctor d, Map<Long, Department> dict) {
-        DoctorVo vo = new DoctorVo();
-        BeanUtils.copyProperties(d, vo);
+    private static DoctorVo toVo(Doctor d, Map<Long, Department> dict) {
         Department dept = dict.get(d.getDepartmentId());
-        if (dept != null) {
-            vo.setDepartmentName(dept.getName());
-            vo.setDepartmentIcon(dept.getIcon());
-        }
-        return vo;
+        return new DoctorVo(
+                d.getId(),
+                d.getName(),
+                d.getAvatar(),
+                d.getGender(),
+                d.getTitle(),
+                d.getDepartmentId(),
+                d.getSpecialty(),
+                d.getIntroduction(),
+                d.getWorkYears(),
+                d.getConsultationFee(),
+                d.getRating(),
+                d.getReviewCount(),
+                d.getAppointmentCount(),
+                d.getOnlineStatus(),
+                d.getStatus(),
+                d.getSort(),
+                d.getCreateTime(),
+                dept == null ? null : dept.getName(),
+                dept == null ? null : dept.getIcon()
+        );
     }
 }

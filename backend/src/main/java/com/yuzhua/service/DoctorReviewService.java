@@ -26,7 +26,6 @@ import com.yuzhua.vo.PetDisplayVo;
 import com.yuzhua.vo.ReviewVo;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,26 +50,26 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
 
     /** 同一事务内落库评价、标记已评并刷新医生均分；仅已完成且未评价的本人预约可提交。 */
     @Transactional
-    public DoctorReview submit(ReviewForm req) {
+    public ReviewVo submit(ReviewForm req) {
         Appointment a = validateSubmitEligibility(req);
         DoctorReview r = buildReview(req, a);
         save(r);
         appointmentService.markReviewed(Objects.requireNonNull(a.getId()));
         doctorMapper.refreshStats(Objects.requireNonNull(a.getDoctorId()));
-        return r;
+        return toVo(r, null, null, a, null, false);
     }
 
     private Appointment validateSubmitEligibility(ReviewForm req) {
-        if (req.getRating() == null || req.getRating() < MIN_RATING || req.getRating() > MAX_RATING) {
+        if (req.rating() == null || req.rating() < MIN_RATING || req.rating() > MAX_RATING) {
             throw new BizException("评分为 1-5 星");
         }
-        if (req.getRating() < MAX_RATING && (req.getContent() == null || req.getContent().isBlank())) {
+        if (req.rating() < MAX_RATING && (req.content() == null || req.content().isBlank())) {
             throw new BizException("低于 5 星请填写评价说明");
         }
-        if (req.getAppointmentId() == null) {
+        if (req.appointmentId() == null) {
             throw new BizException("缺少预约单");
         }
-        Appointment a = appointmentService.requireMine(req.getAppointmentId());
+        Appointment a = appointmentService.requireMine(req.appointmentId());
         if (a.getStatus() != AppointmentStatus.FINISHED) {
             throw new BizException("问诊完成后才能评价");
         }
@@ -90,12 +89,12 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         r.setUserId(a.getUserId());
         r.setDoctorId(a.getDoctorId());
         r.setDepartmentId(a.getDepartmentId());
-        r.setRating(req.getRating());
-        r.setAttitudeScore(req.getAttitudeScore() == null ? req.getRating() : req.getAttitudeScore());
-        r.setEffectScore(req.getEffectScore() == null ? req.getRating() : req.getEffectScore());
-        r.setContent(req.getContent() == null || req.getContent().isBlank() ? null : req.getContent().trim());
-        r.setImages(req.getImages() == null || req.getImages().isBlank() ? null : req.getImages());
-        r.setIsAnonymous(Integer.valueOf(1).equals(req.getIsAnonymous()) ? 1 : 0);
+        r.setRating(req.rating());
+        r.setAttitudeScore(req.attitudeScore() == null ? req.rating() : req.attitudeScore());
+        r.setEffectScore(req.effectScore() == null ? req.rating() : req.effectScore());
+        r.setContent(req.content() == null || req.content().isBlank() ? null : req.content().trim());
+        r.setImages(req.images() == null || req.images().isBlank() ? null : req.images());
+        r.setIsAnonymous(Integer.valueOf(1).equals(req.isAnonymous()) ? 1 : 0);
         r.setStatus(EnableStatus.ENABLED);
         return r;
     }
@@ -177,34 +176,44 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         Map<Long, Appointment> appointments = anonymousMasked ? Map.of() : appointmentsOf(page.getRecords());
         Map<Long, PetDisplayVo> pets = petsOf(appointments.values());
         List<ReviewVo> rows = page.getRecords().stream().map(r -> {
-            ReviewVo vo = new ReviewVo();
-            BeanUtils.copyProperties(r, vo);
             SysUser u = users.get(r.getUserId());
-            if (u != null) {
-                vo.setUserNickname(u.getNickname());
-                vo.setUserAvatar(u.getAvatar());
-            }
             Doctor d = doctors.get(r.getDoctorId());
-            if (d != null) {
-                vo.setDoctorName(d.getName());
-                vo.setDoctorTitle(d.getTitle());
-            }
             Appointment a = appointments.get(r.getAppointmentId());
-            if (a != null) {
-                vo.setOrderNo(a.getOrderNo());
-                vo.setAppointmentDate(a.getAppointmentDate());
-                PetDisplayVo p = pets.get(a.getPetId());
-                if (p != null) {
-                    vo.setPetName(p.getName());
-                    vo.setPetSpecies(p.getSpecies());
-                }
-            }
-            if (anonymousMasked) {
-                vo.maskAnonymous();
-            }
-            return vo;
+            PetDisplayVo p = a == null ? null : pets.get(a.getPetId());
+            return toVo(r, u, d, a, p, anonymousMasked);
         }).toList();
         return PageResult.of(page, rows);
+    }
+
+    private static ReviewVo toVo(DoctorReview r, @Nullable SysUser u, @Nullable Doctor d,
+                                 @Nullable Appointment a, @Nullable PetDisplayVo p, boolean anonymousMasked) {
+        boolean masked = anonymousMasked && Integer.valueOf(1).equals(r.getIsAnonymous());
+        String userNickname = masked ? "匿名用户" : (u == null ? null : u.getNickname());
+        String userAvatar = masked ? null : (u == null ? null : u.getAvatar());
+        return new ReviewVo(
+                r.getId(),
+                r.getAppointmentId(),
+                r.getDoctorId(),
+                r.getDepartmentId(),
+                r.getRating(),
+                r.getAttitudeScore(),
+                r.getEffectScore(),
+                r.getContent(),
+                r.getImages(),
+                r.getIsAnonymous(),
+                r.getReply(),
+                r.getReplyTime(),
+                r.getStatus(),
+                r.getCreateTime(),
+                userNickname,
+                userAvatar,
+                d == null ? null : d.getName(),
+                d == null ? null : d.getTitle(),
+                a == null ? null : a.getOrderNo(),
+                a == null ? null : a.getAppointmentDate(),
+                p == null ? null : p.name(),
+                p == null ? null : p.species()
+        );
     }
 
     private Map<Long, SysUser> usersOf(List<DoctorReview> rows) {
@@ -224,6 +233,6 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
 
     private Map<Long, PetDisplayVo> petsOf(Collection<Appointment> appointments) {
         return BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
-                BatchLookup.ids(appointments, Appointment::getPetId), PetDisplayVo::getId);
+                BatchLookup.ids(appointments, Appointment::getPetId), PetDisplayVo::id);
     }
 }

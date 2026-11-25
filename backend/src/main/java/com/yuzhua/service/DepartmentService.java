@@ -19,6 +19,7 @@ import com.yuzhua.mapper.DoctorReviewMapper;
 import com.yuzhua.entity.Appointment;
 import com.yuzhua.entity.MedicalRecord;
 import com.yuzhua.entity.DoctorReview;
+import com.yuzhua.vo.DepartmentVo;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -39,19 +40,21 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
 
     private static final int DEFAULT_SORT = 99;
 
-    public List<Department> listEnabled() {
+    public List<DepartmentVo> listEnabled() {
         return list(Wrappers.<Department>lambdaQuery()
                 .eq(Department::getStatus, EnableStatus.ENABLED)
                 .orderByAsc(Department::getSort)
-                .orderByAsc(Department::getId));
+                .orderByAsc(Department::getId))
+                .stream().map(DepartmentService::toVo).toList();
     }
 
-    public PageResult<Department> page(PageQuery query, @Nullable String keyword) {
+    public PageResult<DepartmentVo> page(PageQuery query, @Nullable String keyword) {
         LambdaQueryWrapper<Department> qw = Wrappers.<Department>lambdaQuery()
                 .like(keyword != null && !keyword.isBlank(), Department::getName, keyword)
                 .orderByAsc(Department::getSort)
                 .orderByAsc(Department::getId);
-        return PageResult.of(page(new Page<>(query.getPageNum(), query.getPageSize()), qw));
+        Page<Department> page = page(new Page<>(query.getPageNum(), query.getPageSize()), qw);
+        return PageResult.of(page, page.getRecords().stream().map(DepartmentService::toVo).toList());
     }
 
     /**
@@ -59,24 +62,24 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
      * 排序默认 {@code DEFAULT_SORT}，{@code status} 非空时校验合法性，为空默认 {@code EnableStatus.ENABLED}。
      */
     @Transactional
-    public Department create(DepartmentForm form) {
-        requireName(form.getName());
-        requireCode(form.getCode());
-        if (form.getStatus() != null) {
-            requireStatus(form.getStatus());
+    public DepartmentVo create(DepartmentForm form) {
+        requireName(form.name());
+        requireCode(form.code());
+        if (form.status() != null) {
+            requireStatus(form.status());
         }
-        if (exists(Wrappers.<Department>lambdaQuery().eq(Department::getCode, form.getCode()))) {
-            throw new BizException("科室编码 " + form.getCode() + " 已存在");
+        if (exists(Wrappers.<Department>lambdaQuery().eq(Department::getCode, form.code()))) {
+            throw new BizException("科室编码 " + form.code() + " 已存在");
         }
         Department d = new Department();
-        d.setName(form.getName());
-        d.setCode(form.getCode());
-        d.setIcon(form.getIcon());
-        d.setDescription(form.getDescription());
-        d.setSort(form.getSort() == null ? DEFAULT_SORT : form.getSort());
-        d.setStatus(form.getStatus() == null ? EnableStatus.ENABLED : form.getStatus());
+        d.setName(form.name());
+        d.setCode(form.code());
+        d.setIcon(form.icon());
+        d.setDescription(form.description());
+        d.setSort(form.sort() == null ? DEFAULT_SORT : form.sort());
+        d.setStatus(form.status() == null ? EnableStatus.ENABLED : form.status());
         save(d);
-        return d;
+        return toVo(d);
     }
 
     /**
@@ -86,12 +89,12 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
     @Transactional
     public void update(Long id, DepartmentForm form) {
         Department d = require(id);
-        requireName(form.getName());
-        requireCode(form.getCode());
-        if (form.getStatus() != null) {
-            requireStatus(form.getStatus());
+        requireName(form.name());
+        requireCode(form.code());
+        if (form.status() != null) {
+            requireStatus(form.status());
         }
-        String code = Objects.requireNonNull(form.getCode());
+        String code = Objects.requireNonNull(form.code());
         if (!code.equals(d.getCode())
                 && exists(Wrappers.<Department>lambdaQuery()
                 .eq(Department::getCode, code).ne(Department::getId, id))) {
@@ -99,12 +102,12 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         }
         Department row = new Department();
         row.setId(id);
-        row.setName(form.getName());
+        row.setName(form.name());
         row.setCode(code);
-        row.setIcon(form.getIcon());
-        row.setDescription(form.getDescription());
-        row.setSort(form.getSort());
-        row.setStatus(form.getStatus());
+        row.setIcon(form.icon());
+        row.setDescription(form.description());
+        row.setSort(form.sort());
+        row.setStatus(form.status());
         updateById(row);
     }
 
@@ -163,5 +166,18 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         if (status == null) {
             throw new BizException("状态只能是停用或启用");
         }
+    }
+
+    private static DepartmentVo toVo(Department d) {
+        return new DepartmentVo(
+                d.getId(),
+                d.getName(),
+                d.getCode(),
+                d.getIcon(),
+                d.getDescription(),
+                d.getSort(),
+                d.getStatus(),
+                d.getCreateTime()
+        );
     }
 }

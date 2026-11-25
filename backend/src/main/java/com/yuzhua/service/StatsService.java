@@ -43,45 +43,59 @@ public class StatsService {
         Long doctorId = u.isDoctor() ? UserContext.requireDoctorId() : null;
         int win = days == null ? DEFAULT_DAYS : Math.min(Math.max(days, 1), MAX_DAYS);
 
-        DashboardVo vo = new DashboardVo();
-        vo.setDays(win);
         AppointmentMapper.TodayCard today = appointmentMapper.todayCard(doctorId);
-        if (today != null) {
-            vo.setTodayOrders(today.getOrders());
-            vo.setTodayPending(today.getPending());
-            vo.setTodayAccepted(today.getAccepted());
-            vo.setTodayFinished(today.getFinished());
-            vo.setTodayIncome(today.getIncome() == null ? BigDecimal.ZERO : today.getIncome());
-        }
+        long todayOrders = today == null ? 0L : today.getOrders();
+        long todayPending = today == null ? 0L : today.getPending();
+        long todayAccepted = today == null ? 0L : today.getAccepted();
+        long todayFinished = today == null ? 0L : today.getFinished();
+        BigDecimal todayIncome = today == null || today.getIncome() == null ? BigDecimal.ZERO : today.getIncome();
 
         AppointmentMapper.ServedCount served = appointmentMapper.countServed(doctorId);
+        long totalUsers;
+        long totalPets;
         if (doctorId == null) {
-            vo.setTotalUsers(count(sysUserMapper.selectCount(Wrappers.<SysUser>lambdaQuery())));
-            vo.setTotalPets(count(petMapper.selectCount(Wrappers.<Pet>lambdaQuery())));
+            totalUsers = count(sysUserMapper.selectCount(Wrappers.<SysUser>lambdaQuery()));
+            totalPets = count(petMapper.selectCount(Wrappers.<Pet>lambdaQuery()));
         } else if (served != null) {
-            vo.setTotalUsers(served.getUsers() == null ? 0L : served.getUsers());
-            vo.setTotalPets(served.getPets() == null ? 0L : served.getPets());
+            totalUsers = served.getUsers() == null ? 0L : served.getUsers();
+            totalPets = served.getPets() == null ? 0L : served.getPets();
+        } else {
+            totalUsers = 0L;
+            totalPets = 0L;
         }
-        vo.setTotalDoctors(count(doctorMapper.selectCount(Wrappers.<Doctor>lambdaQuery())));
-        vo.setOnlineDoctors(count(doctorMapper.selectCount(
-                Wrappers.<Doctor>lambdaQuery().eq(Doctor::getOnlineStatus, 1))));
+        long totalDoctors = count(doctorMapper.selectCount(Wrappers.<Doctor>lambdaQuery()));
+        long onlineDoctors = count(doctorMapper.selectCount(
+                Wrappers.<Doctor>lambdaQuery().eq(Doctor::getOnlineStatus, 1)));
 
-        vo.setReviewPendingReply(count(reviewMapper.selectCount(Wrappers.<DoctorReview>lambdaQuery()
+        long reviewPendingReply = count(reviewMapper.selectCount(Wrappers.<DoctorReview>lambdaQuery()
                 .eq(doctorId != null, DoctorReview::getDoctorId, doctorId)
                 .eq(DoctorReview::getStatus, EnableStatus.ENABLED)
-                .and(w -> w.isNull(DoctorReview::getReply).or().eq(DoctorReview::getReply, "")))));
+                .and(w -> w.isNull(DoctorReview::getReply).or().eq(DoctorReview::getReply, ""))));
 
-        vo.setUnpaidTimeoutRisk(count(appointmentMapper.selectCount(Wrappers.<Appointment>lambdaQuery()
+        long unpaidTimeoutRisk = count(appointmentMapper.selectCount(Wrappers.<Appointment>lambdaQuery()
                 .eq(doctorId != null, Appointment::getDoctorId, doctorId)
                 .eq(Appointment::getStatus, AppointmentStatus.PENDING)
-                .eq(Appointment::getPayStatus, PayStatus.UNPAID))));
+                .eq(Appointment::getPayStatus, PayStatus.UNPAID)));
 
-        vo.setTrend(appointmentMapper.statDaily(win, doctorId));
-        vo.setStatusDist(appointmentMapper.statStatus(win, doctorId));
-        vo.setDeptDist(appointmentMapper.statDepartment(win, doctorId));
-        // 原因: 接诊排行用于全院横向比较，医生视角保持全院口径
-        vo.setTopDoctors(appointmentMapper.statTopDoctors(win, TOP_DOCTORS));
-        return vo;
+        return new DashboardVo(
+                win,
+                todayOrders,
+                todayPending,
+                todayAccepted,
+                todayFinished,
+                todayIncome,
+                totalUsers,
+                totalPets,
+                totalDoctors,
+                onlineDoctors,
+                reviewPendingReply,
+                unpaidTimeoutRisk,
+                appointmentMapper.statDaily(win, doctorId),
+                appointmentMapper.statStatus(win, doctorId),
+                appointmentMapper.statDepartment(win, doctorId),
+                // 原因: 接诊排行用于全院横向比较，医生视角保持全院口径
+                appointmentMapper.statTopDoctors(win, TOP_DOCTORS)
+        );
     }
 
     private long count(Long n) {

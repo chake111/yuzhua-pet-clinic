@@ -1,16 +1,15 @@
 package com.yuzhua.vo;
 
-import com.yuzhua.entity.Pet;
-import com.yuzhua.entity.SysUser;
-import lombok.Data;
-import org.jspecify.annotations.Nullable;
-
 import java.util.List;
 
-@Data
-public class UserDetailVo {
+public record UserDetailVo(
+        UserVo user,
+        List<PetVo> pets,
+        List<AppointmentVo> appointments
+) {
 
-    private @Nullable SysUser user;
-    private @Nullable List<Pet> pets;
-    private @Nullable List<AppointmentVo> appointments;
+    public UserDetailVo {
+        pets = pets == null ? List.of() : List.copyOf(pets);
+        appointments = appointments == null ? List.of() : List.copyOf(appointments);
+    }
 }

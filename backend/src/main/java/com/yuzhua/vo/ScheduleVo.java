@@ -1,24 +1,33 @@
 package com.yuzhua.vo;
 
-import com.yuzhua.entity.DoctorSchedule;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.SchedulePeriod;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
-public class ScheduleVo extends DoctorSchedule {
-
-    private @Nullable String doctorName;
-    private @Nullable String doctorTitle;
-    private @Nullable String doctorAvatar;
-    private @Nullable Long departmentId;
-    private @Nullable String departmentName;
-    private @Nullable BigDecimal consultationFee;
-
-    private @Nullable Boolean doctorAvailable;
-
-    private @Nullable Long refNum;
+public record ScheduleVo(
+        @Nullable Long id,
+        @Nullable Long doctorId,
+        @Nullable LocalDate workDate,
+        @Nullable SchedulePeriod period,
+        @Nullable LocalTime startTime,
+        @Nullable LocalTime endTime,
+        @Nullable Integer totalNum,
+        @Nullable Integer remainNum,
+        @Nullable Integer lastQueueNo,
+        @Nullable EnableStatus status,
+        @Nullable LocalDateTime createTime,
+        @Nullable String doctorName,
+        @Nullable String doctorTitle,
+        @Nullable String doctorAvatar,
+        @Nullable Long departmentId,
+        @Nullable String departmentName,
+        @Nullable BigDecimal consultationFee,
+        @Nullable Boolean doctorAvailable,
+        @Nullable Long refNum
+) {
 }

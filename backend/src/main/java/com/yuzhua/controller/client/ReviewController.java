@@ -2,8 +2,8 @@ package com.yuzhua.controller.client;
 
 import com.yuzhua.common.Result;
 import com.yuzhua.dto.ReviewForm;
-import com.yuzhua.entity.DoctorReview;
 import com.yuzhua.service.DoctorReviewService;
+import com.yuzhua.vo.ReviewVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -23,7 +23,7 @@ public class ReviewController {
 
     @Operation(summary = "提交评价（仅已完成的预约，一单一评）")
     @PostMapping
-    public Result<DoctorReview> submit(@Valid @RequestBody ReviewForm req) {
+    public Result<ReviewVo> submit(@Valid @RequestBody ReviewForm req) {
         return Result.ok("感谢您的评价", reviewService.submit(req));
     }
 }

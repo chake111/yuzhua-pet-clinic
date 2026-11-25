@@ -10,6 +10,7 @@ import com.yuzhua.service.AppointmentService;
 import com.yuzhua.vo.AppointmentVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -60,8 +61,8 @@ public class AdminAppointmentController {
     @Operation(summary = "代患者取消（号源退回）")
     @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     @PostMapping("/{id}/cancel")
-    public Result<Void> cancel(@PathVariable Long id, @RequestBody(required = false) @Nullable CancelForm req) {
-        appointmentService.cancelByStaff(id, req == null ? null : req.getReason());
+    public Result<Void> cancel(@PathVariable Long id, @RequestBody(required = false) @Valid @Nullable CancelForm req) {
+        appointmentService.cancelByStaff(id, req == null ? null : req.reason());
         return Result.ok("已取消，号源已退回", null);
     }
 }

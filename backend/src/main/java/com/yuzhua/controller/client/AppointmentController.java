@@ -6,10 +6,10 @@ import com.yuzhua.domain.enums.AppointmentStatus;
 import com.yuzhua.dto.AppointmentForm;
 import com.yuzhua.dto.CancelForm;
 import com.yuzhua.dto.PageQuery;
-import com.yuzhua.entity.MedicalRecord;
 import com.yuzhua.service.AppointmentService;
 import com.yuzhua.service.MedicalRecordService;
 import com.yuzhua.vo.AppointmentVo;
+import com.yuzhua.vo.MedicalRecordVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -50,8 +50,8 @@ public class AppointmentController {
 
     @Operation(summary = "取消预约（号源退回池子，已支付则标记退款）")
     @PostMapping("/{id}/cancel")
-    public Result<Void> cancel(@PathVariable Long id, @RequestBody(required = false) @Nullable CancelForm req) {
-        appointmentService.cancelByUser(id, req == null ? null : req.getReason());
+    public Result<Void> cancel(@PathVariable Long id, @RequestBody(required = false) @Valid @Nullable CancelForm req) {
+        appointmentService.cancelByUser(id, req == null ? null : req.reason());
         return Result.ok("已取消，号源已退回", null);
     }
 
@@ -70,7 +70,7 @@ public class AppointmentController {
 
     @Operation(summary = "这次预约的病历（医生未写则为空）")
     @GetMapping("/{id}/record")
-    public Result<MedicalRecord> record(@PathVariable Long id) {
+    public Result<MedicalRecordVo> record(@PathVariable Long id) {
         return Result.ok(recordService.ofAppointmentForOwner(id));
     }
 }
