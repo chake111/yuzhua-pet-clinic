@@ -2,9 +2,9 @@ package com.yuzhua.controller.admin;
 
 import com.yuzhua.common.PageResult;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.AdminRole;
 import com.yuzhua.dto.AppointmentQuery;
 import com.yuzhua.dto.CancelForm;
-import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.AppointmentService;
 import com.yuzhua.vo.AppointmentVo;
@@ -28,19 +28,21 @@ public class AdminAppointmentController {
     private final AppointmentService appointmentService;
 
     @Operation(summary = "订单分页（医生账号自动限定为本人）")
+    @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     @GetMapping("/page")
     public Result<PageResult<AppointmentVo>> page(AppointmentQuery query) {
         return Result.ok(appointmentService.pageForStaff(query));
     }
 
     @Operation(summary = "订单详情（含患者联系方式）")
+    @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     @GetMapping("/{id}")
     public Result<AppointmentVo> detail(@PathVariable Long id) {
         return Result.ok(appointmentService.detail(id));
     }
 
     @Operation(summary = "接诊：待接诊 + 已支付才能开始（仅医生账号，R4）")
-    @RequireRole(LoginUser.ROLE_DOCTOR)
+    @RequireRole(AdminRole.DOCTOR)
     @PostMapping("/{id}/accept")
     public Result<Void> accept(@PathVariable Long id) {
         appointmentService.accept(id);
@@ -48,7 +50,7 @@ public class AdminAppointmentController {
     }
 
     @Operation(summary = "结束问诊（仅医生账号，R4）")
-    @RequireRole(LoginUser.ROLE_DOCTOR)
+    @RequireRole(AdminRole.DOCTOR)
     @PostMapping("/{id}/finish")
     public Result<Void> finish(@PathVariable Long id) {
         appointmentService.finish(id);
@@ -56,6 +58,7 @@ public class AdminAppointmentController {
     }
 
     @Operation(summary = "代患者取消（号源退回）")
+    @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     @PostMapping("/{id}/cancel")
     public Result<Void> cancel(@PathVariable Long id, @RequestBody(required = false) @Nullable CancelForm req) {
         appointmentService.cancelByStaff(id, req == null ? null : req.getReason());

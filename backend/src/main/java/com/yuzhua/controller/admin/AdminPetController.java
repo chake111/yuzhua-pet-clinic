@@ -2,9 +2,9 @@ package com.yuzhua.controller.admin;
 
 import com.yuzhua.common.PageResult;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.AdminRole;
 import com.yuzhua.dto.PetForm;
 import com.yuzhua.dto.PetQuery;
-import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.PetService;
 import com.yuzhua.vo.PetVo;
@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin/pet")
 @RequiredArgsConstructor
-@RequireRole(LoginUser.ROLE_ADMIN)
+@RequireRole(AdminRole.ADMIN)
 public class AdminPetController {
 
     private final PetService petService;

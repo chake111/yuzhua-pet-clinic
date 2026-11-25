@@ -1,5 +1,6 @@
 package com.yuzhua.websocket;
 
+import com.yuzhua.domain.enums.ConsultModerationStatus;
 import com.yuzhua.entity.ConsultSession;
 import com.yuzhua.mapper.ConsultSessionMapper;
 import com.yuzhua.security.AccountGuard;
@@ -50,7 +51,7 @@ public class ConsultDeliveryGuard {
         if (s == null || !isMember(receiver, s)) {
             return Decision.SESSION_DENIED;
         }
-        if (s.getModerateStatus() != null && s.getModerateStatus() != ConsultSession.MV_NORMAL) {
+        if (s.getModerateStatus() != null && s.getModerateStatus() != ConsultModerationStatus.NORMAL) {
             return Decision.SESSION_DENIED;
         }
         return Decision.OK;

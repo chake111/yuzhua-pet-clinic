@@ -1,6 +1,9 @@
 package com.yuzhua.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.yuzhua.domain.enums.AppointmentStatus;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.PayStatus;
 import com.yuzhua.entity.Appointment;
 import com.yuzhua.entity.Doctor;
 import com.yuzhua.entity.DoctorReview;
@@ -65,13 +68,13 @@ public class StatsService {
 
         vo.setReviewPendingReply(count(reviewMapper.selectCount(Wrappers.<DoctorReview>lambdaQuery()
                 .eq(doctorId != null, DoctorReview::getDoctorId, doctorId)
-                .eq(DoctorReview::getStatus, 1)
+                .eq(DoctorReview::getStatus, EnableStatus.ENABLED)
                 .and(w -> w.isNull(DoctorReview::getReply).or().eq(DoctorReview::getReply, "")))));
 
         vo.setUnpaidTimeoutRisk(count(appointmentMapper.selectCount(Wrappers.<Appointment>lambdaQuery()
                 .eq(doctorId != null, Appointment::getDoctorId, doctorId)
-                .eq(Appointment::getStatus, Appointment.ST_PENDING)
-                .eq(Appointment::getPayStatus, Appointment.PAY_NONE))));
+                .eq(Appointment::getStatus, AppointmentStatus.PENDING)
+                .eq(Appointment::getPayStatus, PayStatus.UNPAID))));
 
         vo.setTrend(appointmentMapper.statDaily(win, doctorId));
         vo.setStatusDist(appointmentMapper.statStatus(win, doctorId));

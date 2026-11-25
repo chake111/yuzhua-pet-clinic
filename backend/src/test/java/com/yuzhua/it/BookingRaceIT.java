@@ -1,6 +1,8 @@
 package com.yuzhua.it;
 
 import com.yuzhua.common.BizException;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.service.AppointmentService;
@@ -41,7 +43,7 @@ class BookingRaceIT extends MySqlITSupport {
             long petId = FIRST_PET_ID + i;
             futures.add(pool.submit(() -> {
                 UserContext.set(new LoginUser(9001L, "ituser", "IT用户", null,
-                        "CLIENT", "USER", null, 1, null));
+                        TokenType.CLIENT, UserRole.USER, null, 1, null));
                 try {
                     ready.countDown();
                     go.await();

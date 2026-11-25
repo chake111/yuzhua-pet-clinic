@@ -2,9 +2,10 @@ package com.yuzhua.controller.admin;
 
 import com.yuzhua.common.PageResult;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.AdminRole;
+import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.UserQuery;
 import com.yuzhua.entity.SysUser;
-import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.SysUserService;
 import com.yuzhua.vo.UserDetailVo;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin/user")
 @RequiredArgsConstructor
-@RequireRole(LoginUser.ROLE_ADMIN)
+@RequireRole(AdminRole.ADMIN)
 public class AdminUserController {
 
     private final SysUserService sysUserService;
@@ -41,7 +42,7 @@ public class AdminUserController {
 
     @Operation(summary = "禁用/恢复账号。status: 0 禁用 1 正常")
     @PutMapping("/{id}/status")
-    public Result<Void> changeStatus(@PathVariable Long id, @RequestParam Integer status) {
+    public Result<Void> changeStatus(@PathVariable Long id, @RequestParam EnableStatus status) {
         sysUserService.changeStatus(id, status);
         return Result.ok("已更新", null);
     }

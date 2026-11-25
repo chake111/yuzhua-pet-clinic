@@ -3,6 +3,8 @@ package com.yuzhua.it;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.yuzhua.props.AppProperties;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.dto.AppointmentForm;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.task.AppointmentSweepTask;
@@ -180,7 +182,7 @@ public abstract class MySqlITSupport {
     // ---------------------------------------------------------------- 辅助
 
     protected static LoginUser clientUser() {
-        return new LoginUser(9001L, "ituser", "IT用户", null, "CLIENT", "USER", null, 1, null);
+        return new LoginUser(9001L, "ituser", "IT用户", null, TokenType.CLIENT, UserRole.USER, null, 1, null);
     }
 
     protected AppointmentForm appointmentForm(long petId) {

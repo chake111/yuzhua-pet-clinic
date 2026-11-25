@@ -2,6 +2,7 @@ package com.yuzhua.security;
 
 import tools.jackson.databind.ObjectMapper;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.TokenType;
 import com.yuzhua.props.AppProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,7 +13,11 @@ import org.springframework.http.MediaType;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 鉴权拦截器。校验 JWT、区分两套登录体系，并回查账号状态。
@@ -28,14 +33,18 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final AppProperties props;
     private final AccountGuard accountGuard;
     private final ObjectMapper objectMapper;
+    private final Map<Method, Optional<PublicEndpoint>> publicCache = new ConcurrentHashMap<>();
 
     /**
-     * 仅从请求头解析 JWT（拒绝 query 参数避免泄露至访问日志），按路径隔离两套登录体系，
-     * 经 AccountGuard 回查账号状态及令牌版本，并在放行时校验 @RequireRole 并写入 UserContext。
+     * 仅从请求头解析 JWT（拒绝 query 参数避免泄露至访问日志），先校验 @PublicEndpoint，
+     * 再按路径隔离两套登录体系、回查账号状态与令牌版本，并在后台强制执行 @RequireRole Fail-Closed。
      */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+        if (handler instanceof HandlerMethod hm && findPublicEndpoint(hm) != null) {
             return true;
         }
 
@@ -43,14 +52,12 @@ public class AuthInterceptor implements HandlerInterceptor {
         String path = request.getRequestURI().substring(request.getContextPath().length());
 
         boolean needAdmin = path.startsWith("/admin/");
-        boolean needClient = path.startsWith("/client/");
-        // 原因: /common/** 双端共用，只校验已登录而不限登录体系
-        boolean needAny = path.startsWith("/common/");
+        boolean needProtected = needAdmin || path.startsWith("/client/") || path.startsWith("/common/");
 
         // 原因: REST 仅认请求头 token，避免 ?token= 落入访问日志与浏览器历史
         String token = jwtUtils.strip(request.getHeader(props.getJwt().getHeader()));
         if (token == null || token.isBlank()) {
-            if (needAdmin || needClient || needAny) {
+            if (needProtected) {
                 reject(response, 401, "请先登录");
                 return false;
             }
@@ -63,12 +70,9 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        if (needAdmin && !LoginUser.TYP_ADMIN.equals(user.getTyp())) {
-            reject(response, 403, "无权访问后台");
-            return false;
-        }
-        if (needClient && !LoginUser.TYP_CLIENT.equals(user.getTyp())) {
-            reject(response, 403, "请使用用户端账号访问");
+        String scopeDeny = checkTokenScope(path, needAdmin, user);
+        if (scopeDeny != null) {
+            reject(response, 403, scopeDeny);
             return false;
         }
 
@@ -77,7 +81,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        String deny = checkRole(handler, user);
+        String deny = checkRole(handler, user, needAdmin);
         if (deny != null) {
             reject(response, 403, deny);
             return false;
@@ -87,8 +91,29 @@ public class AuthInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    private @Nullable String checkRole(Object handler, LoginUser user) {
+    private @Nullable String checkTokenScope(String path, boolean needAdmin, LoginUser user) {
+        if (needAdmin && user.getTyp() != TokenType.ADMIN) {
+            return "无权访问后台";
+        }
+        if (path.startsWith("/client/") && user.getTyp() != TokenType.CLIENT) {
+            return "请使用用户端账号访问";
+        }
+        return null;
+    }
+
+    private @Nullable PublicEndpoint findPublicEndpoint(HandlerMethod hm) {
+        return publicCache.computeIfAbsent(hm.getMethod(), method -> {
+            PublicEndpoint ann = hm.getMethodAnnotation(PublicEndpoint.class);
+            if (ann == null) {
+                ann = hm.getBeanType().getAnnotation(PublicEndpoint.class);
+            }
+            return Optional.ofNullable(ann);
+        }).orElse(null);
+    }
+
+    private @Nullable String checkRole(Object handler, LoginUser user, boolean needAdmin) {
         if (!(handler instanceof HandlerMethod hm)) {
+            // 原因: 非 HandlerMethod（如后台未知路径交由 ResourceHandler 触发业务 404）不拦截为 403
             return null;
         }
         RequireRole ann = hm.getMethodAnnotation(RequireRole.class);
@@ -96,14 +121,9 @@ public class AuthInterceptor implements HandlerInterceptor {
             ann = hm.getBeanType().getAnnotation(RequireRole.class);
         }
         if (ann == null) {
-            return null;
+            return needAdmin ? "当前账号没有该操作权限" : null;
         }
-        for (String role : ann.value()) {
-            if (role.equals(user.getRole())) {
-                return null;
-            }
-        }
-        return "当前账号没有该操作权限";
+        return user.matchesAny(ann.value()) ? null : "当前账号没有该操作权限";
     }
 
     @Override

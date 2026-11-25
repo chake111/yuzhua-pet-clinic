@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.yuzhua.domain.enums.EnableStatus;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -36,7 +37,7 @@ public class SysUser {
     private @Nullable String city;
     private @Nullable String address;
 
-    private @Nullable Integer status;
+    private @Nullable EnableStatus status;
 
     @JsonIgnore
     private @Nullable Integer tokenVersion;

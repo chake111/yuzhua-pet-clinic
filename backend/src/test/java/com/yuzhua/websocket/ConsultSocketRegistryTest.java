@@ -1,5 +1,6 @@
 package com.yuzhua.websocket;
 
+import com.yuzhua.domain.enums.TokenType;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.websocket.ConsultSocketRegistry.Conn;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ class ConsultSocketRegistryTest {
     private static LoginUser user() {
         LoginUser u = new LoginUser();
         u.setId(1L);
-        u.setTyp(LoginUser.TYP_CLIENT);
+        u.setTyp(TokenType.CLIENT);
         return u;
     }
 

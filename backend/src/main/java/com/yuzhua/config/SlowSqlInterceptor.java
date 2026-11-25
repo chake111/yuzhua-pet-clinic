@@ -39,6 +39,8 @@ import java.util.function.LongSupplier;
 })
 public class SlowSqlInterceptor implements Interceptor {
 
+    private static final long NANOS_PER_MILLI = 1_000_000L;
+
     private final AppProperties appProperties;
     private final LongSupplier nanoClock;
 
@@ -70,7 +72,7 @@ public class SlowSqlInterceptor implements Interceptor {
             failed = true;
             throw t;
         } finally {
-            long elapsedMs = (nanoClock.getAsLong() - startNanos) / 1_000_000L;
+            long elapsedMs = (nanoClock.getAsLong() - startNanos) / NANOS_PER_MILLI;
             // 原因: 契约语义为达到或超过阈值即告警
             if (elapsedMs >= thresholdMs) {
                 log.warn("慢 SQL statement={} type={} elapsed={}ms failed={}",

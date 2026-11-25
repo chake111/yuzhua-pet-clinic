@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.yuzhua.common.BatchLookup;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.PageResult;
+import com.yuzhua.domain.enums.AppointmentStatus;
+import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.PageQuery;
 import com.yuzhua.dto.ReviewForm;
 import com.yuzhua.entity.Appointment;
@@ -38,6 +40,9 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorReview> {
 
+    private static final int MIN_RATING = 1;
+    private static final int MAX_RATING = 5;
+
     private final SysUserMapper sysUserMapper;
     private final AppointmentService appointmentService;
     private final DoctorMapper doctorMapper;
@@ -56,17 +61,17 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
     }
 
     private Appointment validateSubmitEligibility(ReviewForm req) {
-        if (req.getRating() == null || req.getRating() < 1 || req.getRating() > 5) {
+        if (req.getRating() == null || req.getRating() < MIN_RATING || req.getRating() > MAX_RATING) {
             throw new BizException("评分为 1-5 星");
         }
-        if (req.getRating() < 5 && (req.getContent() == null || req.getContent().isBlank())) {
+        if (req.getRating() < MAX_RATING && (req.getContent() == null || req.getContent().isBlank())) {
             throw new BizException("低于 5 星请填写评价说明");
         }
         if (req.getAppointmentId() == null) {
             throw new BizException("缺少预约单");
         }
         Appointment a = appointmentService.requireMine(req.getAppointmentId());
-        if (!Integer.valueOf(Appointment.ST_FINISHED).equals(a.getStatus())) {
+        if (a.getStatus() != AppointmentStatus.FINISHED) {
             throw new BizException("问诊完成后才能评价");
         }
         if (Integer.valueOf(1).equals(a.getIsReviewed())) {
@@ -91,7 +96,7 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         r.setContent(req.getContent() == null || req.getContent().isBlank() ? null : req.getContent().trim());
         r.setImages(req.getImages() == null || req.getImages().isBlank() ? null : req.getImages());
         r.setIsAnonymous(Integer.valueOf(1).equals(req.getIsAnonymous()) ? 1 : 0);
-        r.setStatus(1);
+        r.setStatus(EnableStatus.ENABLED);
         return r;
     }
 
@@ -124,9 +129,9 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
      * 所以隐藏一条就要重算一次，否则医生卡片上的均分会和实际看到的评价对不上。
      */
     @Transactional
-    public void changeStatus(Long id, @Nullable Integer status) {
+    public void changeStatus(Long id, @Nullable EnableStatus status) {
         DoctorReview r = require(id);
-        if (status == null || (status != 0 && status != 1)) {
+        if (status == null) {
             throw new BizException("状态只能是 0 隐藏 或 1 显示");
         }
         update(Wrappers.<DoctorReview>lambdaUpdate()
@@ -150,12 +155,12 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         Page<DoctorReview> page = page(new Page<>(q.getPageNum(), q.getPageSize()),
                 Wrappers.<DoctorReview>lambdaQuery()
                         .eq(DoctorReview::getDoctorId, doctorId)
-                        .eq(DoctorReview::getStatus, 1)
+                        .eq(DoctorReview::getStatus, EnableStatus.ENABLED)
                         .orderByDesc(DoctorReview::getCreateTime));
         return toVoPage(page, true);
     }
 
-    public PageResult<ReviewVo> pageForStaff(@Nullable Long doctorId, @Nullable Integer status, PageQuery q) {
+    public PageResult<ReviewVo> pageForStaff(@Nullable Long doctorId, @Nullable EnableStatus status, PageQuery q) {
         LoginUser u = UserContext.require();
         Long scoped = u.isDoctor() ? UserContext.requireDoctorId() : doctorId;
         LambdaQueryWrapper<DoctorReview> qw = Wrappers.<DoctorReview>lambdaQuery()

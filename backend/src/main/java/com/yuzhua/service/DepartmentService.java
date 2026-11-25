@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.PageResult;
+import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.DepartmentForm;
 import com.yuzhua.dto.PageQuery;
 import com.yuzhua.entity.Department;
@@ -36,14 +37,16 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
     private final MedicalRecordMapper recordMapper;
     private final DoctorReviewMapper reviewMapper;
 
+    private static final int DEFAULT_SORT = 99;
+
     public List<Department> listEnabled() {
         return list(Wrappers.<Department>lambdaQuery()
-                .eq(Department::getStatus, 1)
+                .eq(Department::getStatus, EnableStatus.ENABLED)
                 .orderByAsc(Department::getSort)
                 .orderByAsc(Department::getId));
     }
 
-    public PageResult<Department> page(PageQuery query, String keyword) {
+    public PageResult<Department> page(PageQuery query, @Nullable String keyword) {
         LambdaQueryWrapper<Department> qw = Wrappers.<Department>lambdaQuery()
                 .like(keyword != null && !keyword.isBlank(), Department::getName, keyword)
                 .orderByAsc(Department::getSort)
@@ -67,8 +70,8 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         d.setCode(form.getCode());
         d.setIcon(form.getIcon());
         d.setDescription(form.getDescription());
-        d.setSort(form.getSort() == null ? 99 : form.getSort());
-        d.setStatus(form.getStatus() == null ? 1 : form.getStatus());
+        d.setSort(form.getSort() == null ? DEFAULT_SORT : form.getSort());
+        d.setStatus(form.getStatus() == null ? EnableStatus.ENABLED : form.getStatus());
         save(d);
         return d;
     }
@@ -125,7 +128,7 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         removeById(id);
     }
 
-    public void changeStatus(Long id, Integer status) {
+    public void changeStatus(Long id, @Nullable EnableStatus status) {
         requireStatus(status);
         require(id);
         update(Wrappers.<Department>lambdaUpdate()
@@ -153,8 +156,8 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         }
     }
 
-    private void requireStatus(@Nullable Integer status) {
-        if (status == null || (status != 0 && status != 1)) {
+    private void requireStatus(@Nullable EnableStatus status) {
+        if (status == null) {
             throw new BizException("状态只能是停用或启用");
         }
     }

@@ -2,15 +2,17 @@ package com.yuzhua.controller.admin;
 
 import com.yuzhua.common.PageResult;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.AdminRole;
+import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.DepartmentForm;
 import com.yuzhua.dto.PageQuery;
 import com.yuzhua.entity.Department;
-import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.DepartmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,22 +29,22 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin/department")
 @RequiredArgsConstructor
-@RequireRole(LoginUser.ROLE_ADMIN)
+@RequireRole(AdminRole.ADMIN)
 public class DepartmentController {
 
     private final DepartmentService departmentService;
 
     @Operation(summary = "科室分页")
     @GetMapping("/page")
-    @RequireRole({LoginUser.ROLE_ADMIN, LoginUser.ROLE_DOCTOR})
+    @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     public Result<PageResult<Department>> page(PageQuery query,
-                                               @RequestParam(required = false) String keyword) {
+                                               @RequestParam(required = false) @Nullable String keyword) {
         return Result.ok(departmentService.page(query, keyword));
     }
 
     @Operation(summary = "全部科室（下拉选项用）")
     @GetMapping("/list")
-    @RequireRole({LoginUser.ROLE_ADMIN, LoginUser.ROLE_DOCTOR})
+    @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     public Result<List<Department>> list() {
         return Result.ok(departmentService.listEnabled());
     }
@@ -62,7 +64,7 @@ public class DepartmentController {
 
     @Operation(summary = "启用/停用科室。status: 0 停用 1 启用")
     @PutMapping("/{id}/status")
-    public Result<Void> changeStatus(@PathVariable Long id, @RequestParam Integer status) {
+    public Result<Void> changeStatus(@PathVariable Long id, @RequestParam EnableStatus status) {
         departmentService.changeStatus(id, status);
         return Result.ok("已更新", null);
     }

@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.BatchLookup;
 import com.yuzhua.common.PageResult;
+import com.yuzhua.domain.enums.AppointmentStatus;
 import com.yuzhua.dto.MedicalRecordForm;
 import com.yuzhua.dto.PageQuery;
 import com.yuzhua.dto.RecordQuery;
@@ -44,6 +45,7 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
 
     // 原因: 并发首次建档会撞 uk_record_no，秒级时间戳精度不足须到毫秒加随机
     private static final DateTimeFormatter NO_STAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
+    private static final int RECORD_NO_RANDOM_BOUND = 10_000;
 
     private final AppointmentService appointmentService;
     private final DoctorMapper doctorMapper;
@@ -56,8 +58,8 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         // 原因: 查空后插入必须在预约行锁内串行化，避免并发首次保存写出同预约双份病历
         Appointment a = requireStaffAppointmentLocked(appointmentId);
         // 原因: R7 状态用白名单仅放行已接诊与已完成，避免黑名单漏态导致未就诊开处方
-        if (!Integer.valueOf(Appointment.ST_ACCEPTED).equals(a.getStatus())
-                && !Integer.valueOf(Appointment.ST_FINISHED).equals(a.getStatus())) {
+        if (a.getStatus() != AppointmentStatus.ACCEPTED
+                && a.getStatus() != AppointmentStatus.FINISHED) {
             throw new BizException("仅已接诊或已完成的预约可填写病历");
         }
         if (req.getDiagnosis() == null || req.getDiagnosis().isBlank()) {
@@ -79,7 +81,7 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         r.setVisitDate(a.getAppointmentDate() == null ? LocalDate.now() : a.getAppointmentDate());
         if (exist == null) {
             r.setRecordNo("MR" + LocalDateTime.now().format(NO_STAMP)
-                    + String.format(Locale.ROOT, "%04d", ThreadLocalRandom.current().nextInt(10000)));
+                    + String.format(Locale.ROOT, "%04d", ThreadLocalRandom.current().nextInt(RECORD_NO_RANDOM_BOUND)));
             r.setUserId(a.getUserId());
             r.setPetId(a.getPetId());
             r.setDoctorId(a.getDoctorId());

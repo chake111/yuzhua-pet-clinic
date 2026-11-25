@@ -2,12 +2,13 @@ package com.yuzhua.controller.admin;
 
 import com.yuzhua.common.PageResult;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.AdminRole;
+import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.PageQuery;
 import com.yuzhua.dto.ScheduleBatchForm;
 import com.yuzhua.dto.ScheduleEditForm;
 import com.yuzhua.dto.ScheduleForm;
 import com.yuzhua.entity.DoctorSchedule;
-import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.service.DoctorScheduleService;
@@ -16,6 +17,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,19 +35,19 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/admin/schedule")
 @RequiredArgsConstructor
-@RequireRole(LoginUser.ROLE_ADMIN)
+@RequireRole(AdminRole.ADMIN)
 public class ScheduleController {
 
     private final DoctorScheduleService scheduleService;
 
     @Operation(summary = "排班分页")
     @GetMapping("/page")
-    @RequireRole({LoginUser.ROLE_ADMIN, LoginUser.ROLE_DOCTOR})
+    @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     public Result<PageResult<ScheduleVo>> page(
-            @RequestParam(required = false) Long doctorId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end,
-            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) @Nullable Long doctorId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate end,
+            @RequestParam(required = false) @Nullable EnableStatus status,
             PageQuery query) {
         // 原因: 医生仅可查看本人排班，忽略传入 doctorId 防止越权查询他人班表
         Long scopedDoctorId = UserContext.require().isDoctor() ? UserContext.requireDoctorId() : doctorId;

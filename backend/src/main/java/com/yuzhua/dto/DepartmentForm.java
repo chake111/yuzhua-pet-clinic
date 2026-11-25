@@ -1,5 +1,6 @@
 package com.yuzhua.dto;
 
+import com.yuzhua.domain.enums.EnableStatus;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -12,5 +13,5 @@ public class DepartmentForm {
     private @Nullable String description;
     private @Nullable Integer sort;
 
-    private @Nullable Integer status;
+    private @Nullable EnableStatus status;
 }

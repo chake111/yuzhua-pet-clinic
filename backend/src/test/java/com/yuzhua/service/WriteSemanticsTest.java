@@ -4,6 +4,11 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.yuzhua.domain.enums.AppointmentStatus;
+import com.yuzhua.domain.enums.NoticeStatus;
+import com.yuzhua.domain.enums.NoticeType;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.dto.MedicalRecordForm;
 import com.yuzhua.dto.NoticeForm;
 import com.yuzhua.dto.PetForm;
@@ -54,24 +59,24 @@ class WriteSemanticsTest {
     static void asAdmin() {
         LoginUser admin = new LoginUser();
         admin.setId(1L);
-        admin.setTyp(LoginUser.TYP_ADMIN);
-        admin.setRole(LoginUser.ROLE_ADMIN);
+        admin.setTyp(TokenType.ADMIN);
+        admin.setRole(UserRole.ADMIN);
         UserContext.set(admin);
     }
 
     static void asClient() {
         LoginUser client = new LoginUser();
         client.setId(1L);
-        client.setTyp(LoginUser.TYP_CLIENT);
-        client.setRole(LoginUser.ROLE_USER);
+        client.setTyp(TokenType.CLIENT);
+        client.setRole(UserRole.USER);
         UserContext.set(client);
     }
 
     static void asDoctor(long doctorId) {
         LoginUser doctor = new LoginUser();
         doctor.setId(99L);
-        doctor.setTyp(LoginUser.TYP_ADMIN);
-        doctor.setRole(LoginUser.ROLE_DOCTOR);
+        doctor.setTyp(TokenType.ADMIN);
+        doctor.setRole(UserRole.DOCTOR);
         doctor.setDoctorId(doctorId);
         UserContext.set(doctor);
     }
@@ -106,7 +111,7 @@ class WriteSemanticsTest {
         }
     }
 
-    static NoticeForm noticeForm(String title, int type, int topFlag, int status) {
+    static NoticeForm noticeForm(String title, NoticeType type, int topFlag, NoticeStatus status) {
         NoticeForm f = new NoticeForm();
         f.setTitle(title);
         f.setCover("/api/uploads/cover.png");
@@ -122,7 +127,7 @@ class WriteSemanticsTest {
     void noticeCreateFirstPublishSetsPublishMetadata() {
         asAdmin();
         NoticeSvc s = new NoticeSvc();
-        s.create(noticeForm("公告标题", 2, 1, 1));
+        s.create(noticeForm("公告标题", NoticeType.ACTIVITY, 1, NoticeStatus.PUBLISHED));
 
         assertEquals(0, s.saved.getViewCount());
         assertEquals(1L, s.saved.getPublishBy());
@@ -135,10 +140,10 @@ class WriteSemanticsTest {
         NoticeSvc s = new NoticeSvc();
         s.current = new Notice();
         s.current.setId(9L);
-        s.current.setStatus(1);
+        s.current.setStatus(NoticeStatus.PUBLISHED);
         s.current.setPublishTime(java.time.LocalDateTime.now().minusDays(1));
 
-        s.update(9L, noticeForm("公告标题（新）", 3, 0, 2));
+        s.update(9L, noticeForm("公告标题（新）", NoticeType.GUIDE, 0, NoticeStatus.OFFLINE));
 
         assertEquals(9L, s.saved.getId(), "路径 id 优先于请求体");
         assertNull(s.saved.getViewCount(), "阅读量不在表单里，交给更新策略保留");
@@ -153,10 +158,10 @@ class WriteSemanticsTest {
         NoticeSvc s = new NoticeSvc();
         s.current = new Notice();
         s.current.setId(9L);
-        s.current.setStatus(0);
+        s.current.setStatus(NoticeStatus.DRAFT);
         s.current.setPublishTime(null);
 
-        s.update(9L, noticeForm("首次发布", 1, 0, 1));
+        s.update(9L, noticeForm("首次发布", NoticeType.NOTICE, 0, NoticeStatus.PUBLISHED));
 
         assertEquals(1L, s.saved.getPublishBy());
         assertTrue(s.saved.getPublishTime() != null);
@@ -330,7 +335,7 @@ class WriteSemanticsTest {
     static Appointment acceptedAppointment() {
         Appointment a = new Appointment();
         a.setId(11L);
-        a.setStatus(Appointment.ST_ACCEPTED);
+        a.setStatus(AppointmentStatus.ACCEPTED);
         a.setUserId(1L);
         a.setPetId(2L);
         a.setDoctorId(5L);

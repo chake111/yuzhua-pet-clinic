@@ -11,9 +11,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import tools.jackson.databind.exc.InvalidFormatException;
+import tools.jackson.databind.exc.ValueInstantiationException;
 
 import java.util.stream.Collectors;
 
@@ -53,6 +56,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public Result<Void> handleUnreadable(HttpMessageNotReadableException e) {
         log.warn("请求体解析失败: {}", e.getMessage());
+        return Result.fail(400, "提交的内容有误，请刷新后重试");
+    }
+
+    @ExceptionHandler({
+            MethodArgumentTypeMismatchException.class,
+            InvalidFormatException.class,
+            ValueInstantiationException.class
+    })
+    public Result<Void> handleTypeMismatch(Exception e) {
+        log.warn("参数格式或枚举编码无效: {}", e.getMessage());
         return Result.fail(400, "提交的内容有误，请刷新后重试");
     }
 

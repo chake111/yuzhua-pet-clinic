@@ -3,6 +3,9 @@ package com.yuzhua.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.yuzhua.common.BizException;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.dto.AuthDto;
 import com.yuzhua.entity.AdminUser;
 import com.yuzhua.entity.Department;
@@ -39,7 +42,7 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
         if (a == null || !passwordEncoder.matches(req.getPassword(), a.getPassword())) {
             throw new BizException("账号或密码错误");
         }
-        if (!Integer.valueOf(1).equals(a.getStatus())) {
+        if (a.getStatus() != EnableStatus.ENABLED) {
             throw new BizException("账号已被停用");
         }
         AdminUser touch = new AdminUser();
@@ -79,8 +82,8 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
         lu.setUsername(a.getUsername());
         lu.setName(a.getRealName());
         lu.setAvatar(avatarOf(a, d));
-        lu.setTyp(LoginUser.TYP_ADMIN);
-        lu.setRole(a.getRole());
+        lu.setTyp(TokenType.ADMIN);
+        lu.setRole(a.getRole() == null ? null : UserRole.fromCode(a.getRole().code()));
         lu.setDoctorId(a.getDoctorId());
         lu.setTokenVersion(a.getTokenVersion());
 
@@ -97,8 +100,8 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
         vo.setAvatar(avatarOf(a, d));
         vo.setPhone(a.getPhone());
         vo.setEmail(a.getEmail());
-        vo.setTyp(LoginUser.TYP_ADMIN);
-        vo.setRole(a.getRole());
+        vo.setTyp(TokenType.ADMIN);
+        vo.setRole(a.getRole() == null ? null : UserRole.fromCode(a.getRole().code()));
         vo.setDoctorId(a.getDoctorId());
 
         if (d != null) {

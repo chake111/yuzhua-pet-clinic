@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.yuzhua.domain.enums.EnableStatus;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -32,7 +33,7 @@ public class DoctorReview {
     private @Nullable Integer isAnonymous;
     private @Nullable String reply;
     private @Nullable LocalDateTime replyTime;
-    private @Nullable Integer status;
+    private @Nullable EnableStatus status;
 
     @TableField(fill = FieldFill.INSERT)
     private @Nullable LocalDateTime createTime;

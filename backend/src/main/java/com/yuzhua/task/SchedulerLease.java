@@ -18,6 +18,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SchedulerLease {
 
+    private static final int HOLDER_RANDOM_PREFIX_LEN = 8;
+    private static final int MAX_HOLDER_LENGTH = 128;
+
     private final SchedulerLeaseMapper leaseMapper;
 
     private final String holder = buildHolder();
@@ -49,8 +52,8 @@ public class SchedulerLease {
             host = "unknown";
         }
         String raw = host + "/" + ProcessHandle.current().pid() + "/"
-                + UUID.randomUUID().toString().substring(0, 8);
+                + UUID.randomUUID().toString().substring(0, HOLDER_RANDOM_PREFIX_LEN);
         // 原因: holder 列宽 128，超长截尾保留进程号与随机后缀避免 INSERT IGNORE 静默截断后无法匹配释放
-        return raw.length() <= 128 ? raw : raw.substring(raw.length() - 128);
+        return raw.length() <= MAX_HOLDER_LENGTH ? raw : raw.substring(raw.length() - MAX_HOLDER_LENGTH);
     }
 }

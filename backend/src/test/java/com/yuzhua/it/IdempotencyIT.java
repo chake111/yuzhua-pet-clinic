@@ -1,6 +1,8 @@
 package com.yuzhua.it;
 
 import tools.jackson.databind.JsonNode;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.service.AppointmentService;
@@ -242,6 +244,6 @@ class IdempotencyIT extends MySqlITSupport {
     }
 
     private static LoginUser secondUser() {
-        return new LoginUser(SECOND_USER_ID, "ituser2", "IT用户2", null, "CLIENT", "USER", null, 1, null);
+        return new LoginUser(SECOND_USER_ID, "ituser2", "IT用户2", null, TokenType.CLIENT, UserRole.USER, null, 1, null);
     }
 }

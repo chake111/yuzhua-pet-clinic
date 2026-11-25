@@ -2,6 +2,7 @@ package com.yuzhua.controller.client;
 
 import com.yuzhua.common.PageResult;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.AppointmentStatus;
 import com.yuzhua.dto.AppointmentForm;
 import com.yuzhua.dto.CancelForm;
 import com.yuzhua.dto.PageQuery;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,7 +38,7 @@ public class AppointmentController {
                     + "同一用户携带同一个键重放时返回原单，不重复占号")
     @PostMapping
     public Result<AppointmentVo> create(@Valid @RequestBody AppointmentForm req,
-                                        @RequestHeader(value = "Idempotency-Key", required = false) String idemKey) {
+                                        @RequestHeader(value = "Idempotency-Key", required = false) @Nullable String idemKey) {
         return Result.ok("预约成功，请在有效期内支付", appointmentService.create(req, idemKey));
     }
 
@@ -48,14 +50,14 @@ public class AppointmentController {
 
     @Operation(summary = "取消预约（号源退回池子，已支付则标记退款）")
     @PostMapping("/{id}/cancel")
-    public Result<Void> cancel(@PathVariable Long id, @RequestBody(required = false) CancelForm req) {
+    public Result<Void> cancel(@PathVariable Long id, @RequestBody(required = false) @Nullable CancelForm req) {
         appointmentService.cancelByUser(id, req == null ? null : req.getReason());
         return Result.ok("已取消，号源已退回", null);
     }
 
     @Operation(summary = "我的预约分页")
     @GetMapping("/page")
-    public Result<PageResult<AppointmentVo>> page(@RequestParam(required = false) Integer status,
+    public Result<PageResult<AppointmentVo>> page(@RequestParam(required = false) @Nullable AppointmentStatus status,
                                                   PageQuery query) {
         return Result.ok(appointmentService.pageMine(status, query));
     }

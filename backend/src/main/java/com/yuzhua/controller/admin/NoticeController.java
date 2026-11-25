@@ -2,15 +2,18 @@ package com.yuzhua.controller.admin;
 
 import com.yuzhua.common.PageResult;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.AdminRole;
+import com.yuzhua.domain.enums.NoticeStatus;
+import com.yuzhua.domain.enums.NoticeType;
 import com.yuzhua.dto.NoticeForm;
 import com.yuzhua.dto.PageQuery;
 import com.yuzhua.entity.Notice;
-import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.NoticeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin/notice")
 @RequiredArgsConstructor
-@RequireRole(LoginUser.ROLE_ADMIN)
+@RequireRole(AdminRole.ADMIN)
 public class NoticeController {
 
     private final NoticeService noticeService;
@@ -33,9 +36,9 @@ public class NoticeController {
     @Operation(summary = "公告分页。status: 0 草稿 1 已发布 2 已下架")
     @GetMapping("/page")
     public Result<PageResult<Notice>> page(PageQuery query,
-                                           @RequestParam(required = false) Integer status,
-                                           @RequestParam(required = false) Integer type,
-                                           @RequestParam(required = false) String keyword) {
+                                           @RequestParam(required = false) @Nullable NoticeStatus status,
+                                           @RequestParam(required = false) @Nullable NoticeType type,
+                                           @RequestParam(required = false) @Nullable String keyword) {
         return Result.ok(noticeService.pageAdmin(query, status, type, keyword));
     }
 
@@ -60,7 +63,7 @@ public class NoticeController {
 
     @Operation(summary = "发布 / 下架 / 转草稿")
     @PutMapping("/{id}/status")
-    public Result<Void> changeStatus(@PathVariable Long id, @RequestParam Integer status) {
+    public Result<Void> changeStatus(@PathVariable Long id, @RequestParam NoticeStatus status) {
         noticeService.changeStatus(id, status);
         return Result.ok("已更新", null);
     }

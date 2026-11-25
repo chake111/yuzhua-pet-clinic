@@ -1,5 +1,6 @@
 package com.yuzhua.dto;
 
+import com.yuzhua.domain.enums.SchedulePeriod;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
@@ -33,7 +34,7 @@ public class ScheduleBatchForm {
     @Data
     public static class PeriodTemplate {
         @NotNull(message = "请选择时段")
-        private @Nullable Integer period;
+        private @Nullable SchedulePeriod period;
 
         @NotNull(message = "请选择开始时间")
         private @Nullable LocalTime startTime;

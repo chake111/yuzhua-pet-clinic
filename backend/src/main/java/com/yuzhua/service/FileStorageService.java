@@ -27,6 +27,13 @@ public class FileStorageService {
 
     private static final Set<String> ALLOWED_EXT = Set.of("jpg", "jpeg", "png", "gif", "webp");
     private static final DateTimeFormatter DIR_FMT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    private static final long BYTES_PER_MB = 1024L * 1024L;
+    private static final int IMAGE_HEADER_READ_BYTES = 12;
+    private static final int UNSIGNED_BYTE_MASK = 0xff;
+    private static final int JPEG_MAGIC_LEN = 3;
+    private static final int JPEG_SOI_0 = 0xff;
+    private static final int JPEG_SOI_1 = 0xd8;
+    private static final int WEBP_TAG_OFFSET = 8;
 
     private final AppProperties props;
 
@@ -35,7 +42,7 @@ public class FileStorageService {
             throw new BizException("请选择要上传的文件");
         }
         if (file.getSize() > props.getUpload().getMaxSizeBytes()) {
-            throw new BizException("文件不能超过 " + props.getUpload().getMaxSizeBytes() / 1024 / 1024 + "MB");
+            throw new BizException("文件不能超过 " + props.getUpload().getMaxSizeBytes() / BYTES_PER_MB + "MB");
         }
         String ext = extractSafeExt(file.getOriginalFilename());
         requireImageHeader(file, ext);
@@ -62,14 +69,17 @@ public class FileStorageService {
 
     private void requireImageHeader(MultipartFile file, String ext) {
         try (InputStream input = file.getInputStream()) {
-            byte[] header = input.readNBytes(12);
+            byte[] header = input.readNBytes(IMAGE_HEADER_READ_BYTES);
             String text = new String(header, StandardCharsets.ISO_8859_1);
             boolean matches = switch (ext) {
-                case "jpg", "jpeg" -> header.length >= 3 && (header[0] & 255) == 0xff
-                        && (header[1] & 255) == 0xd8 && (header[2] & 255) == 0xff;
+                case "jpg", "jpeg" -> header.length >= JPEG_MAGIC_LEN
+                        && (header[0] & UNSIGNED_BYTE_MASK) == JPEG_SOI_0
+                        && (header[1] & UNSIGNED_BYTE_MASK) == JPEG_SOI_1
+                        && (header[2] & UNSIGNED_BYTE_MASK) == JPEG_SOI_0;
                 case "png" -> text.startsWith("\u0089PNG\r\n\u001a\n");
                 case "gif" -> text.startsWith("GIF87a") || text.startsWith("GIF89a");
-                case "webp" -> header.length == 12 && text.startsWith("RIFF") && text.substring(8).equals("WEBP");
+                case "webp" -> header.length == IMAGE_HEADER_READ_BYTES
+                        && text.startsWith("RIFF") && text.substring(WEBP_TAG_OFFSET).equals("WEBP");
                 default -> false;
             };
             if (!matches) {

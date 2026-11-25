@@ -3,6 +3,7 @@ package com.yuzhua.controller.client;
 import com.yuzhua.common.Result;
 import com.yuzhua.dto.AuthDto;
 import com.yuzhua.entity.SysUser;
+import com.yuzhua.security.PublicEndpoint;
 import com.yuzhua.service.SysUserService;
 import com.yuzhua.vo.LoginVo;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,13 +25,17 @@ public class AuthController {
 
     private final SysUserService sysUserService;
 
+    /** 用户端注册公开写入口：校验唯一性后创建账号并直发登录令牌，依赖网关限流防恶意批量注册。 */
     @Operation(summary = "注册（成功即登录，直接返回 token）")
+    @PublicEndpoint(allowMutation = true)
     @PostMapping("/register")
     public Result<LoginVo> register(@Valid @RequestBody AuthDto.Register req) {
         return Result.ok("注册成功", sysUserService.register(req));
     }
 
+    /** 用户端登录公开写入口：校验凭证并签发用户端 JWT，作为免鉴权登录边界之一。 */
     @Operation(summary = "登录")
+    @PublicEndpoint(allowMutation = true)
     @PostMapping("/login")
     public Result<LoginVo> login(@Valid @RequestBody AuthDto.Login req) {
         return Result.ok(sysUserService.login(req));

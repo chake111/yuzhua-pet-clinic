@@ -2,10 +2,12 @@ package com.yuzhua.controller.client;
 
 import com.yuzhua.common.PageResult;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.NoticeType;
 import com.yuzhua.dto.DoctorQuery;
 import com.yuzhua.dto.PageQuery;
 import com.yuzhua.entity.Department;
 import com.yuzhua.entity.Notice;
+import com.yuzhua.security.PublicEndpoint;
 import com.yuzhua.service.DepartmentService;
 import com.yuzhua.service.DoctorReviewService;
 import com.yuzhua.service.DoctorScheduleService;
@@ -18,6 +20,7 @@ import com.yuzhua.vo.ScheduleVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,7 +35,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/client/catalog")
 @RequiredArgsConstructor
+@PublicEndpoint
 public class CatalogController {
+
+    private static final int HOME_DOCTOR_LIMIT = 6;
+    private static final int HOME_NOTICE_LIMIT = 5;
 
     private final DepartmentService departmentService;
     private final DoctorService doctorService;
@@ -45,8 +52,8 @@ public class CatalogController {
     public Result<HomeVo> home() {
         HomeVo vo = new HomeVo();
         vo.setDepartments(departmentService.listEnabled());
-        vo.setDoctors(doctorService.listTopVisible(6));
-        vo.setNotices(noticeService.listLatest(5));
+        vo.setDoctors(doctorService.listTopVisible(HOME_DOCTOR_LIMIT));
+        vo.setNotices(noticeService.listLatest(HOME_NOTICE_LIMIT));
         return Result.ok(vo);
     }
 
@@ -72,8 +79,8 @@ public class CatalogController {
     @GetMapping("/doctors/{id}/schedules")
     public Result<List<ScheduleVo>> doctorSchedules(
             @PathVariable Long id,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) Integer days) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate from,
+            @RequestParam(required = false) @Nullable Integer days) {
         return Result.ok(scheduleService.listBookable(id, from, days));
     }
 
@@ -86,8 +93,8 @@ public class CatalogController {
     @Operation(summary = "公告/科普列表。type: 1 公告 2 活动 3 养宠科普")
     @GetMapping("/notices")
     public Result<PageResult<Notice>> notices(PageQuery query,
-                                             @RequestParam(required = false) Integer type,
-                                             @RequestParam(required = false) String keyword) {
+                                             @RequestParam(required = false) @Nullable NoticeType type,
+                                             @RequestParam(required = false) @Nullable String keyword) {
         return Result.ok(noticeService.pagePublished(query, type, keyword));
     }
 

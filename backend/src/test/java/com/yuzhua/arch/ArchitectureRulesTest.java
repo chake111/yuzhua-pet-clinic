@@ -17,11 +17,15 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.yuzhua.security.PublicEndpoint;
+import com.yuzhua.security.RequireRole;
 import com.yuzhua.task.SchedulerLease;
 import io.swagger.v3.oas.annotations.Operation;
 import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -125,6 +129,82 @@ class ArchitectureRulesTest {
         rule.check(PROD_CLASSES);
     }
 
+    @Test
+    void arch06_adminEndpointsDeclareRoleOrPublicAndAllowMutationIsRestricted() {
+        arch06AdminRoleRule().check(PROD_CLASSES);
+        arch06PublicMutationRule().check(PROD_CLASSES);
+    }
+
+    @Test
+    void arch06_negativeFixturesDetectMissingRoleAndIllegalAllowMutation() {
+        JavaClasses missingRoleFixture = new ClassFileImporter().importClasses(
+                MissingRoleAdminControllerFixture.class);
+        assertThrows(AssertionError.class, () ->
+                arch06AdminRoleRule().check(missingRoleFixture));
+
+        JavaClasses illegalMutationFixture = new ClassFileImporter().importClasses(
+                IllegalAllowMutationControllerFixture.class);
+        assertThrows(AssertionError.class, () ->
+                arch06PublicMutationRule().check(illegalMutationFixture));
+    }
+
+    private static ArchRule arch06AdminRoleRule() {
+        return classes().that().areAnnotatedWith(RestController.class)
+                .and().resideInAPackage("..controller.admin..")
+                .or().areAssignableTo(MissingRoleAdminControllerFixture.class)
+                .should(haveRoleOrPublicOnAllHandlers());
+    }
+
+    private static ArchRule arch06PublicMutationRule() {
+        return methods().that().areDeclaredInClassesThat().areAnnotatedWith(RestController.class)
+                .and(annotatedAsRequestHandler())
+                .should(onlyAllowPublicMutationOnAuthEndpoints());
+    }
+
+    private static ArchCondition<JavaClass> haveRoleOrPublicOnAllHandlers() {
+        return new ArchCondition<>("declare @RequireRole or @PublicEndpoint on every admin handler") {
+            @Override
+            public void check(JavaClass controller, ConditionEvents events) {
+                boolean classProtected = controller.isAnnotatedWith(RequireRole.class)
+                        || controller.isAnnotatedWith(PublicEndpoint.class);
+                for (JavaMethod method : controller.getMethods()) {
+                    if (!isRequestHandler(method)) {
+                        continue;
+                    }
+                    boolean methodProtected = method.isAnnotatedWith(RequireRole.class)
+                            || method.isAnnotatedWith(PublicEndpoint.class);
+                    if (!classProtected && !methodProtected) {
+                        events.add(SimpleConditionEvent.violated(method,
+                                method.getFullName() + " missing @RequireRole or @PublicEndpoint"));
+                    }
+                }
+            }
+        };
+    }
+
+    private static ArchCondition<JavaMethod> onlyAllowPublicMutationOnAuthEndpoints() {
+        Set<String> allowed = Set.of(
+                "com.yuzhua.controller.client.AuthController.register",
+                "com.yuzhua.controller.client.AuthController.login",
+                "com.yuzhua.controller.admin.AdminAuthController.login");
+        return new ArchCondition<>("restrict @PublicEndpoint(allowMutation=true) to login/register") {
+            @Override
+            public void check(JavaMethod method, ConditionEvents events) {
+                boolean methodMut = method.isAnnotatedWith(PublicEndpoint.class)
+                        && method.getAnnotationOfType(PublicEndpoint.class).allowMutation();
+                boolean classMut = method.getOwner().isAnnotatedWith(PublicEndpoint.class)
+                        && method.getOwner().getAnnotationOfType(PublicEndpoint.class).allowMutation();
+                if (methodMut || classMut) {
+                    String key = method.getOwner().getName() + "." + method.getName();
+                    if (!allowed.contains(key)) {
+                        events.add(SimpleConditionEvent.violated(method,
+                                "unexpected @PublicEndpoint(allowMutation=true) on " + key));
+                    }
+                }
+            }
+        };
+    }
+
     private static ArchRule arch02Rule(String... callerPackages) {
         return classes().that().resideInAnyPackage(callerPackages)
                 .should(notCallGenericServiceCrud());
@@ -182,10 +262,14 @@ class ArchitectureRulesTest {
         return new DescribedPredicate<>("annotated as Spring request handler") {
             @Override
             public boolean test(JavaMethod method) {
-                return method.isAnnotatedWith(RequestMapping.class)
-                        || method.isMetaAnnotatedWith(RequestMapping.class);
+                return isRequestHandler(method);
             }
         };
+    }
+
+    private static boolean isRequestHandler(JavaMethod method) {
+        return method.isAnnotatedWith(RequestMapping.class)
+                || method.isMetaAnnotatedWith(RequestMapping.class);
     }
 
     static class SampleEntityFixture {
@@ -211,6 +295,23 @@ class ArchitectureRulesTest {
 
         void trigger() {
             service.getById(1L);
+        }
+    }
+
+    @RestController
+    static class MissingRoleAdminControllerFixture {
+        @GetMapping("/admin/fixture")
+        public String ping() {
+            return "ok";
+        }
+    }
+
+    @RestController
+    static class IllegalAllowMutationControllerFixture {
+        @PublicEndpoint(allowMutation = true)
+        @PostMapping("/client/fixture")
+        public String mutate() {
+            return "ok";
         }
     }
 }

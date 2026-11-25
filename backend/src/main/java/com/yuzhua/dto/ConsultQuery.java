@@ -1,5 +1,7 @@
 package com.yuzhua.dto;
 
+import com.yuzhua.domain.enums.ConsultModerationStatus;
+import com.yuzhua.domain.enums.ConsultSessionStatus;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
@@ -8,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 @EqualsAndHashCode(callSuper = true)
 public class ConsultQuery extends PageQuery {
 
-    private @Nullable Integer status;
+    private @Nullable ConsultSessionStatus status;
 
-    private @Nullable Integer moderateStatus;
+    private @Nullable ConsultModerationStatus moderateStatus;
 }
