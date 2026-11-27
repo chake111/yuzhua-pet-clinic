@@ -95,7 +95,10 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         });
     }
 
-    /** 校验医生在诊、时段范围与唯一性后新建排班，初始余量等于总量。 */
+    /**
+     * 校验医生在诊、时段范围及应用层判重（{@code exists}，并发同排班由库表 {@code uk_doctor_date_period} 唯一约束兜底）后新建排班；
+     * 初始余量等于总量，{@code status} 为 {@code null} 时默认 {@code EnableStatus.ENABLED}。
+     */
     @Transactional
     public DoctorSchedule create(ScheduleForm req) {
         requireSchedulable(req.getDoctorId());

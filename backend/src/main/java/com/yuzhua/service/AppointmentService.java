@@ -67,7 +67,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointment> {
 
-    // 原因: 毫秒时间戳后补 8 位随机，将百并发抢号下撞 uk_order_no 的概率压到可忽略（总长 27 字符）
+    // 原因: "PC" 前缀(2) + 毫秒时间戳(17) + 8 位随机(8) 共 27 字符，将百并发抢号下撞 uk_order_no 的概率压到可忽略
     private static final DateTimeFormatter NO_STAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
     // 原因: 收紧幂等键为 8-64 位 URL 安全字符，入口即拒脏键避免落库截断或排序规则差异导致异常重放
@@ -290,7 +290,12 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
     }
 
-    /** 医生接诊：锁行校验归属、未过就诊日、已支付且待接诊后推进至已接诊（VisitOverdueException 不回滚）。 */
+    /**
+     * 医生接诊：先 {@code lockForUpdate} 锁预约行并仅放行接诊医生本人（管理员或他人代操抛 403）；
+     * 若已支付待接诊单已过就诊日，{@code requireVisitNotOverdue} 会先落库 {@code MISSED}（不退号不退款）并抛出
+     * {@code VisitOverdueException}，因 {@code noRollbackFor} 该未到诊状态会提交保留；
+     * 校验已支付待接诊后通过条件更新推进至 {@code ACCEPTED}（0 行受影响抛异常防并发重入）。
+     */
     @Transactional(noRollbackFor = VisitOverdueException.class)
     public void accept(Long id) {
         Appointment a = lockForUpdate(id);

@@ -130,9 +130,9 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     }
 
     /**
-     * 结束会话。医生随时可结束，并可附一段问诊小结（线上只建议、确诊要面诊）；
-     * 患者只能关掉自己那张还没被接诊的会话，且不能写小结。
-     * 先锁会话行：与发送共用一个顺序，结束提示一定落在已提交消息之后，摘要不会被旧消息覆盖。
+     * 结束会话：持会话行锁校验状态（医生随时可结束并可附不超过 500 字小结；患者仅可关闭待接诊会话且忽略小结），
+     * 并经条件更新写入 {@code CLOSED}。结束系统消息仅通过 {@code consultPush.push} 注册 {@code afterCommit}
+     * 在事务提交后推送，确保对端仅在库内提交成功后收到终止帧。
      */
     @Transactional
     public void close(Long sessionId, @Nullable String summary) {
@@ -480,7 +480,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
             // 原因: 处置关闭后的系统消息仅管理员审计视图可见，参与方已无法读取整个会话
             systemMessage(sessionId, "该会话已由管理员处置关闭。");
         }
-        // 原因: 提交后先推送 MODERATION 帧再清退房间订阅，阻止旧连接继续收到正文
+        // 原因: pushModeration 内部注册 afterCommit，在事务提交后先发 MODERATION 帧再清退房间订阅，防旧连接续收正文
         consultPush.pushModeration(sessionId, Map.of(
                 "type", "MODERATION", "sessionId", sessionId, "moderateStatus", moderateStatus.code()));
     }

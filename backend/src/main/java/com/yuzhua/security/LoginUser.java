@@ -44,7 +44,10 @@ public class LoginUser {
         return typ == TokenType.CLIENT;
     }
 
-    /** 校验当前后台登录态是否命中给定后台角色集合。 */
+    /**
+     * 校验当前后台登录态是否命中给定后台角色集合：必须同时满足 {@code typ == TokenType.ADMIN} 且 {@code role != null}；
+     * 用户端令牌（即使 {@code role} 同名）或 {@code roles} 为空时均按 fail-closed 返回 {@code false}。
+     */
     public boolean matchesAny(AdminRole... roles) {
         if (typ != TokenType.ADMIN || role == null) {
             return false;
