@@ -37,7 +37,7 @@ public class ConsultDeliveryGuard {
 
     /**
      * 业务帧：账号有效、会话存在、接收方仍是会话当事人、会话未被处置。
-     * 正常结束（status=2）的会话仍放行，历史查询与收尾通知不受影响。
+     * 正常结束（{@code ConsultSessionStatus.CLOSED}）的会话仍放行，历史查询与收尾通知不受影响。
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Decision checkBusiness(LoginUser receiver, Long sessionId) {

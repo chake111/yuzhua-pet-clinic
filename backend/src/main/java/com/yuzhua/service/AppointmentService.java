@@ -313,9 +313,9 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
 
     /**
      * 医生结束本人已接诊预约：先 {@code lockForUpdate} 锁预约行（不存在抛 404），经 {@code requireDoctorMayTouch}
-     * 仅放行接诊医生本人（管理员或他人代操抛 403）并校验 {@code status == ST_ACCEPTED}；
-     * 通过条件更新（{@code WHERE status = ST_ACCEPTED}）推进至 {@code ST_FINISHED} 与 {@code finishTime}，影响 0 行抛异常防并发重复完成，
-     * 仅 CAS 成功后才递增医生接诊量；允许结束后补写病历，不强制病历已存在。
+     * 仅放行接诊医生本人（管理员或他人代操抛 403）并校验 {@code status == AppointmentStatus.ACCEPTED}；
+     * 通过条件更新（{@code WHERE status = AppointmentStatus.ACCEPTED}）推进至 {@code AppointmentStatus.FINISHED} 与 {@code finishTime}，
+     * 影响 0 行抛异常防并发重复完成，仅 CAS 成功后才递增医生接诊量；允许结束后补写病历，不强制病历已存在。
      */
     @Transactional
     public void finish(Long id) {

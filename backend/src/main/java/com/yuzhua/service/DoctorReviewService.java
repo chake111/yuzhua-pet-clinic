@@ -125,7 +125,7 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
     }
 
     /**
-     * 显示 / 隐藏评价。评分聚合只统计 status=1 的行，
+     * 显示 / 隐藏评价。评分聚合只统计启用态（{@code EnableStatus.ENABLED}，库值 {@code status = 1}）的行，
      * 所以隐藏一条就要重算一次，否则医生卡片上的均分会和实际看到的评价对不上。
      */
     @Transactional

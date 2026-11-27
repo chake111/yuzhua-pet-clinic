@@ -64,7 +64,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     private final SysUserMapper sysUserMapper;
 
     /**
-     * 校验宠物归属、医生存在且在诊（{@code status == 1}）及症状非空白后创建免费图文问诊会话（初始待接诊，未读数归零）。
+     * 校验宠物归属、医生存在且在诊（{@code EnableStatus.ENABLED}）及症状非空白后创建免费图文问诊会话（初始待接诊，未读数归零）。
      * 本接口无幂等键去重，重复提交会创建独立会话。
      */
     @Transactional
@@ -435,8 +435,8 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     }
 
     /**
-     * 管理员处置会话（1 无效关闭 / 2 违规屏蔽 / 0 撤销处置），持会话行锁执行。
-     * 非 0 处置连带关闭未结束会话并由 {@link ConsultPush#pushModeration} 清退房间订阅；撤销不恢复关闭态。
+     * 管理员处置会话（{@code ConsultModerationStatus.INVALID} 无效关闭 / {@code VIOLATION} 违规屏蔽 / {@code NORMAL} 撤销处置；{@code null} 抛业务异常），持会话行锁执行。
+     * 非 {@code NORMAL} 处置连带关闭未结束会话并由 {@link ConsultPush#pushModeration} 清退房间订阅；撤销不恢复关闭态。
      */
     @Transactional
     public void moderate(Long sessionId, @Nullable ConsultModerationStatus moderateStatus, @Nullable String reason) {
