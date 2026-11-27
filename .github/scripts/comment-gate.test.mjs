@@ -976,6 +976,30 @@ test('isNoOpPraiseFinding drops Major praise entries while preserving real defec
     }),
     false
   )
+  assert.equal(
+    isNoOpPraiseFinding({
+      dimension: 'INFO_GAIN',
+      severity: 'Major',
+      suggestion: 'No change needed. This is a high-value comment explaining non-obvious business logic.',
+    }),
+    true
+  )
+  assert.equal(
+    isNoOpPraiseFinding({
+      dimension: 'INFO_GAIN',
+      severity: 'Major',
+      suggestion: '无需修改，该注释准确说明了异常口径。',
+    }),
+    true
+  )
+  assert.equal(
+    isNoOpPraiseFinding({
+      dimension: 'INFO_GAIN',
+      severity: 'Major',
+      suggestion: 'Keep as is, but add the 403 precondition.',
+    }),
+    false
+  )
 
   const item = makeSampleItem()
   const server = await startMockServer((req, res, body) => {
