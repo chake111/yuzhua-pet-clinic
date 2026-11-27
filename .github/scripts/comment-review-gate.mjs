@@ -85,7 +85,16 @@ export function sanitizeOutputText(text) {
     .replace(/'/g, '&#39;')
 }
 
-export function buildBatches(items, { maxFiles = 8, maxItems = 15 } = {}) {
+export function sanitizeErrorText(text) {
+  return String(text || 'unknown error')
+    .replace(/\bBearer\s+\S+/gi, 'Bearer [REDACTED]')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, 'sk-[REDACTED]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 240)
+}
+
+export function buildBatches(items, { maxFiles = 6, maxItems = 8 } = {}) {
   const batches = []
   let current = []
   let currentFiles = new Set()
@@ -259,6 +268,14 @@ function stripJsonFences(raw) {
   return fenceMatch ? fenceMatch[1].trim() : trimmed
 }
 
+function mergeExtraBody(payload, reviewer) {
+  const extra = reviewer?.extra_body
+  if (!extra || typeof extra !== 'object' || Array.isArray(extra)) {
+    return payload
+  }
+  return { ...extra, ...payload }
+}
+
 async function callModelEndpoint({
   reviewer,
   apiKey,
@@ -277,6 +294,17 @@ async function callModelEndpoint({
       .filter((m) => m.role !== 'system')
       .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
 
+    const anthropicBody = mergeExtraBody(
+      {
+        model: reviewer.model_id,
+        max_tokens: 2048,
+        temperature,
+        system: systemMsg,
+        messages: userMsgs,
+      },
+      reviewer
+    )
+
     const res = await fetchWithRetry(
       `${baseUrl}/messages`,
       {
@@ -286,13 +314,7 @@ async function callModelEndpoint({
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({
-          model: reviewer.model_id,
-          max_tokens: 2048,
-          temperature,
-          system: systemMsg,
-          messages: userMsgs,
-        }),
+        body: JSON.stringify(anthropicBody),
       },
       { fetchImpl, baseDelayMs }
     )
@@ -310,11 +332,14 @@ async function callModelEndpoint({
   }
 
   // OpenAI-compatible /chat/completions
-  const body = {
-    model: reviewer.model_id,
-    temperature,
-    messages,
-  }
+  const body = mergeExtraBody(
+    {
+      model: reviewer.model_id,
+      temperature,
+      messages,
+    },
+    reviewer
+  )
   if (useSchema) {
     body.response_format = {
       type: 'json_schema',
@@ -514,12 +539,19 @@ export function filterAllowedFindings(findings, batch) {
  * Dimensionless clustering by (file, line_overlap ±2) with 2/3 majority vote
  * and zero-tolerance (>= 1/3) PROMPT_INJECTION blocking.
  */
-export function aggregateReviewerResults(reviewerResults, precheckPIHits = []) {
+export function aggregateReviewerResults(
+  reviewerResults,
+  precheckPIHits = [],
+  { infraFailureOverride } = {}
+) {
   const totalReviewers = reviewerResults.length
   const okReviewers = reviewerResults.filter((r) => r.ok)
-  const failedReviewers = reviewerResults.filter((r) => !r.ok)
+  const failedReviewers = reviewerResults.filter(
+    (r) => !r.ok || (Array.isArray(r.errors) && r.errors.length > 0)
+  )
 
-  const infraFailure = okReviewers.length < 2
+  const infraFailure =
+    typeof infraFailureOverride === 'boolean' ? infraFailureOverride : okReviewers.length < 2
   const piReviewers = okReviewers.filter(
     (r) =>
       r.prompt_injection_detected ||
@@ -604,7 +636,11 @@ export function aggregateReviewerResults(reviewerResults, precheckPIHits = []) {
   return {
     infraFailure,
     okCount: okReviewers.length,
-    failedReviewers: failedReviewers.map((r) => ({ id: r.reviewerId, error: r.error })),
+    failedReviewers: failedReviewers.map((r) => ({
+      id: r.reviewerId,
+      error: r.error,
+      partial: Boolean(r.ok),
+    })),
     promptInjection,
     precheckPIHits,
     piEvidence: piReviewers.map((r) => ({
@@ -631,7 +667,7 @@ export function renderPrComment({ mode, decision, aggregation, overrideInfo }) {
     COMMENT_MARKER,
     `### L2 注释语义门禁结果: **${statusBadge}**（模式: \`${mode}\`）`,
     '',
-    `- 有效评审数: ${aggregation.okCount}/3${aggregation.failedReviewers.length ? `（故障: ${aggregation.failedReviewers.map((r) => `${r.id}`).join(', ')}）` : ''}`,
+    `- 有效评审数: ${aggregation.okCount}/3${aggregation.failedReviewers.length ? `（故障: ${aggregation.failedReviewers.map((r) => `${r.id}${r.partial ? '(部分批次)' : ''}`).join(', ')}）` : ''}`,
     `- 2/3 多数决阻断聚类: ${aggregation.blockingClusters.length} 项`,
     `- 少数/Nit 参考建议: ${aggregation.advisoryClusters.length} 项`,
   ]
@@ -733,7 +769,7 @@ export async function runReviewGate({
   schemaFallbackCache = new Set(),
 }) {
   const precheckPIHits = detectPromptInjectionPrecheck(items)
-  const batches = buildBatches(items, { maxFiles: 8, maxItems: 15 })
+  const batches = buildBatches(items, { maxFiles: 6, maxItems: 8 })
 
   // Run each reviewer independently across all batches, keeping total concurrency <= 3
   const tasks = []
@@ -752,24 +788,27 @@ export async function runReviewGate({
           schemaFallbackCache,
         })
         completedCalls++
-        if (batches.length > 1) {
+        const progress = `(${completedCalls}/${batches.length * reviewers.length})`
+        if (batches.length > 1 || !res.ok) {
+          const detail = res.ok ? 'ok' : `err ${progress} — ${sanitizeErrorText(res.error)}`
           console.error(
-            `[comment-review-gate] batch ${bIdx + 1}/${batches.length} ${reviewer.id}: ${res.ok ? 'ok' : 'err'} (${completedCalls}/${batches.length * reviewers.length})`
+            `[comment-review-gate] batch ${bIdx + 1}/${batches.length} ${reviewer.id}: ${res.ok ? `ok ${progress}` : detail}`
           )
         }
-        return { reviewerId: reviewer.id, res }
+        return { batchIndex: bIdx, reviewerId: reviewer.id, res }
       })
     }
   }
 
   const batchOutputs = await runWithConcurrency(tasks, 3)
 
-  // Merge batch results per reviewer
+  // Track per-batch quorum (>= 2/3 healthy reviewers per batch) and preserve passing batch findings
+  const batchOkCounts = new Array(batches.length).fill(0)
   const byReviewer = new Map()
   for (const r of reviewers) {
     byReviewer.set(r.id, {
       reviewerId: r.id,
-      ok: true,
+      okBatches: 0,
       prompt_injection_detected: false,
       prompt_injection_evidence: '',
       findings: [],
@@ -779,9 +818,10 @@ export async function runReviewGate({
   for (const entry of batchOutputs) {
     const acc = byReviewer.get(entry.reviewerId)
     if (!entry.res.ok) {
-      acc.ok = false
-      acc.errors.push(entry.res.error)
+      acc.errors.push(`batch ${entry.batchIndex + 1}/${batches.length}: ${sanitizeErrorText(entry.res.error)}`)
     } else {
+      batchOkCounts[entry.batchIndex]++
+      acc.okBatches++
       if (entry.res.prompt_injection_detected) {
         acc.prompt_injection_detected = true
         acc.prompt_injection_evidence = [acc.prompt_injection_evidence, entry.res.prompt_injection_evidence]
@@ -792,12 +832,18 @@ export async function runReviewGate({
     }
   }
 
+  const minHealthyPerBatch = Math.min(2, reviewers.length)
+  const batchInfraFailure = batches.length > 0 && batchOkCounts.some((cnt) => cnt < minHealthyPerBatch)
+
   const mergedReviewerResults = [...byReviewer.values()].map((r) => ({
     ...r,
+    ok: r.okBatches > 0,
     error: r.errors.join('; '),
   }))
 
-  const aggregation = aggregateReviewerResults(mergedReviewerResults, precheckPIHits)
+  const aggregation = aggregateReviewerResults(mergedReviewerResults, precheckPIHits, {
+    infraFailureOverride: batchInfraFailure,
+  })
 
   let decision = 'PASS'
   let overridable = false
