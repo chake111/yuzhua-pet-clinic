@@ -60,7 +60,7 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
         return toLoginVo(null, a, doctorOf(a));
     }
 
-    /** 同用户端：密码与令牌版本同一条 UPDATE 提交，使此前签发的后台令牌立即失效 */
+    /** 校验当前登录账号与原密码后，同一条 {@code UPDATE} 写入新密码并递增 {@code token_version}，使此前签发的后台令牌在 {@code AccountGuard} 立即失效。 */
     @Transactional
     public void changePassword(AuthDto.ChangePassword req) {
         AdminUser a = baseMapper.selectWithPassword(UserContext.requireId());

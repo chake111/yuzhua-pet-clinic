@@ -153,10 +153,31 @@ class FormValidationAndPatchSemanticsTest {
                         .content("{\"summary\":\"" + over500 + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400));
+
+        mockMvc.perform(post("/probe/notice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"草稿","status":0}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(post("/probe/notice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":" ","status":0}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400));
     }
 
     @RestController
     static class ValidationProbeController {
+
+        @PostMapping("/probe/notice")
+        public Result<Void> notice(@Valid @RequestBody NoticeForm form) {
+            return Result.ok(null);
+        }
 
         @PostMapping("/probe/schedule-batch")
         public Result<Void> scheduleBatch(@Valid @RequestBody ScheduleBatchForm form) {

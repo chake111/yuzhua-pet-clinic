@@ -83,7 +83,10 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         return n;
     }
 
-    /** 事务内新建公告；仅当初始状态为已发布时记录发布人与发布时间。 */
+    /**
+     * 事务内新建公告：缺省 {@code status}/{@code type}/{@code topFlag} 分别回退 {@code DRAFT}/{@code NOTICE}/0，
+     * 仅当初始状态为 {@code PUBLISHED} 时记录发布人与发布时间。
+     */
     @Transactional
     public NoticeVo create(NoticeForm form) {
         requireTitle(form.title());
@@ -106,7 +109,10 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         return toVo(n);
     }
 
-    /** 事务内更新公告，首次发布才补写发布人/时间，阅读量由更新策略保留。 */
+    /**
+     * 事务内更新公告（不存在抛 404）：缺省 {@code status}/{@code type}/{@code topFlag} 沿用原记录值，
+     * 仅首次发布补写发布人与发布时间，{@code viewCount} 不写入以保留原阅读量。
+     */
     @Transactional
     public void update(Long id, NoticeForm form) {
         Notice cur = require(id);

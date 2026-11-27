@@ -121,6 +121,24 @@ class WriteSemanticsTest {
     }
 
     @Test
+    void noticeCreateAndUpdateHandleOmittedType() {
+        asAdmin();
+        NoticeSvc s = new NoticeSvc();
+        s.create(new NoticeForm("草稿", null, null, null, null, null, NoticeStatus.DRAFT));
+        assertEquals(NoticeType.NOTICE, s.saved.getType());
+
+        s.current = new Notice();
+        s.current.setId(9L);
+        s.current.setType(NoticeType.GUIDE);
+        s.current.setTopFlag(1);
+        s.current.setStatus(NoticeStatus.DRAFT);
+        s.update(9L, new NoticeForm("更新标题", null, null, null, null, null, null));
+        assertEquals(NoticeType.GUIDE, s.saved.getType());
+        assertEquals(1, s.saved.getTopFlag());
+        assertEquals(NoticeStatus.DRAFT, s.saved.getStatus());
+    }
+
+    @Test
     void noticeCreateFirstPublishSetsPublishMetadata() {
         asAdmin();
         NoticeSvc s = new NoticeSvc();

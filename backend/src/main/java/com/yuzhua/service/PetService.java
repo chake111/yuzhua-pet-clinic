@@ -126,7 +126,7 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
         return PageResult.of(page, rows);
     }
 
-    /** 后台纠正档案：不校验归属，其余校验与用户端一致 */
+    /** 后台纠正宠物档案：不存在抛 404，跳过主人归属校验且保留原 {@code userId}，其余字段校验与三态清空同用户端。 */
     @Transactional
     public void updateByAdmin(Long id, PetForm form) {
         Pet own = getById(id);
