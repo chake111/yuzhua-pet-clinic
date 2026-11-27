@@ -22,6 +22,7 @@ public final class BatchLookup {
 
     public static <T> Map<Long, T> mapByIds(Function<Set<Long>, List<T>> loader, Set<Long> keys,
                                             Function<T, Long> idFn) {
+        // 原因: 空键集合直接短路避免无效查询
         if (keys.isEmpty()) {
             return Map.of();
         }
