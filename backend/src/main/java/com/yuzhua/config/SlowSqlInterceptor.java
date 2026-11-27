@@ -55,13 +55,13 @@ public class SlowSqlInterceptor implements Interceptor {
     }
 
     /**
-     * 无状态可重入的只读观察者（不修改 SQL 返回值或异常）；关闭阈值时直接放行，
+     * 无状态可重入的只读观察者（不修改 SQL 返回值或异常）；配置阈值小于等于 0 时跳过监控，
      * 开启后在 {@code finally} 中以单调时钟计时（SQL 抛异常亦记录 {@code failed=true}），耗时达阈值及以上时记 WARN。
      */
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
         long thresholdMs = appProperties.getObservability().getSlowSqlThresholdMs();
-        // 原因: 阈值为 0 表示关闭慢 SQL 监控，直接放行避免额外计时开销
+        // 原因: 阈值小于等于 0 视作关闭慢 SQL 监控，跳过计时以省去额外时钟读取与告警判断开销
         if (thresholdMs <= 0) {
             return invocation.proceed();
         }
