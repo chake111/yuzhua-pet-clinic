@@ -5,17 +5,18 @@ import com.yuzhua.entity.ConsultMessage;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
 public interface ConsultMessageMapper extends BaseMapper<ConsultMessage> {
 
     /**
-     * 当前读一条消息并加行锁。调用方必须已经持有该会话的行锁，
-     * 用于在锁内重新确认消息状态（普通 SELECT 在 REPEATABLE READ 下仍是旧快照）。
+     * 对单条消息执行 {@code FOR UPDATE} 当前读（绕过 REPEATABLE READ 旧快照）。
+     * 为避免与发送或已读路径死锁，调用方须按约定先持有所属会话行锁（锁顺序：会话行 -> 消息行）。
      */
     @Select("SELECT * FROM consult_message WHERE id = #{id} FOR UPDATE")
-    ConsultMessage selectByIdForUpdate(@Param("id") Long id);
+    @Nullable ConsultMessage selectByIdForUpdate(@Param("id") Long id);
 
     /**
      * 当前读最后一条可见消息。摘要重算必须用它：事务可能在等会话锁之前
@@ -28,7 +29,7 @@ public interface ConsultMessageMapper extends BaseMapper<ConsultMessage> {
             LIMIT 1
             FOR UPDATE
             """)
-    ConsultMessage selectLastVisibleForUpdate(@Param("sessionId") Long sessionId);
+    @Nullable ConsultMessage selectLastVisibleForUpdate(@Param("sessionId") Long sessionId);
 
     /**
      * 锁定本会话中对侧可见且未读的消息ID：FOR UPDATE 防止选中之后又被屏蔽，

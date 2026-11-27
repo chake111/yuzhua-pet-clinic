@@ -15,6 +15,7 @@ import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.vo.LoginVo;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,9 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
     private final DepartmentMapper departmentMapper;
 
     public LoginVo login(AuthDto.Login req) {
+        if (req.getUsername() == null || req.getPassword() == null) {
+            throw new BizException("账号或密码错误");
+        }
         AdminUser a = baseMapper.selectForLogin(req.getUsername());
         if (a == null || !passwordEncoder.matches(req.getPassword(), a.getPassword())) {
             throw new BizException("账号或密码错误");
@@ -86,7 +90,7 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
         return vo;
     }
 
-    private void fill(LoginVo vo, AdminUser a, Doctor d) {
+    private void fill(LoginVo vo, AdminUser a, @Nullable Doctor d) {
         vo.setId(a.getId());
         vo.setUsername(a.getUsername());
         vo.setName(a.getRealName());
@@ -104,11 +108,11 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
         }
     }
 
-    private Doctor doctorOf(AdminUser a) {
+    private @Nullable Doctor doctorOf(AdminUser a) {
         return a.getDoctorId() == null ? null : doctorMapper.selectById(a.getDoctorId());
     }
 
-    private static String avatarOf(AdminUser a, Doctor d) {
+    private static @Nullable String avatarOf(AdminUser a, @Nullable Doctor d) {
         if (a.getAvatar() != null && !a.getAvatar().isBlank()) {
             return a.getAvatar();
         }

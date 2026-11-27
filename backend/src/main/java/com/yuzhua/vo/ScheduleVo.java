@@ -3,6 +3,7 @@ package com.yuzhua.vo;
 import com.yuzhua.entity.DoctorSchedule;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 
@@ -10,14 +11,14 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(callSuper = true)
 public class ScheduleVo extends DoctorSchedule {
 
-    private String doctorName;
-    private String doctorTitle;
-    private String doctorAvatar;
-    private Long departmentId;
-    private String departmentName;
-    private BigDecimal consultationFee;
+    private @Nullable String doctorName;
+    private @Nullable String doctorTitle;
+    private @Nullable String doctorAvatar;
+    private @Nullable Long departmentId;
+    private @Nullable String departmentName;
+    private @Nullable BigDecimal consultationFee;
 
-    private Boolean doctorAvailable;
+    private @Nullable Boolean doctorAvailable;
 
-    private Long refNum;
+    private @Nullable Long refNum;
 }

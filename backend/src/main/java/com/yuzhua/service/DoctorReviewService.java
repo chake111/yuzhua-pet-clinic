@@ -23,6 +23,7 @@ import com.yuzhua.security.UserContext;
 import com.yuzhua.vo.PetDisplayVo;
 import com.yuzhua.vo.ReviewVo;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -48,8 +50,8 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         Appointment a = validateSubmitEligibility(req);
         DoctorReview r = buildReview(req, a);
         save(r);
-        appointmentService.markReviewed(a.getId());
-        doctorMapper.refreshStats(a.getDoctorId());
+        appointmentService.markReviewed(Objects.requireNonNull(a.getId()));
+        doctorMapper.refreshStats(Objects.requireNonNull(a.getDoctorId()));
         return r;
     }
 
@@ -60,8 +62,11 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         if (req.getRating() < 5 && (req.getContent() == null || req.getContent().isBlank())) {
             throw new BizException("低于 5 星请填写评价说明");
         }
+        if (req.getAppointmentId() == null) {
+            throw new BizException("缺少预约单");
+        }
         Appointment a = appointmentService.requireMine(req.getAppointmentId());
-        if (a.getStatus() != Appointment.ST_FINISHED) {
+        if (!Integer.valueOf(Appointment.ST_FINISHED).equals(a.getStatus())) {
             throw new BizException("问诊完成后才能评价");
         }
         if (Integer.valueOf(1).equals(a.getIsReviewed())) {
@@ -90,9 +95,13 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         return r;
     }
 
-    /** 医生（或管理员）回复评价 */
+    /**
+     * 医生或管理员回复评价：要求已登录，校验非空白且原串长度不超过 500 字（{@code trim()} 后落库）；
+     * 医生身份仅可回复归属本人 {@code doctorId} 的评价（越权抛 403），管理员可代回复。
+     * 直接覆写 {@code reply} 与 {@code replyTime}，不校验评价显示状态（{@code status}）或是否已有旧回复。
+     */
     @Transactional
-    public void reply(Long id, String reply) {
+    public void reply(Long id, @Nullable String reply) {
         if (reply == null || reply.isBlank()) {
             throw new BizException("请填写回复内容");
         }
@@ -101,7 +110,7 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         }
         DoctorReview r = require(id);
         LoginUser u = UserContext.require();
-        if (u.isDoctor() && !r.getDoctorId().equals(u.getDoctorId())) {
+        if (u.isDoctor() && !Objects.equals(r.getDoctorId(), u.getDoctorId())) {
             throw BizException.forbidden("只能回复自己收到的评价");
         }
         update(Wrappers.<DoctorReview>lambdaUpdate()
@@ -115,7 +124,7 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
      * 所以隐藏一条就要重算一次，否则医生卡片上的均分会和实际看到的评价对不上。
      */
     @Transactional
-    public void changeStatus(Long id, Integer status) {
+    public void changeStatus(Long id, @Nullable Integer status) {
         DoctorReview r = require(id);
         if (status == null || (status != 0 && status != 1)) {
             throw new BizException("状态只能是 0 隐藏 或 1 显示");
@@ -123,7 +132,10 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         update(Wrappers.<DoctorReview>lambdaUpdate()
                 .set(DoctorReview::getStatus, status)
                 .eq(DoctorReview::getId, id));
-        doctorMapper.refreshStats(r.getDoctorId());
+        Long doctorId = r.getDoctorId();
+        if (doctorId != null) {
+            doctorMapper.refreshStats(doctorId);
+        }
     }
 
     public DoctorReview require(Long id) {
@@ -143,7 +155,7 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         return toVoPage(page, true);
     }
 
-    public PageResult<ReviewVo> pageForStaff(Long doctorId, Integer status, PageQuery q) {
+    public PageResult<ReviewVo> pageForStaff(@Nullable Long doctorId, @Nullable Integer status, PageQuery q) {
         LoginUser u = UserContext.require();
         Long scoped = u.isDoctor() ? UserContext.requireDoctorId() : doctorId;
         LambdaQueryWrapper<DoctorReview> qw = Wrappers.<DoctorReview>lambdaQuery()

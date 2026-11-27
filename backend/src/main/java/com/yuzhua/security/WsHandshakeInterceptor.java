@@ -2,6 +2,7 @@ package com.yuzhua.security;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
@@ -70,15 +71,15 @@ public class WsHandshakeInterceptor implements HandshakeInterceptor {
 
     @Override
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
-                               WebSocketHandler wsHandler, Exception exception) {
+                               WebSocketHandler wsHandler, @Nullable Exception exception) {
         // 原因: 101 升级由 Spring 收尾，握手拦截器无额外状态需要清理
     }
 
-    private static String first(List<String> values) {
+    private static @Nullable String first(@Nullable List<String> values) {
         return values == null || values.isEmpty() ? null : values.get(0);
     }
 
-    private static Long asLong(String raw) {
+    private static @Nullable Long asLong(@Nullable String raw) {
         if (raw == null || !raw.chars().allMatch(Character::isDigit) || raw.isBlank()) {
             return null;
         }

@@ -13,7 +13,7 @@ import java.util.function.Function;
 @AllArgsConstructor
 public class PageResult<T> {
 
-    private List<T> records;
+    private List<T> records = List.of();
     private long total;
     private long current;
     private long size;

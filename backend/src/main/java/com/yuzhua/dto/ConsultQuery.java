@@ -2,12 +2,13 @@ package com.yuzhua.dto;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class ConsultQuery extends PageQuery {
 
-    private Integer status;
+    private @Nullable Integer status;
 
-    private Integer moderateStatus;
+    private @Nullable Integer moderateStatus;
 }

@@ -19,11 +19,13 @@ import com.yuzhua.entity.Appointment;
 import com.yuzhua.entity.MedicalRecord;
 import com.yuzhua.entity.DoctorReview;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -71,7 +73,10 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         return d;
     }
 
-    /** 校验科室存在与编码唯一后更新科室配置。 */
+    /**
+     * 校验科室存在、{@code name} 与 {@code code} 必填，并在编码变更时排除自身 {@code id} 校验唯一性后更新；
+     * {@code status} 仅在非 {@code null} 时校验合法性。
+     */
     @Transactional
     public void update(Long id, DepartmentForm form) {
         Department d = require(id);
@@ -80,15 +85,16 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         if (form.getStatus() != null) {
             requireStatus(form.getStatus());
         }
-        if (!form.getCode().equals(d.getCode())
+        String code = Objects.requireNonNull(form.getCode());
+        if (!code.equals(d.getCode())
                 && exists(Wrappers.<Department>lambdaQuery()
-                .eq(Department::getCode, form.getCode()).ne(Department::getId, id))) {
-            throw new BizException("科室编码 " + form.getCode() + " 已存在");
+                .eq(Department::getCode, code).ne(Department::getId, id))) {
+            throw new BizException("科室编码 " + code + " 已存在");
         }
         Department row = new Department();
         row.setId(id);
         row.setName(form.getName());
-        row.setCode(form.getCode());
+        row.setCode(code);
         row.setIcon(form.getIcon());
         row.setDescription(form.getDescription());
         row.setSort(form.getSort());
@@ -135,19 +141,19 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         return d;
     }
 
-    private void requireName(String name) {
+    private void requireName(@Nullable String name) {
         if (name == null || name.isBlank()) {
             throw new BizException("请填写科室名称");
         }
     }
 
-    private void requireCode(String code) {
+    private void requireCode(@Nullable String code) {
         if (code == null || code.isBlank()) {
             throw new BizException("请填写科室编码");
         }
     }
 
-    private void requireStatus(Integer status) {
+    private void requireStatus(@Nullable Integer status) {
         if (status == null || (status != 0 && status != 1)) {
             throw new BizException("状态只能是停用或启用");
         }

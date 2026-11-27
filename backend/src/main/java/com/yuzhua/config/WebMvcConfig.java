@@ -1,10 +1,12 @@
 package com.yuzhua.config;
 
 import tools.jackson.databind.ObjectMapper;
+import com.yuzhua.props.AppProperties;
 import com.yuzhua.security.AccountGuard;
 import com.yuzhua.security.AuthInterceptor;
 import com.yuzhua.security.JwtUtils;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,7 +31,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     // 原因: Lombok 构造器注入不传递字段上的 @Value，须保留字段注入
     @Value("${server.servlet.context-path:}")
-    private String contextPath;
+    private @Nullable String contextPath;
 
     private static final String[] PUBLIC_PATHS = {
             "/client/catalog/**",

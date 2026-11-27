@@ -1,5 +1,6 @@
 package com.yuzhua.config;
 
+import com.yuzhua.props.AppProperties;
 import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.mapping.BoundSql;

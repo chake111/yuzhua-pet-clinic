@@ -12,6 +12,7 @@ import com.yuzhua.entity.Notice;
 import com.yuzhua.mapper.NoticeMapper;
 import com.yuzhua.security.UserContext;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +27,7 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
     public static final int ST_PUBLISHED = 1;
     public static final int ST_OFFLINE = 2;
 
-    public PageResult<Notice> pagePublished(PageQuery q, Integer type, String keyword) {
+    public PageResult<Notice> pagePublished(PageQuery q, @Nullable Integer type, @Nullable String keyword) {
         LambdaQueryWrapper<Notice> qw = publishedQuery(type, keyword)
                 .select(Notice::getId, Notice::getTitle, Notice::getCover, Notice::getSummary,
                         Notice::getType, Notice::getTopFlag, Notice::getPublishTime, Notice::getViewCount);
@@ -48,12 +49,13 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         update(Wrappers.<Notice>lambdaUpdate()
                 .setSql("view_count = view_count + 1")
                 .eq(Notice::getId, id));
-        n.setViewCount(n.getViewCount() + 1);
+        int views = n.getViewCount() == null ? 0 : n.getViewCount();
+        n.setViewCount(views + 1);
         n.setPublishBy(null);
         return n;
     }
 
-    public PageResult<Notice> pageAdmin(PageQuery q, Integer status, Integer type, String keyword) {
+    public PageResult<Notice> pageAdmin(PageQuery q, @Nullable Integer status, @Nullable Integer type, @Nullable String keyword) {
         LambdaQueryWrapper<Notice> qw = Wrappers.<Notice>lambdaQuery()
                 .eq(status != null, Notice::getStatus, status)
                 .eq(type != null, Notice::getType, type)
@@ -100,7 +102,8 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
     public void update(Long id, NoticeForm form) {
         Notice cur = require(id);
         requireTitle(form.getTitle());
-        int status = form.getStatus() == null ? cur.getStatus() : form.getStatus();
+        int status = form.getStatus() != null ? form.getStatus()
+                : (cur.getStatus() != null ? cur.getStatus() : ST_DRAFT);
         Notice row = new Notice();
         row.setId(id);
         row.setTitle(form.getTitle());
@@ -134,7 +137,11 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
                 .eq(Notice::getId, id));
     }
 
-    private LambdaQueryWrapper<Notice> publishedQuery(Integer type, String keyword) {
+    public void remove(Long id) {
+        removeById(id);
+    }
+
+    private LambdaQueryWrapper<Notice> publishedQuery(@Nullable Integer type, @Nullable String keyword) {
         return Wrappers.<Notice>lambdaQuery()
                 .eq(Notice::getStatus, ST_PUBLISHED)
                 .eq(type != null, Notice::getType, type)
@@ -145,7 +152,7 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
                 .orderByDesc(Notice::getId);
     }
 
-    private void requireTitle(String title) {
+    private void requireTitle(@Nullable String title) {
         if (title == null || title.isBlank()) {
             throw new BizException("请填写标题");
         }

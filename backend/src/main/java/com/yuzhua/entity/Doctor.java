@@ -1,7 +1,13 @@
 package com.yuzhua.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -11,37 +17,37 @@ import java.time.LocalDateTime;
 public class Doctor {
 
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private @Nullable Long id;
 
-    private String name;
-    private String avatar;
-    private Integer gender;
+    private @Nullable String name;
+    private @Nullable String avatar;
+    private @Nullable Integer gender;
 
-    private String phone;
+    private @Nullable String phone;
 
-    private String title;
-    private Long departmentId;
-    private String specialty;
-    private String introduction;
-    private Integer workYears;
-    private BigDecimal consultationFee;
+    private @Nullable String title;
+    private @Nullable Long departmentId;
+    private @Nullable String specialty;
+    private @Nullable String introduction;
+    private @Nullable Integer workYears;
+    private @Nullable BigDecimal consultationFee;
 
-    private BigDecimal rating;
-    private Integer reviewCount;
-    private Integer appointmentCount;
+    private @Nullable BigDecimal rating;
+    private @Nullable Integer reviewCount;
+    private @Nullable Integer appointmentCount;
 
-    private Integer onlineStatus;
+    private @Nullable Integer onlineStatus;
 
-    private Integer status;
-    private Integer sort;
+    private @Nullable Integer status;
+    private @Nullable Integer sort;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private @Nullable LocalDateTime createTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    private @Nullable LocalDateTime updateTime;
 
     @TableLogic
     @TableField(select = false)
-    private Integer deleted;
+    private @Nullable Integer deleted;
 }

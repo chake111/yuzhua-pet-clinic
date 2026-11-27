@@ -1,6 +1,6 @@
 package com.yuzhua.security;
 
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -8,6 +8,7 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -58,7 +59,11 @@ public class JwtUtils {
     }
 
     private SecretKey key() {
-        byte[] raw = props.getJwt().getSecret().getBytes(StandardCharsets.UTF_8);
+        String secret = props.getJwt().getSecret();
+        if (secret == null) {
+            throw new IllegalStateException("yuzhua.jwt.secret 未配置");
+        }
+        byte[] raw = secret.getBytes(StandardCharsets.UTF_8);
         if (raw.length < 32) {
             throw new IllegalStateException("yuzhua.jwt.secret 长度必须不小于 32 字节");
         }
@@ -89,8 +94,15 @@ public class JwtUtils {
         return builder.compact();
     }
 
-    /** 解析并验签；失败返回 null，由调用方决定是 401 还是放行 */
-    public LoginUser parse(String token) {
+    /**
+     * 解析并校验 HMAC-SHA JWT 签名与过期时间：入参为 {@code null}/空白、缺 {@code exp} 声明，
+     * 或抛出 {@code JwtException}/{@code IllegalArgumentException}（含非数字 {@code sub}）时均返回 {@code null}；
+     * 本方法仅随载荷提取 {@code ver} 等字段，不校验令牌撤销或账号停用（交由 {@link AccountGuard} 核验）。
+     */
+    public @Nullable LoginUser parse(@Nullable String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
         try {
             Claims c = Jwts.parser().verifyWith(key()).build()
                     .parseSignedClaims(token).getPayload();
@@ -115,8 +127,12 @@ public class JwtUtils {
         }
     }
 
-    /** 从 "Bearer xxx" 里取出裸 token */
-    public String strip(String header) {
+    /**
+     * 剥离请求头中的令牌前缀（取值自 {@code yuzhua.jwt.prefix}）并返回去首尾空白的裸 token：
+     * 入参为 {@code null} 或全空白时返回 {@code null}；未匹配该前缀时不报错，原样返回 {@code header.trim()}，
+     * 本方法不做签名或过期校验。
+     */
+    public @Nullable String strip(@Nullable String header) {
         if (header == null || header.isBlank()) {
             return null;
         }

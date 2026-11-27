@@ -1,7 +1,7 @@
 # 构建阶段：不依赖宿主机 Maven
 FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /src
-COPY pom.xml .
+COPY pom.xml lombok.config ./
 COPY config ./config
 RUN mvn -B -q -DskipTests dependency:go-offline
 COPY config ./config

@@ -1,8 +1,10 @@
 package com.yuzhua.websocket;
 
+import com.yuzhua.consult.ws.DoctorPresenceGateway;
 import com.yuzhua.security.LoginUser;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -23,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * （前端刷新页面就会重连，两条连接会让消息重复推送）。
  */
 @Component
-public class ConsultSocketRegistry {
+public class ConsultSocketRegistry implements DoctorPresenceGateway {
 
     private final Map<String, Conn> conns = new ConcurrentHashMap<>();
 
@@ -32,17 +34,17 @@ public class ConsultSocketRegistry {
     public static class Conn {
         private final String key;
         private final LoginUser user;
-        private final WebSocketSession ws;
+        private final @Nullable WebSocketSession ws;
         private final Set<Long> rooms = ConcurrentHashMap.newKeySet();
     }
 
-    /** 生成账号维度的唯一连接键（体系:主键）。 */
+    /** 生成账号维度连接键（供 {@link #open} 顶替同账号旧连接并防跨端碰撞），须保证 {@code typ} 与 {@code id} 非空。 */
     public static String keyOf(LoginUser u) {
         return u.getTyp() + ":" + u.getId();
     }
 
-    /** 登记新连接，返回被顶掉的同账号旧连接（可能为 null） */
-    public Conn open(Conn conn) {
+    /** 原子替换同账号键的映射（非幂等，重复登记必顶替前连接）；仅返回旧连接而不关闭，调用方须主动关闭以防重复推送。 */
+    public @Nullable Conn open(Conn conn) {
         return conns.put(conn.getKey(), conn);
     }
 
@@ -54,16 +56,16 @@ public class ConsultSocketRegistry {
      * 表现是握手成功、READY 也到了，之后却收不到任何广播，医生在线状态也会判错。
      * 条件删除把比较与删除合成一个原子操作。
      */
-    public Conn close(String key, Conn conn) {
+    public @Nullable Conn close(String key, Conn conn) {
         return conns.remove(key, conn) ? conn : null;
     }
 
     /** 按连接键查询当前有效连接，不存在时返回 null。 */
-    public Conn find(String key) {
+    public @Nullable Conn find(String key) {
         return conns.get(key);
     }
 
-    /** 将指定连接加入会话房间订阅集合。 */
+    /** 幂等登记连接订阅的会话房间（并发 Set）；不做权限核验，调用方须在入房前校验成员归属。 */
     public void join(Conn conn, Long roomId) {
         conn.getRooms().add(roomId);
     }
@@ -88,6 +90,7 @@ public class ConsultSocketRegistry {
     }
 
     /** 这位医生还挂着活动连接吗（多标签页/顶号时不能误判成离线） */
+    @Override
     public boolean doctorConnected(Long doctorId) {
         return conns.values().stream().anyMatch(c ->
                 c.getUser().isDoctor() && doctorId.equals(c.getUser().getDoctorId()));

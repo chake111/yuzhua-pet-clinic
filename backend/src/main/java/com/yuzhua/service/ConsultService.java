@@ -21,12 +21,13 @@ import com.yuzhua.mapper.DoctorMapper;
 import com.yuzhua.mapper.PetMapper;
 import com.yuzhua.mapper.SysUserMapper;
 import com.yuzhua.security.LoginUser;
-import com.yuzhua.websocket.ConsultPush;
+import com.yuzhua.consult.ws.ConsultPushGateway;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.vo.ConsultSessionVo;
 import com.yuzhua.vo.PetDisplayVo;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ import java.util.HashMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -48,28 +50,41 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     private static final int RECENT_MAX = 50;
 
     private final ConsultMessageMapper messageMapper;
-    private final ConsultPush consultPush;
+    private final ConsultPushGateway consultPush;
     private final PetService petService;
     private final PetMapper petMapper;
     private final DoctorMapper doctorMapper;
     private final SysUserMapper sysUserMapper;
 
-    /** 校验宠物归属与医生在诊状态后创建免费图文问诊会话。 */
+    /**
+     * 校验宠物归属、医生存在且在诊（{@code status == 1}）及症状非空白后创建免费图文问诊会话（初始待接诊，未读数归零）。
+     * 本接口无幂等键去重，重复提交会创建独立会话。
+     */
     @Transactional
     public ConsultSessionVo create(ConsultForm req) {
+        if (req.getPetId() == null) {
+            throw new BizException("请选择问诊宠物");
+        }
         Pet pet = petService.requireOwned(req.getPetId());
+        if (req.getDoctorId() == null) {
+            throw new BizException("请选择医生");
+        }
         Doctor doctor = doctorMapper.selectById(req.getDoctorId());
         if (doctor == null) {
             throw BizException.notFound("医生");
         }
-        if (doctor.getStatus() != 1) {
+        if (!Integer.valueOf(1).equals(doctor.getStatus())) {
             throw new BizException("该医生已停诊，请换个医生");
+        }
+        String symptom = req.getSymptom();
+        if (symptom == null || symptom.isBlank()) {
+            throw new BizException("请描述症状");
         }
         ConsultSession s = new ConsultSession();
         s.setUserId(pet.getUserId());
         s.setDoctorId(doctor.getId());
         s.setPetId(pet.getId());
-        s.setSymptom(req.getSymptom().trim());
+        s.setSymptom(symptom.trim());
         s.setImages(blankToNull(req.getImages()));
         s.setStatus(ConsultSession.ST_PENDING);
         s.setUserUnread(0);
@@ -91,19 +106,20 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         if (!UserContext.require().isDoctor()) {
             throw BizException.forbidden("只有接诊医生能点接诊");
         }
-        if (s.getStatus() != ConsultSession.ST_PENDING) {
+        if (!Integer.valueOf(ConsultSession.ST_PENDING).equals(s.getStatus())) {
             throw new BizException("这个会话不在待接诊状态");
         }
+        Long sid = Objects.requireNonNull(s.getId());
         boolean won = update(Wrappers.<ConsultSession>lambdaUpdate()
                 .set(ConsultSession::getStatus, ConsultSession.ST_ACTIVE)
                 .set(ConsultSession::getStartTime, LocalDateTime.now())
-                .eq(ConsultSession::getId, s.getId())
+                .eq(ConsultSession::getId, sid)
                 .eq(ConsultSession::getStatus, ConsultSession.ST_PENDING));
         if (!won) {
             throw new BizException("这个会话已被接诊，请刷新");
         }
-        ConsultMessage sys = systemMessage(s.getId(), "医生已接诊，会话开始。");
-        consultPush.push(s.getId(), sessionFrame(s.getId(), ConsultSession.ST_ACTIVE, null, sys));
+        ConsultMessage sys = systemMessage(sid, "医生已接诊，会话开始。");
+        consultPush.push(sid, sessionFrame(sid, ConsultSession.ST_ACTIVE, null, sys));
     }
 
     /**
@@ -112,7 +128,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
      * 先锁会话行：与发送共用一个顺序，结束提示一定落在已提交消息之后，摘要不会被旧消息覆盖。
      */
     @Transactional
-    public void close(Long sessionId, String summary) {
+    public void close(Long sessionId, @Nullable String summary) {
         ConsultSession s = lockMember(sessionId);
         boolean byDoctor = UserContext.require().isDoctor();
         if (Integer.valueOf(ConsultSession.ST_CLOSED).equals(s.getStatus())) {
@@ -125,30 +141,31 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         if (concl != null && concl.length() > 500) {
             throw new BizException("问诊小结不超过 500 字");
         }
+        Long sid = Objects.requireNonNull(s.getId());
         boolean won = update(Wrappers.<ConsultSession>lambdaUpdate()
                 .set(ConsultSession::getStatus, ConsultSession.ST_CLOSED)
                 .set(ConsultSession::getEndTime, LocalDateTime.now())
                 .set(concl != null, ConsultSession::getSummary, concl)
-                .eq(ConsultSession::getId, s.getId())
+                .eq(ConsultSession::getId, sid)
                 .eq(ConsultSession::getStatus, s.getStatus()));
         if (!won) {
             throw new BizException("会话状态刚刚变化，请刷新后再试");
         }
-        ConsultMessage sys = systemMessage(s.getId(), byDoctor ? "医生已结束本次问诊。" : "用户已关闭本次问诊。");
-        consultPush.push(s.getId(), sessionFrame(s.getId(), ConsultSession.ST_CLOSED, concl, sys));
+        ConsultMessage sys = systemMessage(sid, byDoctor ? "医生已结束本次问诊。" : "用户已关闭本次问诊。");
+        consultPush.push(sid, sessionFrame(sid, ConsultSession.ST_CLOSED, concl, sys));
     }
 
     public ConsultSession requireMember(Long sessionId) {
-        return requireMember(getById(sessionId), sessionId);
+        return requireMember(getById(sessionId));
     }
 
-    private ConsultSession requireMember(ConsultSession s, Long sessionId) {
+    private ConsultSession requireMember(@Nullable ConsultSession s) {
         if (s == null) {
             throw BizException.notFound("问诊会话");
         }
         LoginUser u = UserContext.require();
-        boolean member = (u.isClient() && s.getUserId().equals(u.getId()))
-                || (u.isDoctor() && u.getDoctorId() != null && s.getDoctorId().equals(u.getDoctorId()));
+        boolean member = (u.isClient() && Objects.equals(s.getUserId(), u.getId()))
+                || (u.isDoctor() && u.getDoctorId() != null && Objects.equals(s.getDoctorId(), u.getDoctorId()));
         if (!member) {
             throw BizException.forbidden("只有患者本人和接诊医生能进入这个会话");
         }
@@ -160,7 +177,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     }
 
     private ConsultSession lockMember(Long sessionId) {
-        return requireMember(baseMapper.selectByIdForUpdate(sessionId), sessionId);
+        return requireMember(baseMapper.selectByIdForUpdate(sessionId));
     }
 
     private ConsultSession lockSession(Long sessionId) {
@@ -262,7 +279,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
      * 清零仅由 {@link #markRead} 在同锁内完成，避免在线推送丢帧导致红点永久丢失。
      */
     @Transactional
-    public ConsultMessage send(Long sessionId, String msgType, String content) {
+    public ConsultMessage send(Long sessionId, @Nullable String msgType, @Nullable String content) {
         ConsultSession s = lockMember(sessionId);
         if (Integer.valueOf(ConsultSession.ST_CLOSED).equals(s.getStatus())) {
             throw new BizException("问诊已结束，会话已关闭");
@@ -271,13 +288,14 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         boolean byDoctor = u.isDoctor();
         String type = normalizeMessageType(msgType, byDoctor);
         String text = normalizeMessageContent(type, content);
-        ConsultMessage m = buildMessage(s.getId(), u, byDoctor, type, text);
+        Long sid = Objects.requireNonNull(s.getId());
+        ConsultMessage m = buildMessage(sid, u, byDoctor, type, text);
         messageMapper.insert(m);
-        baseMapper.touchOnMessage(s.getId(), preview(type, text), byDoctor, true);
+        baseMapper.touchOnMessage(sid, preview(type, text), byDoctor, true);
         return m;
     }
 
-    private String normalizeMessageType(String msgType, boolean byDoctor) {
+    private String normalizeMessageType(@Nullable String msgType, boolean byDoctor) {
         String type = msgType == null || msgType.isBlank() ? ConsultMessage.TYPE_TEXT : msgType.trim().toUpperCase();
         if (!ConsultMessage.TYPE_TEXT.equals(type) && !ConsultMessage.TYPE_IMAGE.equals(type)
                 && !ConsultMessage.TYPE_SUGGEST.equals(type)) {
@@ -289,7 +307,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return type;
     }
 
-    private String normalizeMessageContent(String type, String content) {
+    private String normalizeMessageContent(String type, @Nullable String content) {
         String text = content == null ? "" : content.trim();
         // 原因: 到院建议卡片本身已表达就医意图，允许附言为空；其余类型不允许空消息
         if (text.isEmpty() && !ConsultMessage.TYPE_SUGGEST.equals(type)) {
@@ -325,20 +343,21 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     @Transactional
     public List<Long> markRead(Long sessionId) {
         ConsultSession s = lockMember(sessionId);
+        Long sid = Objects.requireNonNull(s.getId());
         boolean doctor = UserContext.require().isDoctor();
         String role = doctor ? ConsultMessage.ROLE_DOCTOR : ConsultMessage.ROLE_USER;
-        List<Long> ids = messageMapper.unreadPeerIdsForUpdate(s.getId(), role);
+        List<Long> ids = messageMapper.unreadPeerIdsForUpdate(sid, role);
         for (int from = 0; from < ids.size(); from += 200) {
             List<Long> batch = ids.subList(from, Math.min(from + 200, ids.size()));
-            int changed = messageMapper.markPeerRead(s.getId(), role, batch);
+            int changed = messageMapper.markPeerRead(sid, role, batch);
             if (changed != batch.size()) {
                 throw new IllegalStateException("已读消息更新数量不一致");
             }
         }
         if (doctor) {
-            baseMapper.clearDoctorUnread(s.getId());
+            baseMapper.clearDoctorUnread(sid);
         } else {
-            baseMapper.clearUserUnread(s.getId());
+            baseMapper.clearUserUnread(sid);
         }
         return ids;
     }
@@ -363,7 +382,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
      * 不修改会话诊疗状态与已读标志。
      */
     @Transactional
-    public void changeMessageHidden(Long messageId, Integer hidden, String reason) {
+    public void changeMessageHidden(Long messageId, @Nullable Integer hidden, @Nullable String reason) {
         if (hidden == null || (hidden != ConsultMessage.HIDE_NO && hidden != ConsultMessage.HIDE_YES)) {
             throw new BizException("无法完成消息操作，请刷新后重试");
         }
@@ -372,7 +391,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         if (found == null) {
             throw BizException.notFound("问诊消息");
         }
-        lockSession(found.getSessionId());
+        lockSession(Objects.requireNonNull(found.getSessionId()));
         // 原因: 持会话锁后重新当前读消息行，防止并发管理员基于旧快照覆盖标志位
         ConsultMessage m = messageMapper.selectByIdForUpdate(messageId);
         if (m == null) {
@@ -392,13 +411,14 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
                 .set(ConsultMessage::getHiddenBy, hide ? UserContext.requireId() : null)
                 .set(ConsultMessage::getHiddenTime, hide ? LocalDateTime.now() : null)
                 .eq(ConsultMessage::getId, messageId));
+        Long sid = Objects.requireNonNull(m.getSessionId());
         // 原因: 被屏蔽或恢复的消息可能是最后一条或未读消息，须按剩余可见消息重算摘要与未读
-        refreshSessionAggregates(m.getSessionId());
+        refreshSessionAggregates(sid);
         m.setHidden(hidden);
         m.setHiddenReason(null);
         m.setHiddenBy(null);
         m.setHiddenTime(null);
-        consultPush.push(m.getSessionId(), Map.of("type", "MESSAGE_VISIBILITY", "sessionId", m.getSessionId(),
+        consultPush.push(sid, Map.of("type", "MESSAGE_VISIBILITY", "sessionId", sid,
                 "messageId", messageId, "hidden", hidden, "message", hidden == 0 ? m : Map.of()));
     }
 
@@ -407,7 +427,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
      * 非 0 处置连带关闭未结束会话并由 {@link ConsultPush#pushModeration} 清退房间订阅；撤销不恢复关闭态。
      */
     @Transactional
-    public void moderate(Long sessionId, Integer moderateStatus, String reason) {
+    public void moderate(Long sessionId, @Nullable Integer moderateStatus, @Nullable String reason) {
         if (moderateStatus == null || moderateStatus < ConsultSession.MV_NORMAL
                 || moderateStatus > ConsultSession.MV_VIOLATION) {
             throw new BizException("无法完成会话处置，请刷新后重试");
@@ -455,13 +475,14 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
 
     private void refreshSessionAggregates(Long sessionId) {
         baseMapper.refreshUnread(sessionId);
-        // 原因: 同事务等锁前可能已有普通查询，必须当前读否则看不到等待期间提交的可见消息
+        // 原因: changeMessageHidden 锁会话前已执行普通 SELECT，此处须用 FOR UPDATE 当前读最新可见消息以重算末条摘要
         ConsultMessage last = messageMapper.selectLastVisibleForUpdate(sessionId);
         if (last == null) {
             baseMapper.setLastMessage(sessionId, null, null);
         } else {
+            String msgType = last.getMsgType() == null ? ConsultMessage.TYPE_TEXT : last.getMsgType();
             baseMapper.setLastMessage(sessionId,
-                    preview(last.getMsgType(), last.getContent() == null ? "" : last.getContent()),
+                    preview(msgType, last.getContent() == null ? "" : last.getContent()),
                     last.getCreateTime());
         }
     }
@@ -493,7 +514,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return m;
     }
 
-    private Map<String, Object> sessionFrame(Long sessionId, int status, String summary, ConsultMessage message) {
+    private Map<String, Object> sessionFrame(Long sessionId, int status, @Nullable String summary, ConsultMessage message) {
         Map<String, Object> frame = new HashMap<>();
         frame.put("type", "SESSION");
         frame.put("sessionId", sessionId);
@@ -503,7 +524,8 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return frame;
     }
 
-    private ConsultSessionVo buildVo(ConsultSession s, boolean asDoctor, PetDisplayVo pet, Doctor doctor, SysUser patient) {
+    private ConsultSessionVo buildVo(ConsultSession s, boolean asDoctor,
+                                   @Nullable PetDisplayVo pet, @Nullable Doctor doctor, @Nullable SysUser patient) {
         ConsultSessionVo vo = new ConsultSessionVo();
         BeanUtils.copyProperties(s, vo);
         if (pet != null) {
@@ -536,7 +558,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return text.length() <= PREVIEW_LEN ? text : text.substring(0, PREVIEW_LEN) + "…";
     }
 
-    private static String blankToNull(String s) {
+    private static @Nullable String blankToNull(@Nullable String s) {
         return s == null || s.isBlank() ? null : s;
     }
 

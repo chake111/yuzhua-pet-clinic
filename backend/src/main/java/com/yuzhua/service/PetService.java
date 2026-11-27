@@ -16,6 +16,7 @@ import com.yuzhua.mapper.SysUserMapper;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.vo.PetVo;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -80,7 +82,7 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
 
     public Pet requireOwned(Long id) {
         Pet pet = getById(id);
-        if (pet == null || !pet.getUserId().equals(UserContext.requireId())) {
+        if (pet == null || !Objects.equals(pet.getUserId(), UserContext.requireId())) {
             throw BizException.notFound("宠物档案");
         }
         return pet;
@@ -179,7 +181,7 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
         }
     }
 
-    static Integer deriveAgeMonth(LocalDate birthday, Integer manualAge) {
+    static @Nullable Integer deriveAgeMonth(@Nullable LocalDate birthday, @Nullable Integer manualAge) {
         if (birthday == null) {
             if (manualAge != null && (manualAge < 0 || manualAge > 360)) throw new BizException("月龄须在 0～360 之间");
             return manualAge;

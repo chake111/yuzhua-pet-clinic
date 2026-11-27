@@ -3,6 +3,8 @@ package com.yuzhua.security;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 
 /**
@@ -21,15 +23,15 @@ public class LoginUser {
     public static final String ROLE_DOCTOR = "DOCTOR";
     public static final String ROLE_USER = "USER";
 
-    private Long id;
-    private String username;
-    private String name;
-    private String avatar;
-    private String typ;
-    private String role;
-    private Long doctorId;
-    private Integer tokenVersion;
-    private Instant expiresAt;
+    private @Nullable Long id;
+    private @Nullable String username;
+    private @Nullable String name;
+    private @Nullable String avatar;
+    private @Nullable String typ;
+    private @Nullable String role;
+    private @Nullable Long doctorId;
+    private @Nullable Integer tokenVersion;
+    private @Nullable Instant expiresAt;
 
     /** 判定当前登录态是否为后台管理员角色（须同时满足 typ=ADMIN 与 role=ADMIN）。 */
     public boolean isAdmin() {

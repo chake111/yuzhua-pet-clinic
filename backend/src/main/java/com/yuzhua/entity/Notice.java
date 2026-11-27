@@ -1,7 +1,13 @@
 package com.yuzhua.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
 
@@ -10,27 +16,27 @@ import java.time.LocalDateTime;
 public class Notice {
 
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private @Nullable Long id;
 
-    private String title;
-    private String cover;
-    private String summary;
-    private String content;
+    private @Nullable String title;
+    private @Nullable String cover;
+    private @Nullable String summary;
+    private @Nullable String content;
 
-    private Integer type;
-    private Integer topFlag;
-    private Integer status;
-    private Integer viewCount;
-    private LocalDateTime publishTime;
-    private Long publishBy;
+    private @Nullable Integer type;
+    private @Nullable Integer topFlag;
+    private @Nullable Integer status;
+    private @Nullable Integer viewCount;
+    private @Nullable LocalDateTime publishTime;
+    private @Nullable Long publishBy;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private @Nullable LocalDateTime createTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    private @Nullable LocalDateTime updateTime;
 
     @TableLogic
     @TableField(select = false)
-    private Integer deleted;
+    private @Nullable Integer deleted;
 }

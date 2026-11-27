@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.PageResult;
-import com.yuzhua.config.AppProperties;
+import com.yuzhua.props.AppProperties;
 import com.yuzhua.dto.AppointmentForm;
 import com.yuzhua.dto.AppointmentQuery;
 import com.yuzhua.dto.PageQuery;

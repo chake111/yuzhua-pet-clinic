@@ -1,8 +1,9 @@
-package com.yuzhua.config;
+package com.yuzhua.props;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -22,7 +23,7 @@ public class AppProperties {
 
     @Data
     public static class Jwt {
-        private String secret;
+        private @Nullable String secret;
         private long expireSeconds = 604800;
         private String header = "Authorization";
         private String prefix = "Bearer ";

@@ -5,6 +5,7 @@ import com.yuzhua.entity.SysUser;
 import com.yuzhua.mapper.AdminUserMapper;
 import com.yuzhua.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import java.util.Objects;
 import java.time.Instant;
@@ -48,7 +49,7 @@ public class AccountGuard {
                 && versionMatches(db.getTokenVersion(), u.getTokenVersion());
     }
 
-    private static boolean versionMatches(Integer dbVersion, Integer tokenVersion) {
+    private static boolean versionMatches(@Nullable Integer dbVersion, @Nullable Integer tokenVersion) {
         return dbVersion != null && tokenVersion != null && dbVersion.equals(tokenVersion);
     }
 }

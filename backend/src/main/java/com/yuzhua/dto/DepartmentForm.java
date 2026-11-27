@@ -1,15 +1,16 @@
 package com.yuzhua.dto;
 
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 @Data
 public class DepartmentForm {
 
-    private String name;
-    private String code;
-    private String icon;
-    private String description;
-    private Integer sort;
+    private @Nullable String name;
+    private @Nullable String code;
+    private @Nullable String icon;
+    private @Nullable String description;
+    private @Nullable Integer sort;
 
-    private Integer status;
+    private @Nullable Integer status;
 }

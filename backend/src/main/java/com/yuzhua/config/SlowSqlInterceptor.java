@@ -1,5 +1,6 @@
 package com.yuzhua.config;
 
+import com.yuzhua.props.AppProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.executor.Executor;

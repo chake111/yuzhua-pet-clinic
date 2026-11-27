@@ -1,15 +1,18 @@
 package com.yuzhua.websocket;
 
 import tools.jackson.databind.ObjectMapper;
+import com.yuzhua.consult.ws.ConsultPushGateway;
 import com.yuzhua.websocket.ConsultDeliveryGuard.Decision;
 import com.yuzhua.websocket.ConsultSocketRegistry.Conn;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
 
 import java.util.List;
 import java.util.Map;
@@ -27,13 +30,14 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ConsultPush {
+public class ConsultPush implements ConsultPushGateway {
 
     private final ConsultSocketRegistry registry;
     private final ConsultDeliveryGuard guard;
     private final ObjectMapper objectMapper;
 
     /** 业务广播：事务提交后向会话房间内的当事人发送 */
+    @Override
     public void push(Long sessionId, Map<String, Object> payload) {
         afterCommit(() -> sendNow(sessionId, payload));
     }
@@ -42,6 +46,7 @@ public class ConsultPush {
      * 处置通知：事务提交后先向原订阅连接发送 MODERATION，随后无条件清退该房间订阅。
      * 清退放在 finally，单条连接发送异常也要完成，否则处置后的正文仍可能被投递。
      */
+    @Override
     public void pushModeration(Long sessionId, Map<String, Object> payload) {
         afterCommit(() -> {
             List<Conn> targets = registry.inRoom(sessionId);
@@ -57,8 +62,11 @@ public class ConsultPush {
         });
     }
 
-    /** 单条连接的普通业务帧（Handler 的 HISTORY / MSG / ACK / READ / PRESENCE） */
-    public void send(Conn conn, Long sessionId, Map<String, Object> payload) {
+    /**
+     * 向单条连接发送帧：{@code sessionId == null} 时转交 {@link #sendControl} 仅核验账号状态；
+     * 非空时经 {@code guard.checkBusiness} 核验账号、成员归属与未处置状态后再下发业务帧（HISTORY / MSG / ACK / READ / PRESENCE）。
+     */
+    public void send(Conn conn, @Nullable Long sessionId, Map<String, Object> payload) {
         if (sessionId == null) {
             sendControl(conn, payload);
             return;
@@ -116,16 +124,24 @@ public class ConsultPush {
     }
 
     private void write(Conn conn, Map<String, Object> payload) {
+        WebSocketSession ws = conn.getWs();
+        if (ws == null) {
+            return;
+        }
         try {
-            conn.getWs().sendMessage(new TextMessage(objectMapper.writeValueAsString(payload)));
+            ws.sendMessage(new TextMessage(objectMapper.writeValueAsString(payload)));
         } catch (Exception e) {
             log.debug("会话帧下发失败 key={} err={}", conn.getKey(), e.getMessage());
         }
     }
 
     private void closeForAccount(Conn conn) {
+        WebSocketSession ws = conn.getWs();
+        if (ws == null) {
+            return;
+        }
         try {
-            conn.getWs().close(CloseStatus.POLICY_VIOLATION.withReason("account disabled"));
+            ws.close(CloseStatus.POLICY_VIOLATION.withReason("account disabled"));
         } catch (Exception e) {
             log.debug("关闭失效账号连接失败 key={} err={}", conn.getKey(), e.getMessage());
         }

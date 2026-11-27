@@ -1,9 +1,10 @@
 package com.yuzhua.dto;
 
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 @Data
 public class ConsultCloseForm {
 
-    private String summary;
+    private @Nullable String summary;
 }

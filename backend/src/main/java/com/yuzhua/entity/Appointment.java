@@ -1,7 +1,13 @@
 package com.yuzhua.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,49 +32,49 @@ public class Appointment {
     public static final int PAY_REFUNDED = 2;
 
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private @Nullable Long id;
 
-    private String orderNo;
+    private @Nullable String orderNo;
 
     @TableField(select = false)
-    private String idemKey;
+    private @Nullable String idemKey;
 
-    private Long userId;
-    private Long petId;
-    private Long doctorId;
-    private Long departmentId;
-    private Long scheduleId;
+    private @Nullable Long userId;
+    private @Nullable Long petId;
+    private @Nullable Long doctorId;
+    private @Nullable Long departmentId;
+    private @Nullable Long scheduleId;
 
-    private Integer consultType;
-    private LocalDate appointmentDate;
-    private Integer period;
-    private LocalTime startTime;
-    private LocalTime endTime;
-    private Integer queueNo;
+    private @Nullable Integer consultType;
+    private @Nullable LocalDate appointmentDate;
+    private @Nullable Integer period;
+    private @Nullable LocalTime startTime;
+    private @Nullable LocalTime endTime;
+    private @Nullable Integer queueNo;
 
-    private String symptom;
-    private String images;
+    private @Nullable String symptom;
+    private @Nullable String images;
 
-    private BigDecimal amount;
-    private Integer payStatus;
-    private LocalDateTime payTime;
-    private String payType;
-    private Integer status;
+    private @Nullable BigDecimal amount;
+    private @Nullable Integer payStatus;
+    private @Nullable LocalDateTime payTime;
+    private @Nullable String payType;
+    private @Nullable Integer status;
 
-    private LocalDateTime acceptTime;
-    private LocalDateTime finishTime;
-    private String cancelReason;
-    private LocalDateTime cancelTime;
-    private String cancelBy;
-    private Integer isReviewed;
+    private @Nullable LocalDateTime acceptTime;
+    private @Nullable LocalDateTime finishTime;
+    private @Nullable String cancelReason;
+    private @Nullable LocalDateTime cancelTime;
+    private @Nullable String cancelBy;
+    private @Nullable Integer isReviewed;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private @Nullable LocalDateTime createTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    private @Nullable LocalDateTime updateTime;
 
     @TableLogic
     @TableField(select = false)
-    private Integer deleted;
+    private @Nullable Integer deleted;
 }

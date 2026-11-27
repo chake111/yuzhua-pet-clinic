@@ -1,7 +1,13 @@
 package com.yuzhua.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
 
@@ -10,31 +16,31 @@ import java.time.LocalDateTime;
 public class DoctorReview {
 
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private @Nullable Long id;
 
-    private Long appointmentId;
-    private Long userId;
-    private Long doctorId;
-    private Long departmentId;
+    private @Nullable Long appointmentId;
+    private @Nullable Long userId;
+    private @Nullable Long doctorId;
+    private @Nullable Long departmentId;
 
-    private Integer rating;
-    private Integer attitudeScore;
-    private Integer effectScore;
+    private @Nullable Integer rating;
+    private @Nullable Integer attitudeScore;
+    private @Nullable Integer effectScore;
 
-    private String content;
-    private String images;
-    private Integer isAnonymous;
-    private String reply;
-    private LocalDateTime replyTime;
-    private Integer status;
+    private @Nullable String content;
+    private @Nullable String images;
+    private @Nullable Integer isAnonymous;
+    private @Nullable String reply;
+    private @Nullable LocalDateTime replyTime;
+    private @Nullable Integer status;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private @Nullable LocalDateTime createTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    private @Nullable LocalDateTime updateTime;
 
     @TableLogic
     @TableField(select = false)
-    private Integer deleted;
+    private @Nullable Integer deleted;
 }

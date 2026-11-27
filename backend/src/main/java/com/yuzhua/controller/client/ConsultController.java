@@ -39,6 +39,7 @@ public class ConsultController {
         return Result.ok(consultService.pageMine(query));
     }
 
+    @Operation(summary = "问诊会话详情")
     @GetMapping("/sessions/{id}")
     public Result<ConsultSessionVo> detail(@PathVariable Long id) {
         return Result.ok(consultService.detailMine(id));

@@ -12,6 +12,7 @@ import com.yuzhua.service.ConsultService;
 import com.yuzhua.websocket.ConsultSocketRegistry.Conn;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -24,20 +25,18 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 图文问诊的 WebSocket 端点。
  *
- * 协议是四类上行 / 五类下行，都用 {type: ...} 的 JSON 信封：
- *   上行 SUBSCRIBE / CHAT / READ / PING
- *   下行 READY / HISTORY / MSG / READ / PRESENCE / ERROR / PONG
- * 消息一律先落库再推送：连接只是投递通道，历史以库为准，
- * 所以断线重连后前端重新 SUBSCRIBE 就能补齐，不依赖推送不丢。
- * SUBSCRIBE 只补历史，不写已读；已读只认显式 READ 帧（见 subscribe / read 的注释）。
- *
- * 握手线程和这里都不是 MVC 的 HandlerInterceptor 管辖范围，
- * 所以进入业务方法前手动把登录态塞进 UserContext、出来时清掉——
- * 这是这套 ThreadLocal 方案唯一需要额外小心的地方。
+ * 协议统一使用 {@code {type: ...}} JSON 信封：
+ *   本端点处理上行：SUBSCRIBE / CHAT / READ / PING；
+ *   本端点下发下行：READY / HISTORY / MSG / ACK / READ / PRESENCE / ERROR / PONG
+ *   （会话状态变更与治理类下行帧由 {@link ConsultPush} 推送）。
+ * 消息先落库再推送：连接仅作实时通道，重连后靠 SUBSCRIBE 拉取 DB 历史补齐，
+ * 且 SUBSCRIBE 只补历史不标已读，已读仅由显式 READ 帧触发。
+ * 握手与消息线程不受 MVC {@code HandlerInterceptor} 管辖，入口经 {@code runAs} 注入并在 finally 清理 {@link UserContext}。
  */
 @Slf4j
 @Component
@@ -52,7 +51,11 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final AccountGuard accountGuard;
 
-    /** 建连登记（同账号顶替旧连接）、标记医生上线并下发 READY；若握手携带 sessionId 则自动订阅。 */
+    /**
+     * 建连初始化：前置要求 {@link WsHandshakeInterceptor} 已完成鉴权并写入登录态；
+     * 以 5s/256KB {@code ConcurrentWebSocketSessionDecorator} 串行化并发写帧、顶替同账号旧连接、
+     * 标记医生上线并下发 READY，若握手属性含会话编号则自动订阅（均在 {@code UserContext} 边界内执行）。
+     */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         LoginUser user = user(session);
@@ -66,8 +69,9 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
             closeQuietly(stale);
         }
         runAs(user, () -> {
-            if (user.isDoctor()) {
-                consultService.markDoctorOnline(user.getDoctorId(), true);
+            Long doctorId = user.getDoctorId();
+            if (user.isDoctor() && doctorId != null) {
+                consultService.markDoctorOnline(doctorId, true);
             }
             writeControl(conn, envelope("READY", Map.of("name", String.valueOf(user.getName()))));
             Object sid = session.getAttributes().get(WsHandshakeInterceptor.ATTR_SESSION_ID);
@@ -86,10 +90,13 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
         if (!accountGuard.active(conn.getUser())) {
             err(conn, "账号状态或权限已变化，请重新登录");
-            try {
-                conn.getWs().close(CloseStatus.POLICY_VIOLATION.withReason("account disabled"));
-            } catch (IOException e) {
-                log.debug("关闭停用账号连接失败 key={}", conn.getKey());
+            WebSocketSession ws = conn.getWs();
+            if (ws != null) {
+                try {
+                    ws.close(CloseStatus.POLICY_VIOLATION.withReason("account disabled"));
+                } catch (IOException e) {
+                    log.debug("关闭停用账号连接失败 key={}", conn.getKey());
+                }
             }
             return;
         }
@@ -125,7 +132,11 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         });
     }
 
-    /** 原子条件注销当前连接；仅当该医生无其余活动连接时才广播离线并更新在线状态。 */
+    /**
+     * 原子条件注销当前连接（已被顶号替换则直接返回，不触碰新连接与在线态）；
+     * 医生连接注销后向其原订阅房间广播 {@code PRESENCE(doctorOnline=false)}，
+     * 并仅当该医生已无其余活动连接（{@code !registry.doctorConnected}）时才将库内在线状态置为离线。
+     */
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         Conn conn = conn(session);
@@ -143,12 +154,13 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         for (Long roomId : conn.getRooms()) {
             broadcast(roomId, envelope("PRESENCE", Map.of("sessionId", roomId, "doctorOnline", false)), conn.getKey());
         }
-        if (!registry.doctorConnected(user.getDoctorId())) {
-            consultService.markDoctorOnline(user.getDoctorId(), false);
+        Long doctorId = user.getDoctorId();
+        if (doctorId != null && !registry.doctorConnected(doctorId)) {
+            consultService.markDoctorOnline(doctorId, false);
         }
     }
 
-    private void subscribe(Conn conn, Long sessionId) {
+    private void subscribe(Conn conn, @Nullable Long sessionId) {
         if (sessionId == null) {
             err(conn, "缺少 sessionId");
             return;
@@ -162,12 +174,13 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
                 registry.inRoom(sessionId).stream().anyMatch(c -> c.getUser().isDoctor()))));
     }
 
-    private void chat(Conn conn, Long sessionId, String msgType, String content, String requestId) {
+    private void chat(Conn conn, @Nullable Long sessionId, @Nullable String msgType,
+                      @Nullable String content, @Nullable String requestId) {
         if (sessionId == null) {
             err(conn, "缺少 sessionId");
             return;
         }
-        // 原因: 未进房时自动 join 先做参与方权限校验，不信任客户端房间状态
+        // 原因: 本类 `join` 先经 `requireMember` 验权再入房，`send` 持会话锁再核验状态，不信任客户端房间状态
         join(conn, sessionId);
         // 原因: 未读计数不看对方是否在线，避免推送丢帧后红点永久漏记
         ConsultMessage msg = consultService.send(sessionId, msgType, content);
@@ -175,7 +188,7 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         if (requestId != null) write(conn, sessionId, envelope("ACK", Map.of("sessionId", sessionId, "requestId", requestId, "message", msg)));
     }
 
-    private void read(Conn conn, Long sessionId) {
+    private void read(Conn conn, @Nullable Long sessionId) {
         if (sessionId == null) {
             err(conn, "缺少 sessionId");
             return;
@@ -210,7 +223,7 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void broadcast(Long roomId, Map<String, Object> payload, String exceptKey) {
+    private void broadcast(Long roomId, Map<String, Object> payload, @Nullable String exceptKey) {
         List<Conn> targets = registry.inRoom(roomId);
         for (Conn c : targets) {
             if (exceptKey == null || !exceptKey.equals(c.getKey())) {
@@ -227,11 +240,11 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         consultPush.sendControl(conn, payload);
     }
 
-    private void err(Conn conn, String msg) {
-        writeControl(conn, envelope("ERROR", Map.of("msg", msg)));
+    private void err(Conn conn, @Nullable String msg) {
+        writeControl(conn, envelope("ERROR", Map.of("msg", msg == null || msg.isBlank() ? "服务处理失败，请稍后重试" : msg)));
     }
 
-    private void chatFailed(Conn conn, String msg, String requestId) {
+    private void chatFailed(Conn conn, @Nullable String msg, @Nullable String requestId) {
         Map<String, Object> data = new HashMap<>();
         data.put("msg", msg == null || msg.isBlank() ? "消息未保存，请稍后重试" : msg);
         data.put("requestId", requestId == null ? "" : requestId);
@@ -245,8 +258,12 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void closeQuietly(Conn conn) {
+        WebSocketSession ws = conn.getWs();
+        if (ws == null) {
+            return;
+        }
         try {
-            conn.getWs().close(CloseStatus.NORMAL.withReason("replaced"));
+            ws.close(CloseStatus.NORMAL.withReason("replaced"));
         } catch (IOException e) {
             log.debug("关闭被顶掉的连接失败 key={}", conn.getKey());
         }
@@ -272,19 +289,19 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
     }
 
     private static LoginUser user(WebSocketSession session) {
-        return (LoginUser) session.getAttributes().get(WsHandshakeInterceptor.ATTR_USER);
+        return Objects.requireNonNull((LoginUser) session.getAttributes().get(WsHandshakeInterceptor.ATTR_USER));
     }
 
-    private static Conn conn(WebSocketSession session) {
+    private static @Nullable Conn conn(WebSocketSession session) {
         Object v = session.getAttributes().get(ATTR_CONN);
         return v instanceof Conn c ? c : null;
     }
 
-    private static String str(Object v) {
+    private static @Nullable String str(@Nullable Object v) {
         return v == null ? null : String.valueOf(v);
     }
 
-    private static Long asLong(Object v) {
+    private static @Nullable Long asLong(@Nullable Object v) {
         if (v instanceof Number n) {
             return n.longValue();
         }
