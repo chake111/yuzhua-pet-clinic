@@ -25,7 +25,7 @@ public class AuthController {
 
     private final SysUserService sysUserService;
 
-    /** 用户端注册公开写入口：校验唯一性后创建账号并直发登录令牌，依赖网关限流防恶意批量注册。 */
+    /** 免鉴权用户注册写入口（{@code @PublicEndpoint(allowMutation = true)}）：校验账号与手机号唯一（并发冲突由库表唯一约束兜底）后创建账号并签发含 JWT 的登录响应。 */
     @Operation(summary = "注册（成功即登录，直接返回 token）")
     @PublicEndpoint(allowMutation = true)
     @PostMapping("/register")
@@ -33,7 +33,7 @@ public class AuthController {
         return Result.ok("注册成功", sysUserService.register(req));
     }
 
-    /** 用户端登录公开写入口：校验凭证并签发用户端 JWT，作为免鉴权登录边界之一。 */
+    /** 免鉴权用户登录写入口（{@code @PublicEndpoint(allowMutation = true)}）：校验凭证与启用状态并签发用户端 JWT。 */
     @Operation(summary = "登录")
     @PublicEndpoint(allowMutation = true)
     @PostMapping("/login")

@@ -100,7 +100,10 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         return d;
     }
 
-    /** 在 READ_COMMITTED 下持目标科室行锁校验科室存在后创建医生，防止与删科并发形成悬空归属。 */
+    /**
+     * 在 READ_COMMITTED 下经 {@code requireDepartment}（持 {@code selectByIdForUpdate} 科室行锁）校验科室存在后创建医生，防止与删科并发形成悬空归属；
+     * 排序默认 {@code DEFAULT_SORT}，{@code status} 默认 {@code EnableStatus.ENABLED}。
+     */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public Doctor create(DoctorForm form) {
         requireName(form.getName());

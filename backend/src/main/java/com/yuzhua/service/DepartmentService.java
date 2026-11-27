@@ -54,7 +54,10 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         return PageResult.of(page(new Page<>(query.getPageNum(), query.getPageSize()), qw));
     }
 
-    /** 校验编码唯一后新建科室；默认排序 99、默认状态启用。 */
+    /**
+     * 校验名称与编码必填、应用层判重（{@code exists}，并发同编码由库表唯一约束兜底）后新建科室；
+     * 排序默认 {@code DEFAULT_SORT}，{@code status} 非空时校验合法性，为空默认 {@code EnableStatus.ENABLED}。
+     */
     @Transactional
     public Department create(DepartmentForm form) {
         requireName(form.getName());

@@ -78,7 +78,7 @@ public class AdminConsultController {
         return Result.ok(consultService.historyForViewer(id, query));
     }
 
-    // 原因: 前端已读走 WS READ 帧，保留此 REST 入口供并发回归脚本驱动竞态校验
+    // 原因: 前端已读主走 WS READ 帧，保留受 @RequireRole(DOCTOR) 与会话归属校验保护的幂等 REST 入口供并发竞态回归脚本驱动
     @Operation(summary = "标记已读（医生）")
     @PostMapping("/{id}/read")
     @RequireRole(AdminRole.DOCTOR)

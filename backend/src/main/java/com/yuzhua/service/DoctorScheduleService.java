@@ -124,8 +124,9 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
     }
 
     /**
-     * 在排班行锁内更新排班（不修改 status，仅停诊/恢复入口写状态）；
-     * 已存在任何预约引用时禁止改动医生、日期、时段或起止时间，且新总量不得小于有效预约数。
+     * 在排班行锁内更新排班（不修改 status，创建后仅由 stopClinic/resumeClinic 变更状态）；
+     * 经 {@code referencedById} 检出任何未软删预约（含已取消）时即禁止改动医生、日期、时段或起止时间，
+     * 而新总量下限与 {@code remainNum} 重算仅计非 {@code CANCELLED} 有效预约数。
      */
     @Transactional
     public void update(Long id, ScheduleEditForm req) {
@@ -313,7 +314,7 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
 
     /**
      * 停诊（R6）：仅将状态置为停诊而保留 {@code remain_num} 原值（余量与停诊开关解耦，已成交订单保持原样由前台改约）。
-     * 状态列仅在本方法与 {@link #resumeClinic} 写入，{@link #update} 不接收 status 以防编辑表单覆盖停诊态；
+     * 状态列创建后仅由本方法与 {@link #resumeClinic} 变更（{@link #create} 按表单初始化，{@link #update} 不接收 status 以防覆盖停诊态）；
      * 先经 {@code require} 普通读判存，再靠条件 {@code UPDATE} 自身行锁互斥，影响 0 行（并发被删）时抛 404。
      */
     @Transactional

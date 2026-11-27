@@ -26,7 +26,7 @@ public class AdminAuthController {
 
     private final AdminUserService adminUserService;
 
-    /** 后台账号登录公开写入口：校验凭证后签发后台 JWT，受网关限流约束。 */
+    /** 免鉴权后台登录写入口（{@code @PublicEndpoint(allowMutation = true)}）：校验凭证与启用状态，更新最后登录时间并签发后台 JWT。 */
     @Operation(summary = "后台登录")
     @PublicEndpoint(allowMutation = true)
     @PostMapping("/login")

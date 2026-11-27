@@ -54,7 +54,10 @@ public class SlowSqlInterceptor implements Interceptor {
         this.nanoClock = nanoClock;
     }
 
-    /** 仅当 slowSqlThresholdMs 大于 0 时对单条语句计时，耗时达到或超过阈值时记 WARN。 */
+    /**
+     * 无状态可重入的只读观察者（不修改 SQL 返回值或异常）；关闭阈值时直接放行，
+     * 开启后在 {@code finally} 中以单调时钟计时（SQL 抛异常亦记录 {@code failed=true}），耗时达阈值及以上时记 WARN。
+     */
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
         long thresholdMs = appProperties.getObservability().getSlowSqlThresholdMs();
