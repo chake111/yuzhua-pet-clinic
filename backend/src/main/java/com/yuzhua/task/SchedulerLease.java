@@ -53,7 +53,7 @@ public class SchedulerLease {
         }
         String raw = host + "/" + ProcessHandle.current().pid() + "/"
                 + UUID.randomUUID().toString().substring(0, HOLDER_RANDOM_PREFIX_LEN);
-        // 原因: holder 列宽 128，超长截尾保留进程号与随机后缀避免 INSERT IGNORE 静默截断后无法匹配释放
+        // 原因: holder 列宽 128，超长时从头部截断并保留末尾 128 字符（优先保住尾部随机后缀），防库表截断尾部导致释放失配
         return raw.length() <= MAX_HOLDER_LENGTH ? raw : raw.substring(raw.length() - MAX_HOLDER_LENGTH);
     }
 }
