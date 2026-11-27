@@ -166,7 +166,7 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         }
         MedicalRecordVo vo = new MedicalRecordVo();
         BeanUtils.copyProperties(r, vo);
-        // 原因: 详情与列表同走含已删档案的历史查询口径，避免已删宠物档案无法展示
+        // 原因: 复用 selectHistoryDisplay 查询已软删宠物以完整展示历史病历，并借 BatchLookup 兜底 petId 为空场景
         PetDisplayVo pet = BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
                 BatchLookup.ids(List.of(r), MedicalRecord::getPetId), PetDisplayVo::getId).get(r.getPetId());
         if (pet != null) {

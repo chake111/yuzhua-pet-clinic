@@ -43,7 +43,7 @@ public class ConsultSocketRegistry implements DoctorPresenceGateway {
         return u.getTyp() + ":" + u.getId();
     }
 
-    /** 登记新连接，返回被顶掉的同账号旧连接（可能为 null） */
+    /** 原子替换同账号键的映射（非幂等，重复登记必顶替前连接）；仅返回旧连接而不关闭，调用方须主动关闭以防重复推送。 */
     public @Nullable Conn open(Conn conn) {
         return conns.put(conn.getKey(), conn);
     }
