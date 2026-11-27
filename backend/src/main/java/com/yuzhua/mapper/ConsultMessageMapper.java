@@ -12,8 +12,8 @@ import java.util.List;
 public interface ConsultMessageMapper extends BaseMapper<ConsultMessage> {
 
     /**
-     * 当前读一条消息并加行锁。调用方必须已经持有该会话的行锁，
-     * 用于在锁内重新确认消息状态（普通 SELECT 在 REPEATABLE READ 下仍是旧快照）。
+     * 对单条消息执行 {@code FOR UPDATE} 当前读（绕过 REPEATABLE READ 旧快照）。
+     * 为避免与发送或已读路径死锁，调用方须按约定先持有所属会话行锁（锁顺序：会话行 -> 消息行）。
      */
     @Select("SELECT * FROM consult_message WHERE id = #{id} FOR UPDATE")
     @Nullable ConsultMessage selectByIdForUpdate(@Param("id") Long id);

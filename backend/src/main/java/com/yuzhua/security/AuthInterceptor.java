@@ -109,7 +109,7 @@ public class AuthInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler,
                                 @Nullable Exception ex) {
-        // 原因: Tomcat 线程池复用请求线程，必须清理 ThreadLocal 防止身份串用
+        // 原因: 容器线程池会复用请求线程，preHandle 放行后无论正常返回或异常均须清理 ThreadLocal 身份
         UserContext.clear();
     }
 

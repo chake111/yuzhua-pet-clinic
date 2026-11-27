@@ -38,7 +38,7 @@ public class ConsultSocketRegistry implements DoctorPresenceGateway {
         private final Set<Long> rooms = ConcurrentHashMap.newKeySet();
     }
 
-    /** 生成账号维度的唯一连接键（体系:主键）。 */
+    /** 生成账号维度连接键（供 {@link #open} 顶替同账号旧连接并防跨端碰撞），须保证 {@code typ} 与 {@code id} 非空。 */
     public static String keyOf(LoginUser u) {
         return u.getTyp() + ":" + u.getId();
     }
@@ -65,7 +65,7 @@ public class ConsultSocketRegistry implements DoctorPresenceGateway {
         return conns.get(key);
     }
 
-    /** 将指定连接加入会话房间订阅集合。 */
+    /** 幂等登记连接订阅的会话房间（并发 Set）；不做权限核验，调用方须在入房前校验成员归属。 */
     public void join(Conn conn, Long roomId) {
         conn.getRooms().add(roomId);
     }

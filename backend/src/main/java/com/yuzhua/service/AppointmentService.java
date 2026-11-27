@@ -127,7 +127,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     }
 
     private AppointmentVo doCreate(AppointmentForm req, @Nullable String key, @Nullable Long userId) {
-        // 原因: 先锁排班行并做幂等回读，确保并发同键请求即使换了非法参数也先收敛到首单，且与取消路径同向不成环
+        // 原因: scheduleId 非空时先锁排班再查幂等键以收敛同键并发；新建仅插新单不锁已有预约，与取消路径不成环
         DoctorSchedule sch = req.getScheduleId() == null ? null : scheduleMapper.selectByIdForUpdate(req.getScheduleId());
         if (key != null && userId != null) {
             Appointment existing = baseMapper.selectByUserAndIdemKey(userId, key);

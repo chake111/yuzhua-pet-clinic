@@ -51,7 +51,11 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final AccountGuard accountGuard;
 
-    /** 建连登记（同账号顶替旧连接）、标记医生上线并下发 READY；若握手携带 sessionId 则自动订阅。 */
+    /**
+     * 建连初始化：前置要求 {@link WsHandshakeInterceptor} 已完成鉴权并写入登录态；
+     * 以 5s/256KB {@code ConcurrentWebSocketSessionDecorator} 串行化并发写帧、顶替同账号旧连接、
+     * 标记医生上线并下发 READY，若握手属性含会话编号则自动订阅（均在 {@code UserContext} 边界内执行）。
+     */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         LoginUser user = user(session);
@@ -172,7 +176,7 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
             err(conn, "缺少 sessionId");
             return;
         }
-        // 原因: 未进房时自动 join 先做参与方权限校验，不信任客户端房间状态
+        // 原因: 本类 `join` 先经 `requireMember` 验权再入房，`send` 持会话锁再核验状态，不信任客户端房间状态
         join(conn, sessionId);
         // 原因: 未读计数不看对方是否在线，避免推送丢帧后红点永久漏记
         ConsultMessage msg = consultService.send(sessionId, msgType, content);

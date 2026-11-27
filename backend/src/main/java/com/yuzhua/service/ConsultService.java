@@ -475,7 +475,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
 
     private void refreshSessionAggregates(Long sessionId) {
         baseMapper.refreshUnread(sessionId);
-        // 原因: 同事务等锁前可能已有普通查询，必须当前读否则看不到等待期间提交的可见消息
+        // 原因: changeMessageHidden 锁会话前已执行普通 SELECT，此处须用 FOR UPDATE 当前读最新可见消息以重算末条摘要
         ConsultMessage last = messageMapper.selectLastVisibleForUpdate(sessionId);
         if (last == null) {
             baseMapper.setLastMessage(sessionId, null, null);

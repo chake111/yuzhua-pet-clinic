@@ -19,7 +19,7 @@ public interface ConsultSessionMapper extends BaseMapper<ConsultSession> {
     @Select("SELECT * FROM consult_session WHERE id = #{sessionId} FOR UPDATE")
     @Nullable ConsultSession selectByIdForUpdate(@Param("sessionId") Long sessionId);
 
-    // 原因: countUnread 仅区分不涨未读的系统消息，参与方消息一律累加并由 markRead 同锁清零
+    // 原因: countUnread 仅排除系统消息；参与方消息一律累加，再由 clearUserUnread/clearDoctorUnread 在同锁事务内清零
     @Update("""
             UPDATE consult_session SET
               last_message = #{preview},
