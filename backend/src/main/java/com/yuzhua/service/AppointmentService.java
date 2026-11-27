@@ -67,10 +67,10 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointment> {
 
-    // 原因: "PC" 前缀(2) + 毫秒时间戳(17) + 8 位随机(8) 共 27 字符，将百并发抢号下撞 uk_order_no 的概率压到可忽略
+    // 原因: "PC" 前缀 + 17 位毫秒时间戳 + 8 位零填充随机后缀（共 27 字符）生成订单号，并由 uk_order_no 唯一约束兜底
     private static final DateTimeFormatter NO_STAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
-    // 原因: 收紧幂等键为 8-64 位 URL 安全字符，入口即拒脏键避免落库截断或排序规则差异导致异常重放
+    // 原因: 限定幂等键为 8-64 位 [A-Za-z0-9._:-] 字符集，入口即拒超长或特殊字符避免落库截断及排序规则差异导致异常重放
     private static final Pattern IDEM_KEY = Pattern.compile("[A-Za-z0-9._:-]{8,64}");
     private static final long IDEM_RETRY_DELAY_MS = 20L;
     private static final int ORDER_NO_RANDOM_BOUND = 100_000_000;

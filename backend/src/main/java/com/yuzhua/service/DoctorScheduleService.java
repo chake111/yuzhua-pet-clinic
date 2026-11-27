@@ -289,9 +289,10 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
     }
 
     /**
-     * 删除排班前，在排班行锁内统计未软删预约引用（含已取消预约）；存在引用时拒绝删除，可改为停诊。
+     * 删除排班前在排班行锁内通过 {@code referencedById} 统计未软删预约引用（由实体 {@code @TableLogic} 自动过滤 {@code deleted = 0}）；
+     * 与 {@link #update} 排除已取消预约不同，删除有意将 {@code CANCELLED} 订单视为历史引用，存在则拒绝物理删除并引导改用停诊。
      *
-     * @param id 排班 ID；仅统计 deleted=0 的预约
+     * @param id 排班主键
      */
     @Transactional
     public void remove(Long id) {
@@ -311,17 +312,9 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
     }
 
     /**
-     * 停诊（R6）：只关可预约状态，不动余量。
-     * 已成交的订单保持原样，由前台线下联系改约——这是单店场景下最简单的收敛方式。
-     * 之前这里会把 remain_num 一并清零、恢复时再按存活订单重算，页面就分不出
-     * "真余量"和"停诊清零"（跟踪表 I07/D2）；余量是事实，不该被一个状态开关改写。
-     *
-     * <p>状态列<strong>只</strong>在这里和 {@link #resumeClinic} 写入：编辑接口
-     * {@link #update} 的入参不含 status，避免旧的编辑表单把停诊覆盖回去。
-     *
-     * <p>这里用 <code>require</code>（普通读）确认存在，互斥靠 UPDATE 自身的行锁——
-     * 不是 <code>selectByIdForUpdate</code>。窄窗口下若记录刚被并发删除，
-     * UPDATE 影响 0 行，此时抛 404，不把"没改到"报成"已停诊"。
+     * 停诊（R6）：仅将状态置为停诊而保留 {@code remain_num} 原值（余量与停诊开关解耦，已成交订单保持原样由前台改约）。
+     * 状态列仅在本方法与 {@link #resumeClinic} 写入，{@link #update} 不接收 status 以防编辑表单覆盖停诊态；
+     * 先经 {@code require} 普通读判存，再靠条件 {@code UPDATE} 自身行锁互斥，影响 0 行（并发被删）时抛 404。
      */
     @Transactional
     public void stopClinic(Long id) {
