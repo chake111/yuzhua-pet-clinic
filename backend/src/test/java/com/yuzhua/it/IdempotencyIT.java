@@ -1,6 +1,6 @@
 package com.yuzhua.it;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.service.AppointmentService;

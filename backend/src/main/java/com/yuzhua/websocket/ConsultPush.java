@@ -1,6 +1,6 @@
 package com.yuzhua.websocket;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.yuzhua.websocket.ConsultDeliveryGuard.Decision;
 import com.yuzhua.websocket.ConsultSocketRegistry.Conn;
 import lombok.RequiredArgsConstructor;

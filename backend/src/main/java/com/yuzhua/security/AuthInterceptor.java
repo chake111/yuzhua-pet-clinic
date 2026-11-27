@@ -1,6 +1,6 @@
 package com.yuzhua.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.yuzhua.common.Result;
 import com.yuzhua.config.AppProperties;
 import jakarta.servlet.http.HttpServletRequest;

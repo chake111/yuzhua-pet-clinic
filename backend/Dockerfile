@@ -1,20 +1,21 @@
 # 构建阶段：不依赖宿主机 Maven
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /src
 COPY pom.xml .
+COPY config ./config
 RUN mvn -B -q -DskipTests dependency:go-offline
 COPY config ./config
 COPY src ./src
 RUN mvn -B -q -DskipTests package
 
 # 分层提取：COPY 顺序按 Spring Boot 官方文档，从最少变化到最常变化
-FROM eclipse-temurin:17-jre-jammy AS layers
+FROM eclipse-temurin:25-jre AS layers
 WORKDIR /layers
 COPY --from=build /src/target/yuzhua-server.jar application.jar
 RUN java -Djarmode=tools -jar application.jar extract --layers --destination extracted
 
 # 运行时：非 root，装 curl 供 healthcheck 使用
-FROM eclipse-temurin:17-jre-jammy
+FROM eclipse-temurin:25-jre
 RUN groupadd --system app \
  && useradd --system --gid app --home-dir /app --no-create-home --shell /usr/sbin/nologin app \
  && apt-get update \

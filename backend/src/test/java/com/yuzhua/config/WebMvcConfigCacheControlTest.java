@@ -1,6 +1,7 @@
 package com.yuzhua.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.yuzhua.security.AccountGuard;
 import com.yuzhua.security.JwtUtils;
 import org.junit.jupiter.api.Test;
@@ -140,7 +141,7 @@ class WebMvcConfigCacheControlTest {
 
         @Bean
         ObjectMapper objectMapper() {
-            return new ObjectMapper();
+            return JsonMapper.builder().build();
         }
     }
 }

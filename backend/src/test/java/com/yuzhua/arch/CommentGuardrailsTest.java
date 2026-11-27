@@ -1,8 +1,9 @@
 package com.yuzhua.arch;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseResult;
 import com.github.javaparser.ParserConfiguration;
@@ -112,8 +113,8 @@ class CommentGuardrailsTest {
             "Test", "ParameterizedTest", "RepeatedTest", "TestFactory");
 
     private static final JavaParser JAVA_PARSER = new JavaParser(
-            new ParserConfiguration().setLanguageLevel(ParserConfiguration.LanguageLevel.JAVA_17));
-    private static final ObjectMapper JSON = new ObjectMapper();
+            new ParserConfiguration().setLanguageLevel(ParserConfiguration.LanguageLevel.JAVA_25));
+    private static final ObjectMapper JSON = JsonMapper.builder().build();
 
     @Test
     void mainSourcesShouldComplyWithCommentAndJavadocGuardrails() throws IOException {
@@ -328,6 +329,24 @@ class CommentGuardrailsTest {
                 }
                 """;
         assertThat(analyzeMainSource("DemoContext.java", validWhitelisted, banned).violations()).isEmpty();
+    }
+
+    @Test
+    void javaParserSupportsJava25Syntax() {
+        String java25Source = """
+                package com.yuzhua.dto;
+                public sealed interface Frame permits Frame.Ok, Frame.Fail {
+                    record Ok(int code) implements Frame {}
+                    record Fail(String msg) implements Frame {}
+                    static int handle(Frame f) {
+                        return switch (f) {
+                            case Ok(var code) -> code;
+                            case Fail(_) -> -1;
+                        };
+                    }
+                }
+                """;
+        assertThat(analyzeMainSource("Frame.java", java25Source, List.of("axios")).violations()).isEmpty();
     }
 
     private AnalysisResult analyzeMainSource(String relPath, String source, List<String> bannedTerms) {

@@ -1,14 +1,14 @@
 package com.yuzhua.it;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.yuzhua.config.AppProperties;
 import com.yuzhua.dto.AppointmentForm;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.task.AppointmentSweepTask;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.support.EncodedResource;
@@ -23,7 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.mysql.MySQLContainer;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -80,7 +80,7 @@ public abstract class MySqlITSupport {
     protected static final long IT_SCHEDULE_ID = 9001L;
     protected static final long FIRST_PET_ID = 90001L;
 
-    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+    private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.0")
             .withDatabaseName("yuzhua")
             .withUsername("test")
             .withPassword("test")
@@ -293,7 +293,7 @@ public abstract class MySqlITSupport {
     }
 
     private String tokenOf(MvcResult result) throws Exception {
-        String token = responseJson(result).path("data").path("token").asText();
+        String token = responseJson(result).path("data").path("token").asString();
         if (token == null || token.isBlank()) {
             throw new AssertionError("登录响应里没有 data.token: "
                     + result.getResponse().getContentAsString(StandardCharsets.UTF_8));

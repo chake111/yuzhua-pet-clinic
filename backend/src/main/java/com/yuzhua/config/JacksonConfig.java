@@ -1,15 +1,16 @@
 package com.yuzhua.config;
 
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
-import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
-import com.fasterxml.jackson.datatype.jsr310.deser.LocalTimeDeserializer;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalTimeSerializer;
-import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.ext.javatime.deser.LocalDateDeserializer;
+import tools.jackson.databind.ext.javatime.deser.LocalDateTimeDeserializer;
+import tools.jackson.databind.ext.javatime.deser.LocalTimeDeserializer;
+import tools.jackson.databind.ext.javatime.ser.LocalDateSerializer;
+import tools.jackson.databind.ext.javatime.ser.LocalDateTimeSerializer;
+import tools.jackson.databind.ext.javatime.ser.LocalTimeSerializer;
+import tools.jackson.databind.module.SimpleModule;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,18 +25,21 @@ public class JacksonConfig {
     public static final String TIME_PATTERN = "HH:mm:ss";
 
     @Bean
-    public Jackson2ObjectMapperBuilderCustomizer jsr310FormatCustomizer() {
+    public JsonMapperBuilderCustomizer jsr310FormatCustomizer() {
         DateTimeFormatter dateTime = DateTimeFormatter.ofPattern(DATE_TIME_PATTERN);
         DateTimeFormatter date = DateTimeFormatter.ofPattern(DATE_PATTERN);
         DateTimeFormatter time = DateTimeFormatter.ofPattern(TIME_PATTERN);
 
+        SimpleModule javaTimeModule = new SimpleModule()
+                .addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(dateTime))
+                .addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(dateTime))
+                .addSerializer(LocalDate.class, new LocalDateSerializer(date))
+                .addDeserializer(LocalDate.class, new LocalDateDeserializer(date))
+                .addSerializer(LocalTime.class, new LocalTimeSerializer(time))
+                .addDeserializer(LocalTime.class, new LocalTimeDeserializer(time));
+
         return builder -> builder
-                .serializerByType(LocalDateTime.class, new LocalDateTimeSerializer(dateTime))
-                .deserializerByType(LocalDateTime.class, new LocalDateTimeDeserializer(dateTime))
-                .serializerByType(LocalDate.class, new LocalDateSerializer(date))
-                .deserializerByType(LocalDate.class, new LocalDateDeserializer(date))
-                .serializerByType(LocalTime.class, new LocalTimeSerializer(time))
-                .deserializerByType(LocalTime.class, new LocalTimeDeserializer(time))
-                .featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+                .addModule(javaTimeModule)
+                .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 }

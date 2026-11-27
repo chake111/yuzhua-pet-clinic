@@ -1,6 +1,6 @@
 package com.yuzhua.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.yuzhua.security.AccountGuard;
 import com.yuzhua.security.AuthInterceptor;
 import com.yuzhua.security.JwtUtils;
