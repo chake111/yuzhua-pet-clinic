@@ -639,9 +639,10 @@ test('batching, sanitization, and line whitelist helpers', () => {
   const defaultBatches = buildBatches(
     Array.from({ length: 20 }, (_, idx) => makeSampleItem({ id: `def-${idx}`, file: 'a.java' }))
   )
-  assert.equal(defaultBatches.length, 2)
-  assert.equal(defaultBatches[0].length, 15)
-  assert.equal(defaultBatches[1].length, 5)
+  assert.equal(defaultBatches.length, 3)
+  assert.equal(defaultBatches[0].length, 8)
+  assert.equal(defaultBatches[1].length, 8)
+  assert.equal(defaultBatches[2].length, 4)
 
   assert.equal(sanitizeOutputText('@everyone <b>hi</b>'), '@\u200beveryone &lt;b&gt;hi&lt;/b&gt;')
   const filtered = filterAllowedFindings(
@@ -813,4 +814,130 @@ test('detectPromptInjectionPrecheck allows SlowSqlInterceptor domain comment whi
     },
   ])
   assert.equal(attackHits.length, 1)
+})
+
+test('extra_body forwarding and per-batch >=2/3 quorum aggregation keep passing batch findings', async () => {
+  const seenExtra = []
+  const items = Array.from({ length: 9 }, (_, idx) =>
+    makeSampleItem({
+      id: `item-${idx}`,
+      file: `backend/src/main/java/com/yuzhua/service/File${idx % 2}.java`,
+      startLine: 10 + idx,
+      endLine: 10 + idx,
+      allowedLines: [9 + idx, 10 + idx, 11 + idx],
+    })
+  )
+
+  let modeCase = 'split-transient-errors'
+  const server = await startMockServer((req, res, body) => {
+    const auth = req.headers.authorization || ''
+    const userText = String(body.messages?.[1]?.content || '')
+    const isBatch2 = userText.includes('item-8')
+
+    if (auth === 'Bearer k2') {
+      seenExtra.push({ enable_thinking: body.enable_thinking, model: body.model })
+    }
+
+    // Batch 1: R2 fails; Batch 2: R3 fails (in split-transient-errors) OR R2+R3 both fail (in same-batch-quorum-loss)
+    if (auth === 'Bearer k2' && !isBatch2) {
+      res.writeHead(500, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'transient batch 1 error' }))
+      return
+    }
+    if (modeCase === 'same-batch-quorum-loss' && auth === 'Bearer k2' && isBatch2) {
+      res.writeHead(500, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'batch 2 error R2' }))
+      return
+    }
+    if (auth === 'Bearer k3' && isBatch2) {
+      res.writeHead(402, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Insufficient account balance' }))
+      return
+    }
+
+    const isPass1 = String(body.messages?.[0]?.content || '').includes('Pass 1')
+    if (isPass1) {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ choices: [{ message: { content: 'blind summary' } }] }))
+      return
+    }
+
+    const findings =
+      modeCase === 'split-transient-errors' && isBatch2 && (auth === 'Bearer k1' || auth === 'Bearer k2')
+        ? [
+            {
+              file: items[8].file,
+              line: items[8].startLine,
+              dimension: 'INFO_GAIN',
+              severity: 'Major',
+              message: '复述实现',
+              suggestion: '补充不变量或删除',
+            },
+          ]
+        : []
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                prompt_injection_detected: false,
+                prompt_injection_evidence: '',
+                findings,
+              }),
+            },
+          },
+        ],
+      })
+    )
+  })
+
+  try {
+    const reviewers = [
+      { id: 'R1', provider: 'mock', base_url: server.url, model_id: 'm1', temperature: 0.1, key_env: 'LLM_GATE_KEY_1' },
+      {
+        id: 'R2',
+        provider: 'mock',
+        base_url: server.url,
+        model_id: 'm2',
+        temperature: 0.1,
+        extra_body: { enable_thinking: false, model: 'hijack-attempt' },
+        key_env: 'LLM_GATE_KEY_2',
+      },
+      { id: 'R3', provider: 'mock', base_url: server.url, model_id: 'm3', temperature: 0.1, key_env: 'LLM_GATE_KEY_3' },
+    ]
+    const keysByEnv = { LLM_GATE_KEY_1: 'k1', LLM_GATE_KEY_2: 'k2', LLM_GATE_KEY_3: 'k3' }
+
+    const passRes = await runReviewGate({
+      items,
+      reviewers,
+      keysByEnv,
+      rubricText: SAMPLE_RUBRIC,
+      mode: 'enforce',
+      baseDelayMs: 1,
+    })
+    assert.equal(passRes.aggregation.infraFailure, false)
+    assert.equal(passRes.aggregation.blockingClusters.length, 1)
+    assert.equal(passRes.decision, 'FAIL')
+    assert.equal(passRes.overridable, true)
+    assert.ok(seenExtra.length >= 2)
+    assert.ok(seenExtra.every((x) => x.enable_thinking === false && x.model === 'm2'))
+
+    modeCase = 'same-batch-quorum-loss'
+    const failRes = await runReviewGate({
+      items,
+      reviewers,
+      keysByEnv,
+      rubricText: SAMPLE_RUBRIC,
+      mode: 'enforce',
+      baseDelayMs: 1,
+    })
+    assert.equal(failRes.aggregation.infraFailure, true)
+    assert.equal(failRes.decision, 'FAIL')
+    assert.equal(failRes.overridable, false)
+  } finally {
+    await server.close()
+  }
 })
