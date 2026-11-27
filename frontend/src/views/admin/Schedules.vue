@@ -10,11 +10,6 @@ import { PERIOD, WORK_STATUS, options, tagType, text } from '@/utils/dict'
 import { dayLabel, toDate, today } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 排班号源管理。号池由 totalNum / remainNum 两个数决定，
- * 这里只允许改总量与停诊状态——余量是下单结果，不能手改。
- * 归属（医生/日期/时段）一旦被任何预约引用过（含已取消）就冻结，只能另建时段（I10）。
- */
 const rows = ref([])
 const total = ref(0)
 const loading = ref(false)
@@ -26,7 +21,7 @@ const shortcuts = [
 ]
 
 const q = reactive({ pageNum: 1, pageSize: 20, doctorId: null, status: null })
-// 查询时提交筛选快照，翻页和操作后的刷新沿用已提交条件。
+// 原因: 翻页与操作刷新沿用已提交筛选快照，避免未点查询的草稿生效
 let applied = { ...q }
 let appliedRange = []
 
@@ -35,16 +30,11 @@ const batchOpen = ref(false)
 const editing = ref(null)
 const busy = ref(false)
 
-/**
- * 新建时 form.status 有效；编辑时不提交它——停诊与恢复只走列表行的按钮
- * （对应的 /stop、/resume 接口）。编辑弹窗里再放一个状态单选，就等于给同一条排班
- * 开两个写入点，一个停留了很久的弹窗被保存时会把中途的停诊覆盖回去。
- */
+// 原因: 新建时带入 form.status，编辑态停诊/恢复只走列表行专用接口，避免陈旧弹窗覆盖状态
 const blank = () => ({ doctorId: null, workDate: today(), period: 1, startTime: '08:30:00', endTime: '12:00:00', totalNum: 20, status: 1 })
 const form = reactive(blank())
 
-// I10：refNum 是后端给的"引用过这张排的预约条数（含已取消）"，>0 即归属冻结。
-// 置灰只是提示，真正的拦截在服务层，前端不能当成鉴权用。
+// 原因: refNum>0 表示已有预约引用过该排班，前端置灰仅作提示，实际归属冻结由服务端强制校验
 const frozen = computed(() => (editing.value?.refNum || 0) > 0)
 const doctorStopped = computed(() => form.doctorId === editing.value?.doctorId
   ? editing.value.doctorAvailable === false
@@ -67,8 +57,7 @@ function periodError(p) {
   if (p.startTime < start || p.endTime > end) return `${text(PERIOD, p.period)}排班时间须在 ${start.slice(0, 5)}–${end.slice(0, 5)} 内`
   return ''
 }
-// 时段模板按取值 1/2/3 取时间：字典里若混进别的 key（如手改过的本地快照），
-// 兜底成空数组，别让 periodTimes[v][0] 直接抛异常
+// 原因: 防止本地异常或未知时段 key 导致访问默认起止时间时下标越界
 const periodTime = (v) => periodTimes[v] || []
 
 async function load() {
@@ -104,7 +93,7 @@ function openCreate() {
 
 function openEdit(row) {
   editing.value = row
-  // 不带 row.status：编辑不写状态列，弹窗里也不再放这个控件
+  // 原因: 编辑不回填也不修改 status，停诊状态由列表行专用接口控制
   Object.assign(form, {
     doctorId: row.doctorId, workDate: row.workDate, period: row.period,
     startTime: row.startTime, endTime: row.endTime, totalNum: row.totalNum
@@ -132,7 +121,7 @@ async function submit() {
       doctorId: form.doctorId, workDate: form.workDate, period: form.period,
       startTime: form.startTime, endTime: form.endTime, totalNum: form.totalNum
     }
-    // 编辑只提交这六个字段：status 不在编辑契约里，带上会被服务端忽略、也容易误导下一个人
+    // 原因: 编辑契约不含 status，省略该字段避免误导调用方以为弹窗可改状态
     if (editing.value) await updateSchedule(editing.value.id, payload)
     else await createSchedule({ ...payload, status: form.status })
     ElMessage.success('已保存')
@@ -306,7 +295,7 @@ onMounted(() => {
         <el-form-item label="号源总数" required>
           <el-input-number v-model="form.totalNum" :min="editing ? Math.max(1, booked(editing)) : 1" :max="200" />
         </el-form-item>
-        <!-- 编辑不提供状态开关：停诊/恢复在列表行上，走 /stop 与 /resume 两个专用接口 -->
+        <!-- 原因: 编辑弹窗不提供状态开关，停诊与恢复须走列表行的 /stop 与 /resume 接口 -->
         <el-form-item v-if="!editing" label="状态">
           <el-radio-group v-model="form.status">
             <el-radio v-for="o in options(WORK_STATUS)" :key="o.value" :value="o.value"

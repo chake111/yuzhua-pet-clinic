@@ -6,11 +6,6 @@ import { SESSION_STATUS, options, tagType, text } from '@/utils/dict'
 import { maskPhone, since } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 医生的图文问诊会话列表。
- *
- * 按状态向服务端分页查询。
- */
 const ALL = 'all'
 const rows = ref([])
 const loading = ref(false)
@@ -41,7 +36,6 @@ async function accept(row) {
   }
 }
 
-/* 状态标签文案与顺序都取自 utils/dict.js（value 保持字符串，tab 用字符串比对） */
 const tabOptions = computed(() => [
   { label: '全部', value: ALL },
   ...options(SESSION_STATUS).map((o) => ({ label: o.label, value: String(o.value) }))

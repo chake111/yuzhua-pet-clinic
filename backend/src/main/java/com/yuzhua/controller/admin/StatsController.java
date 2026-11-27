@@ -11,10 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 后台看板。管理员拿到全院口径，医生账号拿到自己的口径，
- * 同一个接口靠登录态区分，不做两套 URL。
- */
 @Tag(name = "管理后台-数据统计")
 @RestController
 @RequestMapping("/admin/stats")

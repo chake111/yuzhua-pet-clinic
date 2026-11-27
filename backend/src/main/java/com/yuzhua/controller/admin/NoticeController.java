@@ -13,9 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * 公告与养宠科普管理。
- */
 @Tag(name = "管理后台-公告科普")
 @RestController
 @RequestMapping("/admin/notice")

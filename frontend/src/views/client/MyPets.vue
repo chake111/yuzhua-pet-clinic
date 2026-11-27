@@ -11,7 +11,6 @@ import { toDate } from '@/utils/format'
 import PetForm from '@/components/PetForm.vue'
 import StatusChip from '@/components/StatusChip.vue'
 
-/** 宠物档案列表。预约下单前必须先有档案，所以这页也是挂号流程的入口之一。 */
 const rows = ref([])
 const failed = ref(false)
 const loading = ref(false)

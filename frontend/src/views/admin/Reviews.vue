@@ -10,13 +10,6 @@ import ImageGallery from '@/components/ImageGallery.vue'
 import LoadFailure from '@/components/LoadFailure.vue'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 评价管理。医生账号只能看到并回复自己收到的评价，
- * 隐藏/显示评价属于运营动作，后端用 @RequireRole 限定给管理员。
- *
- * 评分是三个独立维度（综合 / 服务态度 / 诊疗效果），
- * 展示上用同一套标签、数值和量条，避免只看星级时把另外两项误读成附注。
- */
 const store = useAdminStore()
 const route = useRoute()
 const rows = ref([])
@@ -25,7 +18,7 @@ const loading = ref(false)
 const failed = ref(false)
 const doctors = ref([])
 const q = reactive({ pageNum: 1, pageSize: 20, doctorId: null, status: null })
-// 查询时提交筛选快照，翻页和操作后的刷新沿用已提交条件。
+// 原因: 翻页与操作刷新沿用已提交筛选快照，避免未点查询的草稿生效
 let applied = { ...q }
 
 const open = ref(false)
@@ -91,7 +84,6 @@ async function toggle(row) {
 
 const imgs = (row) => (row.images || '').split(',').filter(Boolean)
 
-/** 从评价跳回它对应的预约单；returnTo 让详情页的“返回预约列表”能回到评价页。 */
 const appointmentLink = (row) => ({
   path: `/admin/appointment/${row.appointmentId}`,
   query: { returnTo: route.fullPath }

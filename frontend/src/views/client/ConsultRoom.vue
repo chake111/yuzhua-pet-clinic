@@ -11,10 +11,6 @@ import ConsultPanel from '@/components/ConsultPanel.vue'
 import ImageGallery from '@/components/ImageGallery.vue'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 用户端聊天室外壳：会话抬头 + 共用的聊天面板。
- * 会话详情由后端校验参与方后返回。
- */
 const route = useRoute()
 const router = useRouter()
 const id = Number(route.params.id)
@@ -25,7 +21,7 @@ const loading = ref(true)
 const detailsOpen = ref(false)
 const presence = ref('')
 const viewportHeight = ref(null)
-/** 接诊/结束这类动作后让面板重挂一次，把系统消息重新从库里拉回来 */
+// 原因: 关闭问诊后递增 key 强制面板重挂，从库中拉取最新系统消息
 const panelKey = ref(0)
 
 const closed = computed(() => session.value?.status === 2)
@@ -58,7 +54,7 @@ async function closeSession() {
 }
 
 function resizeViewport() {
-  // 软键盘会缩小 visualViewport，部分手机浏览器的 dvh 不随之变化。
+  // 原因: 软键盘会缩小 visualViewport，部分手机浏览器的 dvh 不会随之更新
   if (window.visualViewport?.scale === 1) viewportHeight.value = window.visualViewport.height
 }
 

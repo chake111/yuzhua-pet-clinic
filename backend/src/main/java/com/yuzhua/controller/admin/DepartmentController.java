@@ -15,9 +15,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 科室管理。医生账号只能读，改动一律要求管理员角色。
- */
 @Tag(name = "管理后台-科室")
 @RestController
 @RequestMapping("/admin/department")

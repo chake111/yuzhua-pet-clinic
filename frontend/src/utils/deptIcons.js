@@ -1,15 +1,6 @@
-/**
- * 科室图标。库里存键名（如 stethoscope），前端内置同一套插画式图标：
- * 实心色块 + 同色深一档描边 + 小面积象牙白高光。emoji 不能用，是因为字形和颜色
- * 由系统字体决定；纯线稿也试过，用户要的是「像给漫画上色」，所以必须是实心形体。
- *
- * 每个图标的 viewBox 已按墨迹的几何均值归一（见 docs/design.md），stroke-width
- * 也按 V/32 预设补偿过——两者都是离线算好的常量，运行时不再测量，避免首帧抖动。
- * 新增图标时用 tools 里的导出脚本重新生成，不要手改这两处数值。
- */
 const IVORY = '#fcf0e4'
 
-/** 每组三个色：主体、线稿（主体加深）、暗部/内层。色值需满足白底 ≥3:1。 */
+// 原因: viewBox 与 stroke-width 已离线按墨迹均值补偿归一，运行时不再测量以避免首帧抖动
 export const DEPT_ICONS = [
   {
     key: 'stethoscope',
@@ -86,7 +77,7 @@ export const DEPT_ICONS = [
 const byKey = new Map(DEPT_ICONS.map((item) => [item.key, item]))
 const FALLBACK = byKey.get('stethoscope')
 
-/** 旧数据是 emoji；同一个 emoji 可能带也可能不带 U+FE0F。 */
+// 原因: 历史数据存 emoji 且可能携带变体选择符 U+FE0F，需先剥离后再映射图标键名
 const LEGACY = {
   '🩺': 'stethoscope',
   '🔪': 'surgery',
@@ -114,5 +105,4 @@ export function resolveDeptIcon(name) {
   return byKey.get(LEGACY[raw.replace(/\uFE0F/g, '')]) || FALLBACK
 }
 
-/** 图标高光色，十个科室共用，让它们读起来像同一套插画。 */
 export const DEPT_ICON_HIGHLIGHT = IVORY

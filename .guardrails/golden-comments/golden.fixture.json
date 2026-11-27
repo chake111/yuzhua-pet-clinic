@@ -1,0 +1,222 @@
+[
+  {
+    "id": "GD-01",
+    "expectedVerdict": "PASS",
+    "domain": "concurrency",
+    "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+    "startLine": 122,
+    "endLine": 123,
+    "kind": "whole_line",
+    "commentText": "// 原因: 必须用 READ_COMMITTED，排班锁串行化后事务内要读到前一个请求刚提交的同键预约",
+    "codeContext": "L121: TransactionTemplate tx = new TransactionTemplate(txManager);\nL122: // 原因: 必须用 READ_COMMITTED，排班锁串行化后事务内要读到前一个请求刚提交的同键预约\nL123: tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);\nL124: return tx.execute(status -> doCreate(req, key, userId));\nL156: private AppointmentVo doCreate(AppointmentForm req, String key, Long userId) {\nL161:     DoctorSchedule schedule = scheduleMapper.selectByIdForUpdate(req.getScheduleId());\nL162:     Appointment existing = key == null ? null : baseMapper.selectByUserAndIdemKey(userId, key);\nL163:     if (existing != null) return replayOf(existing, req);\nL164: }"
+  },
+  {
+    "id": "GD-02",
+    "expectedVerdict": "PASS",
+    "domain": "concurrency",
+    "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+    "startLine": 131,
+    "endLine": 131,
+    "kind": "whole_line",
+    "commentText": "// 原因: 须在 TransactionTemplate 事务回滚退号后再回读，否则会读到未提交状态或自调用绕过代理",
+    "codeContext": "L125: try {\nL126:     return tx.execute(status -> doCreate(req, key, userId));\nL127: } catch (DuplicateKeyException e) {\nL128:     if (key == null) throw e;\nL131:     // 原因: 须在 TransactionTemplate 事务回滚退号后再回读，否则会读到未提交状态或自调用绕过代理\nL132:     Appointment existing = readIdemRowWithRetry(userId, key);\nL133:     if (existing == null) throw e;\nL134:     return replayOf(existing, req);\nL135: }"
+  },
+  {
+    "id": "GD-03",
+    "expectedVerdict": "PASS",
+    "domain": "concurrency",
+    "file": "backend/src/main/java/com/yuzhua/service/AppointmentService.java",
+    "startLine": 66,
+    "endLine": 67,
+    "kind": "whole_line",
+    "commentText": "// 原因: 毫秒时间戳后再补 8 位随机数，降低同毫秒并发撞 uk_order_no 的概率（最终由唯一索引兜底）",
+    "codeContext": "L66: // 原因: 毫秒时间戳后再补 8 位随机数，降低同毫秒并发撞 uk_order_no 的概率（最终由唯一索引兜底）\nL67: private static final DateTimeFormatter NO_STAMP = DateTimeFormatter.ofPattern(\"yyyyMMddHHmmssSSS\");\nL68: private String nextOrderNo() {\nL69:     int rand = ThreadLocalRandom.current().nextInt(100_000_000);\nL70:     return \"PC\" + LocalDateTime.now().format(NO_STAMP) + String.format(\"%08d\", rand);\nL71: }"
+  },
+  {
+    "id": "GD-04",
+    "expectedVerdict": "PASS",
+    "domain": "concurrency",
+    "file": "backend/src/main/java/com/yuzhua/mapper/AppointmentMapper.java",
+    "startLine": 32,
+    "endLine": 35,
+    "kind": "doc_block",
+    "commentText": "/**\n * 按 (user_id, idem_key) 联合唯一索引回读已提交预约。\n * 并发冲突方须在事务回滚后再调用本方法收敛为幂等重放。\n */",
+    "codeContext": "L32: /**\nL33:  * 按 (user_id, idem_key) 联合唯一索引回读已提交预约。\nL34:  * 并发冲突方须在事务回滚后再调用本方法收敛为幂等重放。\nL35:  */\nL36: Appointment selectByUserAndIdemKey(@Param(\"userId\") Long userId, @Param(\"idemKey\") String idemKey);"
+  },
+  {
+    "id": "GD-05",
+    "expectedVerdict": "PASS",
+    "domain": "concurrency",
+    "file": "backend/src/main/java/com/yuzhua/task/SchedulerLease.java",
+    "startLine": 12,
+    "endLine": 17,
+    "kind": "doc_block",
+    "commentText": "/**\n * 多实例定时任务数据库租约。\n * 租期统一用数据库时钟 NOW(3) 判定以防多机 JVM 时钟漂移；\n * 释放时带 holder 条件校验，避免过期旧实例误删新实例租约。\n */",
+    "codeContext": "L12: /**\nL13:  * 多实例定时任务数据库租约。\nL14:  * 租期统一用数据库时钟 NOW(3) 判定以防多机 JVM 时钟漂移；\nL15:  * 释放时带 holder 条件校验，避免过期旧实例误删新实例租约。\nL16:  */\nL17: public class SchedulerLease {\nL42:     public boolean tryAcquire(String name, long ttlSeconds) {\nL43:         return leaseMapper.insertIfAbsent(name, holder, ttlSeconds) == 1 || leaseMapper.takeOverExpired(name, holder, ttlSeconds) == 1;\nL44:     }\nL59:     public void release(String name) {\nL60:         leaseMapper.release(name, holder);\nL61:     }\nL62: }"
+  },
+  {
+    "id": "GD-06",
+    "expectedVerdict": "PASS",
+    "domain": "concurrency",
+    "file": "backend/src/main/java/com/yuzhua/task/SchedulerLease.java",
+    "startLine": 74,
+    "endLine": 75,
+    "kind": "whole_line",
+    "commentText": "// 原因: holder 列宽 128，超长截断保留尾部进程号与随机后缀，防 INSERT 静默截断后 release 匹配失败",
+    "codeContext": "L74: // 原因: holder 列宽 128，超长截断保留尾部进程号与随机后缀，防 INSERT 静默截断后 release 匹配失败\nL75: return raw.length() <= 128 ? raw : raw.substring(raw.length() - 128);"
+  },
+  {
+    "id": "GD-07",
+    "expectedVerdict": "PASS",
+    "domain": "auth",
+    "file": "backend/src/main/java/com/yuzhua/security/AuthInterceptor.java",
+    "startLine": 16,
+    "endLine": 21,
+    "kind": "doc_block",
+    "commentText": "/**\n * 统一鉴权拦截器，按请求路径隔离两套登录体系与角色白名单。\n * 每次请求回查账号状态与权限版本号，确保禁用账号后未过期 JWT 立即失效。\n */",
+    "codeContext": "L16: /**\nL17:  * 统一鉴权拦截器，按请求路径隔离两套登录体系与角色白名单。\nL18:  * 每次请求回查账号状态与权限版本号，确保禁用账号后未过期 JWT 立即失效。\nL19:  */\nL20: public class AuthInterceptor implements HandlerInterceptor {\nL71:     if (!accountGuard.active(user)) { reject(response, 401, \"账号状态已变化\"); return false; }\nL72: }"
+  },
+  {
+    "id": "GD-08",
+    "expectedVerdict": "PASS",
+    "domain": "auth",
+    "file": "backend/src/main/java/com/yuzhua/security/AuthInterceptor.java",
+    "startLine": 45,
+    "endLine": 46,
+    "kind": "whole_line",
+    "commentText": "// 原因: REST 仅从请求头取令牌；?token= 只允许 WebSocket 握手用，防令牌落入访问日志与浏览器历史",
+    "codeContext": "L45: // 原因: REST 仅从请求头取令牌；?token= 只允许 WebSocket 握手用，防令牌落入访问日志与浏览器历史\nL46: String token = jwtUtils.strip(request.getHeader(props.getJwt().getHeader()));"
+  },
+  {
+    "id": "GD-09",
+    "expectedVerdict": "PASS",
+    "domain": "auth",
+    "file": "backend/src/main/java/com/yuzhua/security/AuthInterceptor.java",
+    "startLine": 109,
+    "endLine": 110,
+    "kind": "whole_line",
+    "commentText": "// 原因: Tomcat 线程池复用线程，请求结束必须清理 ThreadLocal 防止跨请求串号",
+    "codeContext": "L109: public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {\nL110:     // 原因: Tomcat 线程池复用线程，请求结束必须清理 ThreadLocal 防止跨请求串号\nL111:     UserContext.clear();\nL112: }"
+  },
+  {
+    "id": "GD-10",
+    "expectedVerdict": "PASS",
+    "domain": "auth",
+    "file": "backend/src/main/java/com/yuzhua/security/WsHandshakeInterceptor.java",
+    "startLine": 28,
+    "endLine": 28,
+    "kind": "whole_line",
+    "commentText": "// 原因: 浏览器原生 WebSocket API 无法自定义请求头，握手阶段仅允许从 query 参数提取 JWT",
+    "codeContext": "L28: // 原因: 浏览器原生 WebSocket API 无法自定义请求头，握手阶段仅允许从 query 参数提取 JWT\nL29: String token = request.getURI().getQuery();"
+  },
+  {
+    "id": "GD-11",
+    "expectedVerdict": "PASS",
+    "domain": "observability",
+    "file": "backend/src/main/java/com/yuzhua/common/TraceIdFilter.java",
+    "startLine": 18,
+    "endLine": 22,
+    "kind": "doc_block",
+    "commentText": "/**\n * 请求链路追踪过滤器，优先级高于鉴权拦截器。\n * 透传或生成 TraceId 写入 MDC 与 X-Trace-Id 响应头，并在 finally 中清理防线程复用污染。\n */",
+    "codeContext": "L18: /**\nL19:  * 请求链路追踪过滤器，优先级高于鉴权拦截器。\nL20:  * 透传或生成 TraceId 写入 MDC 与 X-Trace-Id 响应头，并在 finally 中清理防线程复用污染。\nL21:  */\nL22: public class TraceIdFilter extends OncePerRequestFilter {\nL36:     MDC.put(\"traceId\", traceId);\nL37:     response.setHeader(\"X-Trace-Id\", traceId);\nL38:     try { chain.doFilter(request, response); } finally { MDC.remove(\"traceId\"); }\nL39: }"
+  },
+  {
+    "id": "GD-12",
+    "expectedVerdict": "PASS",
+    "domain": "ws",
+    "file": "frontend/src/utils/consultSocket.js",
+    "startLine": 3,
+    "endLine": 9,
+    "kind": "doc_block",
+    "commentText": "/**\n * 图文问诊 WebSocket 客户端。\n * 浏览器建连无法带自定义头，令牌挂在 query 上；\n * 重连采用指数退避（最多 4 次），被服务端顶下线（reason=replaced）时终止重连。\n */",
+    "codeContext": "L3: /**\nL4:  * 图文问诊 WebSocket 客户端。\nL5:  * 浏览器建连无法带自定义头，令牌挂在 query 上；\nL6:  * 重连采用指数退避（最多 4 次），被服务端顶下线（reason=replaced）时终止重连。\nL7:  */\nL8: export class ConsultSocket {\nL28:   buildUrl(sessionId) { return `${proto}://${location.host}/api/ws/consult?token=${encodeURIComponent(getToken(this.kind))}` }\nL75:   if (e.reason === 'replaced') { this.dead = true; return }\nL80:   if (this.retry >= 4) { this.dead = true; return }\nL86:   const wait = 500 * 2 ** this.retry++"
+  },
+  {
+    "id": "GD-13",
+    "expectedVerdict": "PASS",
+    "domain": "ws",
+    "file": "frontend/src/utils/consultSocket.js",
+    "startLine": 113,
+    "endLine": 118,
+    "kind": "doc_block",
+    "commentText": "/**\n * 发送需服务端落库回执的问诊消息。\n * 仅在收到匹配的 ACK 帧时 resolve；断线、超时或 ERROR 帧均 reject 以便调用方保留草稿。\n */",
+    "codeContext": "L113: /**\nL114:  * 发送需服务端落库回执的问诊消息。\nL115:  * 仅在收到匹配的 ACK 帧时 resolve；断线、超时或 ERROR 帧均 reject 以便调用方保留草稿。\nL116:  */\nL117: chatConfirmed(content, msgType) {\nL121:   if (this.ws?.readyState !== WebSocket.OPEN) return Promise.reject(new Error('连接已断开，消息未发送'))\nL124:   const requestId = String(++this.sequence)\nL125:   return new Promise((resolve, reject) => {\nL126:     const timer = setTimeout(() => { this.pending.delete(requestId); reject(new Error('尚未收到保存回执')) }, 10000)\nL130:     this.pending.set(requestId, { resolve, reject, timer })\nL131:   })\nL132: }"
+  },
+  {
+    "id": "GD-14",
+    "expectedVerdict": "PASS",
+    "domain": "ws",
+    "file": "frontend/src/utils/consultSocket.js",
+    "startLine": 95,
+    "endLine": 96,
+    "kind": "whole_line",
+    "commentText": "// 原因: Nginx 与中间代理会掐断空闲连接，需每 30s 发一次 PING 保活",
+    "codeContext": "L94: startPing() {\nL95:   this.stopPing()\nL96:   // 原因: Nginx 与中间代理会掐断空闲连接，需每 30s 发一次 PING 保活\nL97:   this.pingTimer = setInterval(() => this.send({ type: 'PING' }), 30000)\nL98: }"
+  },
+  {
+    "id": "GD-15",
+    "expectedVerdict": "PASS",
+    "domain": "ws",
+    "file": "backend/src/main/java/com/yuzhua/websocket/ConsultWebSocketHandler.java",
+    "startLine": 72,
+    "endLine": 72,
+    "kind": "whole_line",
+    "commentText": "// 原因: 先从原始 JsonNode 提取 requestId，避免整帧反序列化失败时丢失回执关联 ID",
+    "codeContext": "L72: // 原因: 先从原始 JsonNode 提取 requestId，避免整帧反序列化失败时丢失回执关联 ID\nL73: String requestId = root.path(\"requestId\").asText(null);"
+  },
+  {
+    "id": "GD-16",
+    "expectedVerdict": "PASS",
+    "domain": "weak-network",
+    "file": "frontend/src/api/http.js",
+    "startLine": 5,
+    "endLine": 11,
+    "kind": "doc_block",
+    "commentText": "/**\n * 全站统一 HTTP 请求封装（基于原生 fetch，零第三方运行时依赖）。\n * 业务响应 HTTP 状态恒为 200，成败以 body.code 为准；502/断网/超时等传输层异常\n * 经统一错误分支提示，并在 finally 中释放 AbortController 超时定时器。\n */",
+    "codeContext": "L5: /**\nL6:  * 全站统一 HTTP 请求封装（基于原生 fetch，零第三方运行时依赖）。\nL7:  * 业务响应 HTTP 状态恒为 200，成败以 body.code 为准；502/断网/超时等传输层异常\nL8:  * 经统一错误分支提示，并在 finally 中释放 AbortController 超时定时器。\nL9:  */\nL55: const controller = new AbortController()\nL58: const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)\nL65: try {\nL66:   res = await fetch(buildUrl(url, cfg.params), { method, headers, body, signal: controller.signal })\nL89: } finally {\nL90:   clearTimeout(timer)\nL91: }\nL94: if (payload.code === 200) return payload"
+  },
+  {
+    "id": "GD-17",
+    "expectedVerdict": "PASS",
+    "domain": "weak-network",
+    "file": "frontend/src/api/http.js",
+    "startLine": 44,
+    "endLine": 45,
+    "kind": "whole_line",
+    "commentText": "// 原因: FormData 须由浏览器自动生成 multipart boundary，手动带 Content-Type 会导致上传失败",
+    "codeContext": "L43: if (data instanceof FormData) {\nL44:   // 原因: FormData 须由浏览器自动生成 multipart boundary，手动带 Content-Type 会导致上传失败\nL45:   delete headers['Content-Type']\nL46:   delete headers['content-type']\nL47:   body = data\nL48: }"
+  },
+  {
+    "id": "GD-18",
+    "expectedVerdict": "PASS",
+    "domain": "auth",
+    "file": "frontend/src/api/http.js",
+    "startLine": 105,
+    "endLine": 106,
+    "kind": "whole_line",
+    "commentText": "// 原因: 仅在当前不在登录页时用 location.replace 整页跳转（防死循环），重载页面清掉内存态且不留历史记录",
+    "codeContext": "L104: const target = kind === 'admin' ? '/admin/login' : '/login'\nL105: if (location.pathname !== target) {\nL106:   // 原因: 仅在当前不在登录页时用 location.replace 整页跳转（防死循环），重载页面清掉内存态且不留历史记录\nL107:   location.replace(`${target}?redirect=${encodeURIComponent(location.pathname + location.search)}`)\nL108: }"
+  },
+  {
+    "id": "GD-19",
+    "expectedVerdict": "PASS",
+    "domain": "concurrency",
+    "file": "frontend/src/utils/idempotencyKey.js",
+    "startLine": 1,
+    "endLine": 5,
+    "kind": "doc_block",
+    "commentText": "/**\n * 生成下单幂等键（一次下单意图对应一个键）。\n * 优先使用 crypto.randomUUID，弱兼容环境回退到时间戳与随机串；键仅用于服务端去重。\n */",
+    "codeContext": "L1: /**\nL2:  * 生成下单幂等键（一次下单意图对应一个键）。\nL3:  * 优先使用 crypto.randomUUID，弱兼容环境回退到时间戳与随机串；键仅用于服务端去重。\nL4:  */\nL5: export function newIdempotencyKey(cryptoImpl = globalThis.crypto) {\nL6:   const uuid = cryptoImpl?.randomUUID?.()\nL7:   if (uuid) return uuid\nL8:   return `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`\nL9: }"
+  },
+  {
+    "id": "GD-20",
+    "expectedVerdict": "PASS",
+    "domain": "weak-network",
+    "file": "frontend/src/App.vue",
+    "startLine": 3,
+    "endLine": 3,
+    "kind": "template_comment",
+    "commentText": "<!-- 原因: 图片查看器挂在路由外按需异步加载，既不占首屏包预算，切页也不会中断预览 -->",
+    "codeContext": "L2: <router-view />\nL3: <!-- 原因: 图片查看器挂在路由外按需异步加载，既不占首屏包预算，切页也不会中断预览 -->\nL4: <AsyncImagePreview v-if=\"viewerOpen\" />"
+  }
+]

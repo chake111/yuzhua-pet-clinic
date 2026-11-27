@@ -19,13 +19,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * 本地磁盘文件存储（头像、宠物照片、症状图、检查图）。
- *
- * 安全要点：落盘文件名一律用服务端生成的 UUID + 白名单校验过的扩展名，
- * 绝不使用客户端传来的原始文件名拼接路径——否则 ../../ 之类的路径穿越
- * 能把文件写到 uploads 目录之外。
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -36,7 +29,6 @@ public class FileStorageService {
 
     private final AppProperties props;
 
-    /** @return 可直接给前端用的访问 URL，如 /api/uploads/2026/09/13/ab12cd.png */
     public String store(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BizException("请选择要上传的文件");
@@ -50,7 +42,7 @@ public class FileStorageService {
         String subDir = LocalDate.now().format(DIR_FMT);
         Path base = Paths.get(props.getUpload().getDir()).toAbsolutePath().normalize();
         Path targetDir = base.resolve(subDir).normalize();
-        // 纵深防御：即便 ext 已校验，也确认最终路径仍在 base 之内
+        // 原因: 纵深防御路径穿越，即便扩展名已通过白名单仍确认目标目录位于 base 之内
         if (!targetDir.startsWith(base)) {
             log.warn("上传路径越界，已拒绝: {}", targetDir);
             throw new BizException("文件上传失败，请稍后重试");
@@ -87,13 +79,6 @@ public class FileStorageService {
         }
     }
 
-    /**
-     * 提取末段文件名的扩展名并转为小写。
-     *
-     * @param originalName 原始文件名，先移除最后一个正斜杠或反斜杠之前的内容
-     * @return 白名单内的扩展名：jpg、jpeg、png、gif 或 webp
-     * @throws BizException 文件名为 null、缺少扩展名或扩展名不在白名单内
-     */
     private String extractSafeExt(String originalName) {
         if (originalName == null) {
             throw new BizException("无法识别文件类型");

@@ -28,22 +28,25 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final AccountGuard accountGuard;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 仅从请求头解析 JWT（拒绝 query 参数避免泄露至访问日志），按路径隔离两套登录体系，
+     * 经 AccountGuard 回查账号状态及令牌版本，并在放行时校验 @RequireRole 并写入 UserContext。
+     */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
 
-        // getRequestURI() 含 contextPath（本项目为 /api），剥掉后才能按 /admin/ /client/ 判断
+        // 原因: getRequestURI() 含 contextPath（/api），剥离前缀后才能按 /admin/ /client/ 判定
         String path = request.getRequestURI().substring(request.getContextPath().length());
 
         boolean needAdmin = path.startsWith("/admin/");
         boolean needClient = path.startsWith("/client/");
-        // /common/** 双端共用（文件上传等），只要求已登录，不限登录体系
+        // 原因: /common/** 双端共用，只校验已登录而不限登录体系
         boolean needAny = path.startsWith("/common/");
 
-        // 只从请求头取。?token= 只给 WebSocket 握手用（见 WsHandshakeInterceptor），
-        // REST 若也认 query，token 就会落进访问日志和浏览器历史
+        // 原因: REST 仅认请求头 token，避免 ?token= 落入访问日志与浏览器历史
         String token = jwtUtils.strip(request.getHeader(props.getJwt().getHeader()));
         if (token == null || token.isBlank()) {
             if (needAdmin || needClient || needAny) {
@@ -83,9 +86,6 @@ public class AuthInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    /**
-     * @return 拒绝原因；返回 null 表示放行
-     */
     private String checkRole(Object handler, LoginUser user) {
         if (!(handler instanceof HandlerMethod hm)) {
             return null;
@@ -107,7 +107,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
-        // Tomcat 线程复用，不清理会串号
+        // 原因: Tomcat 线程池复用请求线程，必须清理 ThreadLocal 防止身份串用
         UserContext.clear();
     }
 

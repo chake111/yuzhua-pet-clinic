@@ -27,7 +27,6 @@ public class ConsultSocketRegistry {
 
     private final Map<String, Conn> conns = new ConcurrentHashMap<>();
 
-    /** 一个登录账号的连接。rooms 是该连接当前订阅的会话 id 集合 */
     @Getter
     @RequiredArgsConstructor
     public static class Conn {
@@ -37,6 +36,7 @@ public class ConsultSocketRegistry {
         private final Set<Long> rooms = ConcurrentHashMap.newKeySet();
     }
 
+    /** 生成账号维度的唯一连接键（体系:主键）。 */
     public static String keyOf(LoginUser u) {
         return u.getTyp() + ":" + u.getId();
     }
@@ -58,10 +58,12 @@ public class ConsultSocketRegistry {
         return conns.remove(key, conn) ? conn : null;
     }
 
+    /** 按连接键查询当前有效连接，不存在时返回 null。 */
     public Conn find(String key) {
         return conns.get(key);
     }
 
+    /** 将指定连接加入会话房间订阅集合。 */
     public void join(Conn conn, Long roomId) {
         conn.getRooms().add(roomId);
     }
@@ -74,6 +76,7 @@ public class ConsultSocketRegistry {
         return conn.getRooms().remove(roomId);
     }
 
+    /** 返回当前订阅了指定会话房间的连接快照列表。 */
     public List<Conn> inRoom(Long roomId) {
         List<Conn> out = new ArrayList<>();
         for (Conn c : conns.values()) {

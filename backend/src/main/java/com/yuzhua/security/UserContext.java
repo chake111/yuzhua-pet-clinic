@@ -17,14 +17,17 @@ public final class UserContext {
     private UserContext() {
     }
 
+    /** 写入当前线程登录态，调用方须在请求/帧处理结束后配合 {@link #clear()} 清理。 */
     public static void set(LoginUser user) {
         HOLDER.set(user);
     }
 
+    /** 读取当前线程登录态，未登录时返回 null（不抛异常）。 */
     public static LoginUser get() {
         return HOLDER.get();
     }
 
+    /** 清理当前线程持有的 ThreadLocal 登录态，防止容器线程池复用串号。 */
     public static void clear() {
         HOLDER.remove();
     }
@@ -38,6 +41,7 @@ public final class UserContext {
         return u;
     }
 
+    /** 读取当前登录账号主键，未登录时抛 401。 */
     public static Long requireId() {
         return require().getId();
     }

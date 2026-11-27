@@ -1,0 +1,4 @@
+[comment-audit] backend(122 files): nonDoc=84 (//=84, trailing=0, /*=0), doc=105, >35%=0
+[comment-audit] frontend(82 files): nonDoc=119 (//=114, trailing=0, /*=0, template=5), doc=13, >35%=0
+[comment-audit] totals(204 files): nonDoc=203, doc=118, >35%=0
+[comment-audit] strict violations: 0

@@ -11,7 +11,7 @@ const el = ref(null)
 const busy = ref(false)
 const form = ref({ username: '', password: '', confirm: '', nickname: '', phone: '', gender: 1 })
 
-// 规则与后端 AuthDto.Register 保持一致，别让用户提交后才被弹回来
+// 原因: 校验正则与后端 AuthDto.Register 对齐，避免提交后才返回格式错误
 const rules = {
   username: [
     { required: true, message: '请输入账号', trigger: 'blur' },
@@ -44,7 +44,7 @@ async function submit() {
     ElMessage.success('注册成功，已自动登录')
     router.replace('/me/pets')
   } catch {
-    /* 提示已在拦截器里给出 */
+    // 原因: 请求层已提示失败原因，此处保留表单内容供修改重试
   } finally {
     busy.value = false
   }

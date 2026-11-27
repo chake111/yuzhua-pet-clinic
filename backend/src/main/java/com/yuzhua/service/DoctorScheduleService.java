@@ -36,14 +36,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * 排班与号源池。
- *
- * 号源的"扣减/回滚"本身在 AppointmentService 里通过
- * DoctorScheduleMapper#tryOccupy / #release 完成（单条 UPDATE 判影响行数，不引入 Redis）。
- * 这里只负责排班的录入与余量保护：任何改动都不允许把已占用的号源抹掉，
- * 否则会出现"订单在、号没了"或"号翻倍"的对不上账。
- */
 @Service
 @RequiredArgsConstructor
 public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, DoctorSchedule> {
@@ -52,7 +44,6 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
     private final AppointmentMapper appointmentMapper;
     private final DepartmentMapper departmentMapper;
 
-    /** 用户端选号页：某位医生未来一段日期内可约的时段 */
     public List<ScheduleVo> listBookable(Long doctorId, LocalDate from, Integer days) {
         LocalDate start = from == null ? LocalDate.now() : from;
         int span = days == null ? 7 : Math.max(1, Math.min(days, 30));
@@ -90,6 +81,7 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         });
     }
 
+    /** 校验医生在诊、时段范围与唯一性后新建排班，初始余量等于总量。 */
     @Transactional
     public DoctorSchedule create(ScheduleForm req) {
         requireSchedulable(req.getDoctorId());
@@ -115,27 +107,8 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
     }
 
     /**
-     * 改排班（I10 之后分两类动作）：
-     *
-     * 1. 归属类字段——医生、日期、时段、起止时间：**只要有任何预约引用过这张排班（含已取消的单）就禁止改**。
-     *    预约行上存的是下单时的快照（doctor_id / appointment_date / period / start_time / end_time），
-     *    排班一旦被挪走，历史详情与真实号池就开始分叉，取消单也一样留着旧归属。
-     *    要换医生或时间请另建时段，这张班只能停诊或改容量。
-     * 2. 容量：允许调整，但占用量必须按最新值算。锁排班行之后再算占用——
-     *    {@code total - remain} 的旧快照会被并发抢号甩在后面，直接拿它推占用量就能把别人刚抢到的号抹掉
-     *    （跟踪表 I08/D1）。占用量以库里的有效预约条数为准（未取消、未逻辑删除），新总量不得小于它。
-     *
-     * 第 1 条的引用数同样在这把行锁之内统计，所以"校验通过后别人又下了一单"不成立：
-     * 下单要先对同一行做 {@code tryOccupy} 的条件更新，那把排班行锁在我们释放之前拿不到。
-     *
-     * <p><strong>本方法不写 status</strong>：停诊与恢复只由 {@link #stopClinic} / {@link #resumeClinic}
-     * 写入。入参 {@link ScheduleEditForm} 根本没有状态字段，所以一个停留很久的编辑弹窗再提交一次时，
-     * 不会把期间发生的停诊静默撤销。原先 status 也从这条路径进库，两个写入口互相覆盖，
-     * 管理员看到的是"点了停诊，过一会儿自己变回出诊"。
-     *
-     * 锁顺序：这里只锁 doctor_schedule，不锁任何 appointment——取消路径是
-     * "先锁预约再退号"，反向加锁会成环（Task 4 实测的 1213 就是这么来的）。
-     * 统计预约用普通一致性读，所有改动都在这把行锁之内。
+     * 在排班行锁内更新排班（不修改 status，仅停诊/恢复入口写状态）；
+     * 已存在任何预约引用时禁止改动医生、日期、时段或起止时间，且新总量不得小于有效预约数。
      */
     @Transactional
     public void update(Long id, ScheduleEditForm req) {
@@ -143,53 +116,13 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         if (cur == null) {
             throw BizException.notFound("排班");
         }
-        // 日期校验只在"换了日期"时做：历史排班调容量、改停诊状态不能被"不能给过去日期排班"挡住
-        if (!cur.getWorkDate().equals(req.getWorkDate())) {
-            if (req.getWorkDate() == null) {
-                throw new BizException("请选择排班日期");
-            }
-            checkDateNotPast(req.getWorkDate());
-        }
-        checkTimeOrder(req.getStartTime(), req.getEndTime());
-        checkPeriod(req.getPeriod());
-        boolean sameSlot = cur.getDoctorId().equals(req.getDoctorId())
-                && cur.getWorkDate().equals(req.getWorkDate())
-                && cur.getPeriod().equals(req.getPeriod());
-        if (!sameSlot && exists(Wrappers.<DoctorSchedule>lambdaQuery()
-                .eq(DoctorSchedule::getDoctorId, req.getDoctorId())
-                .eq(DoctorSchedule::getWorkDate, req.getWorkDate())
-                .eq(DoctorSchedule::getPeriod, req.getPeriod())
-                .ne(DoctorSchedule::getId, id))) {
-            throw new BizException("该医生在这一天的这个时段已经排过班了");
-        }
-        long refs = referencedById(id);
-        boolean movesAttribution = !sameSlot
-                || !Objects.equals(cur.getStartTime(), req.getStartTime())
-                || !Objects.equals(cur.getEndTime(), req.getEndTime());
-        if (refs > 0 && movesAttribution) {
-            throw new BizException("该时段已有 " + refs + " 条预约记录（含已取消），不能改医生、日期或时段，"
-                    + "请另建时段；号源总数仍可调整");
-        }
-        // 只有挪归属要医生在诊；改容量（含停诊中的排班）只要医生档案还在
-        if (movesAttribution) {
-            requireSchedulable(req.getDoctorId());
-        } else {
-            requireDoctor(req.getDoctorId());
-        }
-        // 旧排班保留原时间；改时段或起止时间才执行新范围校验。
-        if (!Objects.equals(cur.getPeriod(), req.getPeriod())
-                || !Objects.equals(cur.getStartTime(), req.getStartTime())
-                || !Objects.equals(cur.getEndTime(), req.getEndTime())) {
-            checkPeriodTime(req.getPeriod(), req.getStartTime(), req.getEndTime());
-        }
-
+        validateUpdateFields(id, cur, req);
         int booked = appointmentMapper.selectCount(Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getScheduleId, id)
                 .ne(Appointment::getStatus, Appointment.ST_CANCELLED)).intValue();
         if (req.getTotalNum() < booked) {
             throw new BizException("该时段已有 " + booked + " 个有效预约，总量不能改到 " + booked + " 以下");
         }
-
         DoctorSchedule s = new DoctorSchedule();
         s.setId(id);
         s.setDoctorId(req.getDoctorId());
@@ -199,8 +132,62 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         s.setEndTime(req.getEndTime());
         s.setTotalNum(req.getTotalNum());
         s.setRemainNum(req.getTotalNum() - booked);
-        // 不 setStatus：状态列不在这条路径的写入范围内（见方法注释）
+        // 原因: status 仅由 stopClinic/resumeClinic 写入，避免旧编辑弹窗提交覆盖停诊状态
         updateById(s);
+    }
+
+    private void validateUpdateFields(Long id, DoctorSchedule cur, ScheduleEditForm req) {
+        // 原因: 仅在更换日期时校验不可早于今天，历史排班仍需支持调整容量
+        if (!cur.getWorkDate().equals(req.getWorkDate())) {
+            if (req.getWorkDate() == null) {
+                throw new BizException("请选择排班日期");
+            }
+            checkDateNotPast(req.getWorkDate());
+        }
+        checkTimeOrder(req.getStartTime(), req.getEndTime());
+        checkPeriod(req.getPeriod());
+        boolean sameSlot = isSameSlot(cur, req);
+        if (!sameSlot && existsSlot(id, req)) {
+            throw new BizException("该医生在这一天的这个时段已经排过班了");
+        }
+        boolean movesAttribution = !sameSlot || isTimeChanged(cur, req);
+        validateAttributionAndDoctor(id, req.getDoctorId(), movesAttribution);
+        if (!Objects.equals(cur.getPeriod(), req.getPeriod()) || isTimeChanged(cur, req)) {
+            checkPeriodTime(req.getPeriod(), req.getStartTime(), req.getEndTime());
+        }
+    }
+
+    private void validateAttributionAndDoctor(Long id, Long doctorId, boolean movesAttribution) {
+        long refs = referencedById(id);
+        if (refs > 0 && movesAttribution) {
+            throw new BizException("该时段已有 " + refs + " 条预约记录（含已取消），不能改医生、日期或时段，"
+                    + "请另建时段；号源总数仍可调整");
+        }
+        // 原因: 仅转移排班归属时要求医生在诊；改容量只需医生档案存在
+        if (movesAttribution) {
+            requireSchedulable(doctorId);
+        } else {
+            requireDoctor(doctorId);
+        }
+    }
+
+    private boolean existsSlot(Long excludeId, ScheduleEditForm req) {
+        return exists(Wrappers.<DoctorSchedule>lambdaQuery()
+                .eq(DoctorSchedule::getDoctorId, req.getDoctorId())
+                .eq(DoctorSchedule::getWorkDate, req.getWorkDate())
+                .eq(DoctorSchedule::getPeriod, req.getPeriod())
+                .ne(DoctorSchedule::getId, excludeId));
+    }
+
+    private static boolean isSameSlot(DoctorSchedule cur, ScheduleEditForm req) {
+        return cur.getDoctorId().equals(req.getDoctorId())
+                && cur.getWorkDate().equals(req.getWorkDate())
+                && cur.getPeriod().equals(req.getPeriod());
+    }
+
+    private static boolean isTimeChanged(DoctorSchedule cur, ScheduleEditForm req) {
+        return !Objects.equals(cur.getStartTime(), req.getStartTime())
+                || !Objects.equals(cur.getEndTime(), req.getEndTime());
     }
 
     /**
@@ -282,12 +269,6 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         removeById(id);
     }
 
-    /**
-     * 统计排班的预约引用，供修改归属和删除前校验。
-     *
-     * @param scheduleId 排班 ID
-     * @return deleted=0 的预约条数，包含已取消预约；逻辑删除条件由 MyBatis-Plus 添加
-     */
     private long referencedById(Long scheduleId) {
         return appointmentMapper.selectCount(Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getScheduleId, scheduleId));
@@ -351,7 +332,6 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         return d;
     }
 
-    /** 新建、调整出诊安排或恢复排班时，医生须正常出诊。 */
     private void requireSchedulable(Long doctorId) {
         if (requireDoctor(doctorId).getStatus() != 1) {
             throw new BizException("该医生处于停诊状态，请先在医生管理里恢复出诊再排班");
@@ -383,7 +363,6 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         }
     }
 
-    /** 只有"新建"或"把排班挪到别的日期"才要求日期不在过去（I10：历史排班仍要能调容量） */
     private void checkDateNotPast(LocalDate workDate) {
         if (workDate.isBefore(LocalDate.now())) {
             throw new BizException("不能给过去的日期排班");
@@ -396,7 +375,6 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         }
     }
 
-    /** 一页排班的引用数（含已取消预约），一次分组查询，别按行查 */
     private Map<Long, Long> refCounts(List<DoctorSchedule> rows) {
         List<Long> ids = rows.stream().map(DoctorSchedule::getId)
                 .filter(Objects::nonNull).distinct().collect(Collectors.toList());
@@ -439,13 +417,11 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         return vo;
     }
 
-    /** 按医生行上挂的 departmentId 批量取科室，避免每行一次查询 */
     private Map<Long, Department> departmentsOf(Collection<Doctor> doctors) {
         return BatchLookup.mapByIds(departmentMapper::selectBatchIds,
                 BatchLookup.ids(doctors, Doctor::getDepartmentId), Department::getId);
     }
 
-    /** 批量排班的回执：新建多少条、跳过多少条已存在的 */
     public record BatchSummary(int created, int skipped) {
     }
 }

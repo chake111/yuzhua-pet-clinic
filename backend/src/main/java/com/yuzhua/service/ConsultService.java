@@ -38,20 +38,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 图文问诊会话与消息。
- *
- * 图文问诊免费、不限量、不建订单：患者在医生主页点「图文问诊」直接建会话（待接诊），
- * 医生接诊后开始沟通，结束由医生点或患者关闭待接诊会话。
- * 发言、已读、未读都按参与方（患者本人 / 接诊医生）校验；管理员不参与对话，
- * 但可在后台只读查看会话与消息用于合规追溯（pageForAdmin / historyForViewer），
- * 并可在只读之上做处置（屏蔽违规消息、无效/违规会话，见 changeMessageHidden / moderate）——
- * 处置只改标志位，发言与已读的参与方校验一行不改。
- * 被处置的会话与消息对参与方视同不存在（列表过滤 + 入口 404），管理员审计视图不过滤。
- *
- * WebSocket 线程和 REST 线程都会调这里，因此身份一律从 UserContext 取；
- * 由调用方（握手/消息处理器）负责在进入前 set、退出前 clear。
- */
 @Service
 @RequiredArgsConstructor
 public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSession> {
@@ -68,9 +54,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     private final DoctorMapper doctorMapper;
     private final SysUserMapper sysUserMapper;
 
-    // ---------------------------------------------------------------- 发起 / 生命周期
-
-    /** 患者发起图文问诊。免费不限量，直接落一条待接诊会话，聊天室随即可用 */
+    /** 校验宠物归属与医生在诊状态后创建免费图文问诊会话。 */
     @Transactional
     public ConsultSessionVo create(ConsultForm req) {
         Pet pet = petService.requireOwned(req.getPetId());
@@ -91,7 +75,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         s.setUserUnread(0);
         s.setDoctorUnread(0);
         save(s);
-        // 新建时档案还在，从刚校验过的档案复制展示字段；历史列表则走含已删档案的查询
+        // 原因: 新建时宠物档案必未删除，直接复用刚校验的实体构建展示摘要；历史列表再走含已删档案查询
         PetDisplayVo brief = new PetDisplayVo();
         BeanUtils.copyProperties(pet, brief);
         return buildVo(s, false, brief, doctor, null);
@@ -154,15 +138,10 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         consultPush.push(s.getId(), sessionFrame(s.getId(), ConsultSession.ST_CLOSED, concl, sys));
     }
 
-    /** 会话当事人校验：患者本人或接诊医生，别的账号一律看不到；被处置会话对参与方也视同不存在 */
     public ConsultSession requireMember(Long sessionId) {
         return requireMember(getById(sessionId), sessionId);
     }
 
-    /**
-     * 在给定会话快照上做归属与处置校验。读接口传普通读取结果，
-     * 写接口传锁读结果——校验对象必须是持锁期间看到的那一行。
-     */
     private ConsultSession requireMember(ConsultSession s, Long sessionId) {
         if (s == null) {
             throw BizException.notFound("问诊会话");
@@ -173,22 +152,17 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         if (!member) {
             throw BizException.forbidden("只有患者本人和接诊医生能进入这个会话");
         }
-        // 被处置的会话对参与方像不存在一样（与列表过滤口径一致）；管理员走 historyForViewer，不经这里
+        // 原因: 被处置的会话对参与方视同不存在，与列表过滤口径一致；管理员审计走 historyForViewer
         if (s.getModerateStatus() != null && s.getModerateStatus() != ConsultSession.MV_NORMAL) {
             throw BizException.notFound("问诊会话");
         }
         return s;
     }
 
-    /**
-     * 写路径的会话入口：先 SELECT ... FOR UPDATE 取得会话行锁，再在锁内校验归属与处置状态。
-     * 锁顺序固定为 会话行 → 消息行，和 markRead / changeMessageHidden 保持一致。
-     */
     private ConsultSession lockMember(Long sessionId) {
         return requireMember(baseMapper.selectByIdForUpdate(sessionId), sessionId);
     }
 
-    /** 管理员处置路径：管理员不是参与方，只锁会话并确认存在 */
     private ConsultSession lockSession(Long sessionId) {
         ConsultSession s = baseMapper.selectByIdForUpdate(sessionId);
         if (s == null) {
@@ -197,24 +171,22 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return s;
     }
 
-    /** 参与方按 ID 读取会话，历史详情独立于列表分页。 */
     public ConsultSessionVo detailMine(Long id) {
         ConsultSession s = requireMember(id);
         return buildVos(List.of(s), UserContext.require().isDoctor()).get(0);
     }
 
-    /** 我的会话分页，可按诊疗状态筛选。 */
     public PageResult<ConsultSessionVo> pageMine(ConsultQuery q) {
         LoginUser u = UserContext.require();
         if (!u.isClient() && !u.isDoctor()) {
             throw BizException.forbidden("管理员账号不参与问诊会话");
         }
-        // 条件式 eq 的第三个实参在调用前就求值了，会把患者账号带进 requireDoctorId 的 403
+        // 原因: 条件式 eq 第三参会在调用前求值，不能在患者分支触发 requireDoctorId() 抛 403
         Long mineAsDoctor = u.isDoctor() ? UserContext.requireDoctorId() : null;
         LambdaQueryWrapper<ConsultSession> qw = Wrappers.<ConsultSession>lambdaQuery()
                 .eq(u.isClient(), ConsultSession::getUserId, u.getId())
                 .eq(mineAsDoctor != null, ConsultSession::getDoctorId, mineAsDoctor)
-                // 被管理员处置的会话对参与方不可见（红点/列表一处过滤覆盖两端）
+                // 原因: 被管理员处置的会话对参与方不可见，避免出现无法点开的未读红点
                 .eq(ConsultSession::getModerateStatus, ConsultSession.MV_NORMAL)
                 .eq(q.getStatus() != null, ConsultSession::getStatus, q.getStatus())
                 .last("ORDER BY COALESCE(last_message_time, create_time) DESC, id DESC");
@@ -222,7 +194,6 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return PageResult.of(page, buildVos(page.getRecords(), u.isDoctor()));
     }
 
-    /** 管理员只读：全部会话分页（后台「问诊记录」页，可按状态/处置筛）。审计视图不做处置过滤 */
     public PageResult<ConsultSessionVo> pageForAdmin(ConsultQuery q) {
         Page<ConsultSession> page = page(new Page<>(q.getPageNum(), q.getPageSize()),
                 Wrappers.<ConsultSession>lambdaQuery()
@@ -233,7 +204,6 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return PageResult.of(page, buildVos(page.getRecords(), false));
     }
 
-    /** 两种列表共用历史名称补全，未读数按查看方角色取值。 */
     private List<ConsultSessionVo> buildVos(List<ConsultSession> rows, boolean asDoctor) {
         if (rows.isEmpty()) {
             return List.of();
@@ -248,13 +218,11 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return out;
     }
 
-    /** 历史消息，新→旧分页；beforeId 存在时只查该 id 之前的记录（聊天面板游标翻页） */
     public PageResult<ConsultMessage> history(Long sessionId, ConsultMessageQuery q) {
         requireMember(sessionId);
         return pageHistory(sessionId, q, false);
     }
 
-    /** 历史消息查看口：医生走参与方校验；管理员只读打开（不校验参与方、不清未读，且不过滤屏蔽行） */
     public PageResult<ConsultMessage> historyForViewer(Long sessionId, ConsultMessageQuery q) {
         boolean admin = UserContext.require().isAdmin();
         if (admin) {
@@ -267,19 +235,17 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return pageHistory(sessionId, q, admin);
     }
 
-    /** 历史查询的公共构造：分页、beforeId 游标、按 id 倒序；屏蔽行只对管理员审计视图放行 */
     private PageResult<ConsultMessage> pageHistory(Long sessionId, ConsultMessageQuery q, boolean includeHidden) {
         Page<ConsultMessage> page = messageMapper.selectPage(new Page<>(q.getPageNum(), q.getPageSize()),
                 Wrappers.<ConsultMessage>lambdaQuery()
                         .eq(ConsultMessage::getSessionId, sessionId)
                         .lt(q.getBeforeId() != null, ConsultMessage::getId, q.getBeforeId())
-                        // 管理员审计不过滤：被屏蔽的行仍带 hidden=1 返回，便于复核留痕
+                        // 原因: 管理员审计视图保留已屏蔽消息便于合规追溯，参与方视图过滤屏蔽行
                         .eq(!includeHidden, ConsultMessage::getHidden, ConsultMessage.HIDE_NO)
                         .orderByDesc(ConsultMessage::getId));
         return PageResult.of(page);
     }
 
-    /** 进聊天室时一次性带回最近若干条，省一次 REST 往返（被屏蔽的消息不下发） */
     public List<ConsultMessage> recent(Long sessionId, int limit) {
         int n = Math.min(Math.max(limit, 1), RECENT_MAX);
         List<ConsultMessage> rows = messageMapper.selectList(Wrappers.<ConsultMessage>lambdaQuery()
@@ -292,21 +258,26 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     }
 
     /**
-     * 落一条消息并刷新会话摘要。
-     *
-     * 未读一律累加，不再看对方是否在线：在线只是"此刻可能看到"，不等于已读——
-     * 推送可能因断开而丢失，此时数据库留着未读消息而计数为 0，红点就再也不出来了。
-     * 清零只发生在 {@link #markRead}：它把对侧未读消息真正标成已读后把计数归零，
-     * 两者同处会话行锁内，顺序由锁保证。
+     * 在会话行锁内落库消息并累加对侧未读数与最后消息摘要。
+     * 清零仅由 {@link #markRead} 在同锁内完成，避免在线推送丢帧导致红点永久丢失。
      */
     @Transactional
     public ConsultMessage send(Long sessionId, String msgType, String content) {
         ConsultSession s = lockMember(sessionId);
-        LoginUser u = UserContext.require();
         if (Integer.valueOf(ConsultSession.ST_CLOSED).equals(s.getStatus())) {
             throw new BizException("问诊已结束，会话已关闭");
         }
+        LoginUser u = UserContext.require();
         boolean byDoctor = u.isDoctor();
+        String type = normalizeMessageType(msgType, byDoctor);
+        String text = normalizeMessageContent(type, content);
+        ConsultMessage m = buildMessage(s.getId(), u, byDoctor, type, text);
+        messageMapper.insert(m);
+        baseMapper.touchOnMessage(s.getId(), preview(type, text), byDoctor, true);
+        return m;
+    }
+
+    private String normalizeMessageType(String msgType, boolean byDoctor) {
         String type = msgType == null || msgType.isBlank() ? ConsultMessage.TYPE_TEXT : msgType.trim().toUpperCase();
         if (!ConsultMessage.TYPE_TEXT.equals(type) && !ConsultMessage.TYPE_IMAGE.equals(type)
                 && !ConsultMessage.TYPE_SUGGEST.equals(type)) {
@@ -315,9 +286,12 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         if (ConsultMessage.TYPE_SUGGEST.equals(type) && !byDoctor) {
             throw new BizException("只有医生能发起到院建议");
         }
+        return type;
+    }
+
+    private String normalizeMessageContent(String type, String content) {
         String text = content == null ? "" : content.trim();
-        // 到院建议的附言选填：卡片本身就表达了"建议到院"，医生可以不写。
-        // 其它类型空消息没意义，仍拦掉
+        // 原因: 到院建议卡片本身已表达就医意图，允许附言为空；其余类型不允许空消息
         if (text.isEmpty() && !ConsultMessage.TYPE_SUGGEST.equals(type)) {
             throw new BizException("消息内容不能为空");
         }
@@ -330,10 +304,13 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         if (ConsultMessage.TYPE_SUGGEST.equals(type) && text.length() > MAX_SUGGEST_LEN) {
             throw new BizException("到院建议不超过 " + MAX_SUGGEST_LEN + " 字");
         }
+        return text;
+    }
 
+    private ConsultMessage buildMessage(Long sessionId, LoginUser u, boolean byDoctor, String type, String text) {
         ConsultMessage m = new ConsultMessage();
-        m.setSessionId(s.getId());
-        // 后台账号 id 与医生 id 是两套编号，这里存医生侧的业务 id，和会话归属保持一致
+        m.setSessionId(sessionId);
+        // 原因: 后台账号 id 与医生 id 独立编号，消息发送者统一存医生侧业务 id 以对齐会话归属
         m.setSenderId(byDoctor ? u.getDoctorId() : u.getId());
         m.setSenderRole(byDoctor ? ConsultMessage.ROLE_DOCTOR : ConsultMessage.ROLE_USER);
         m.setSenderName(u.getName());
@@ -341,8 +318,6 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         m.setMsgType(type);
         m.setContent(text);
         m.setIsRead(0);
-        messageMapper.insert(m);
-        baseMapper.touchOnMessage(s.getId(), preview(type, text), byDoctor, true);
         return m;
     }
 
@@ -368,7 +343,6 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return ids;
     }
 
-    /** 未读总数，给前端做红点 */
     public long unreadTotal() {
         LoginUser u = UserContext.require();
         if (!u.isClient() && !u.isDoctor()) {
@@ -378,30 +352,28 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return count(Wrappers.<ConsultSession>lambdaQuery()
                 .eq(u.isClient(), ConsultSession::getUserId, u.getId())
                 .eq(mineAsDoctor != null, ConsultSession::getDoctorId, mineAsDoctor)
-                // 被处置的会话不进红点，否则角标算给看不见的会话
+                // 原因: 被处置的会话对参与方不可见，须同步从红点计数排除
                 .eq(ConsultSession::getModerateStatus, ConsultSession.MV_NORMAL)
                 .gt(u.isClient(), ConsultSession::getUserUnread, 0)
                 .gt(u.isDoctor(), ConsultSession::getDoctorUnread, 0));
     }
 
-    // ---------------------------------------------------------------- 管理员处置
-
     /**
-     * 管理员屏蔽 / 恢复一条消息。只改标志位，不碰会话状态与参与方已读；
-     * 参与方可见性由各查询点过滤（history/recent/WS），管理员审计视图不过滤。
+     * 管理员屏蔽/恢复消息，仅改 hidden 标志并重算会话摘要与未读角标（锁顺序：会话行 -> 消息行）；
+     * 不修改会话诊疗状态与已读标志。
      */
     @Transactional
     public void changeMessageHidden(Long messageId, Integer hidden, String reason) {
         if (hidden == null || (hidden != ConsultMessage.HIDE_NO && hidden != ConsultMessage.HIDE_YES)) {
             throw new BizException("无法完成消息操作，请刷新后重试");
         }
-        // 普通读先定位所属会话，不在此处下结论；随后按"会话行 → 消息行"的顺序加锁
+        // 原因: 先用普通读定位所属会话，再严格按“会话行 -> 消息行”加锁防止与 send/markRead 成环
         ConsultMessage found = messageMapper.selectById(messageId);
         if (found == null) {
             throw BizException.notFound("问诊消息");
         }
         lockSession(found.getSessionId());
-        // 锁内当前读：拿到的是最新已提交状态，避免两个管理员并发改同一条消息时用旧快照判断
+        // 原因: 持会话锁后重新当前读消息行，防止并发管理员基于旧快照覆盖标志位
         ConsultMessage m = messageMapper.selectByIdForUpdate(messageId);
         if (m == null) {
             throw BizException.notFound("问诊消息");
@@ -420,7 +392,7 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
                 .set(ConsultMessage::getHiddenBy, hide ? UserContext.requireId() : null)
                 .set(ConsultMessage::getHiddenTime, hide ? LocalDateTime.now() : null)
                 .eq(ConsultMessage::getId, messageId));
-        // 被屏蔽/恢复的若是最后一条或未读，会话摘要与角标要按剩余可见消息重算
+        // 原因: 被屏蔽或恢复的消息可能是最后一条或未读消息，须按剩余可见消息重算摘要与未读
         refreshSessionAggregates(m.getSessionId());
         m.setHidden(hidden);
         m.setHiddenReason(null);
@@ -431,8 +403,8 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     }
 
     /**
-     * 管理员处置会话：1 无效关闭 / 2 违规屏蔽（非 0 连带关闭），0 撤销处置。
-     * 与 status 的诊疗生命周期正交；处置后参与方在列表与详情入口都当它不存在。
+     * 管理员处置会话（1 无效关闭 / 2 违规屏蔽 / 0 撤销处置），持会话行锁执行。
+     * 非 0 处置连带关闭未结束会话并由 {@link ConsultPush#pushModeration} 清退房间订阅；撤销不恢复关闭态。
      */
     @Transactional
     public void moderate(Long sessionId, Integer moderateStatus, String reason) {
@@ -440,10 +412,10 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
                 || moderateStatus > ConsultSession.MV_VIOLATION) {
             throw new BizException("无法完成会话处置，请刷新后重试");
         }
-        // 先锁会话行：处置与发送/结束共用一个顺序，避免处置提交时仍有消息在途
+        // 原因: 处置与发送/结束共用会话行锁，保证处置提交时无在途消息写入
         ConsultSession s = lockSession(sessionId);
         if (moderateStatus == ConsultSession.MV_NORMAL) {
-            // 撤销只回写处置字段：已连带关闭的会话保持关闭（诊疗事实不复活）
+            // 原因: 撤销处置仅清空处置标志，已连带关闭的会话保持关闭态
             update(Wrappers.<ConsultSession>lambdaUpdate()
                     .set(ConsultSession::getModerateStatus, ConsultSession.MV_NORMAL)
                     .set(ConsultSession::getModerateReason, null)
@@ -460,7 +432,6 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         if (why.length() > 255) {
             throw new BizException("处置原因不超过 255 字");
         }
-        // 未结束的会话连带关闭（条件更新防并发）；已结束的只需记录处置
         boolean closeIt = !Integer.valueOf(ConsultSession.ST_CLOSED).equals(s.getStatus());
         boolean won = update(Wrappers.<ConsultSession>lambdaUpdate()
                 .set(ConsultSession::getModerateStatus, moderateStatus)
@@ -475,17 +446,16 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
             throw new BizException("会话状态刚刚变化，请刷新后再试");
         }
         if (closeIt) {
-            // 该 SYSTEM 消息只在管理员审计视图里可见（参与方已看不到整个会话）——刻意如此
+            // 原因: 处置关闭后的系统消息仅管理员审计视图可见，参与方已无法读取整个会话
             systemMessage(sessionId, "该会话已由管理员处置关闭。");
         }
-        // 处置通知：提交后先发 MODERATION，再清退原订阅，旧连接不能再收到该会话正文
+        // 原因: 提交后先推送 MODERATION 帧再清退房间订阅，阻止旧连接继续收到正文
         consultPush.pushModeration(sessionId, Map.of("type", "MODERATION", "sessionId", sessionId, "moderateStatus", moderateStatus));
     }
 
-    /** 屏蔽态变化后重算会话摘要与两侧未读；调用方必须已持有会话行锁。 */
     private void refreshSessionAggregates(Long sessionId) {
         baseMapper.refreshUnread(sessionId);
-        // 当前读：本事务在等锁前已做过普通查询，普通 SELECT 会沿用旧快照，漏掉等待期间提交的新消息
+        // 原因: 同事务等锁前可能已有普通查询，必须当前读否则看不到等待期间提交的可见消息
         ConsultMessage last = messageMapper.selectLastVisibleForUpdate(sessionId);
         if (last == null) {
             baseMapper.setLastMessage(sessionId, null, null);
@@ -496,14 +466,12 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         }
     }
 
-    /** 医生上下线：连接建立/断开时由 WebSocket 侧调用 */
     public void markDoctorOnline(Long doctorId, boolean online) {
         doctorMapper.update(null, Wrappers.<Doctor>lambdaUpdate()
                 .setSql(online ? "online_status = IF(status = 1, 1, 0)" : "online_status = 0")
                 .eq(Doctor::getId, doctorId));
     }
 
-    /** 进程被直接杀掉时断开回调不会执行，留下的在线标志在下次启动时清掉 */
     @PostConstruct
     void resetDoctorOnline() {
         doctorMapper.update(null, Wrappers.<Doctor>lambdaUpdate()
@@ -511,10 +479,6 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
                 .eq(Doctor::getOnlineStatus, 1));
     }
 
-    /**
-     * 系统消息：接诊/结束在对话里留个痕。is_read 置 1，
-     * 且不涨任何一侧的未读——它不是谁说的话，不该制造红点。
-     */
     private ConsultMessage systemMessage(Long sessionId, String text) {
         ConsultMessage m = new ConsultMessage();
         m.setSessionId(sessionId);
@@ -529,7 +493,6 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
         return m;
     }
 
-    /** SESSION 帧：附带本次已落库的系统消息（带 ID），前端按消息 ID 合并，另触发父组件刷新会话状态 */
     private Map<String, Object> sessionFrame(Long sessionId, int status, String summary, ConsultMessage message) {
         Map<String, Object> frame = new HashMap<>();
         frame.put("type", "SESSION");

@@ -5,7 +5,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { recordDetail } from '@/api/user'
 import MedicalRecordSheet from '@/components/MedicalRecordSheet.vue'
 
-/** 用户端查看病历。正文块的字段顺序与过滤规则在 utils/medicalRecord.js，与后台打印页共用。 */
 const route = useRoute()
 const router = useRouter()
 const row = ref(null)

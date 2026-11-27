@@ -2,11 +2,6 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
-/**
- * 改密表单（后台账号页、用户端账号设置共用）：统一校验、请求与成功清空。
- * 请求函数由页面传入——两页各自的 changePassword API，落点 /admin 与 /client 不同；
- * 表单外观差异（autocomplete、label 布局）经属性透传与开关保留，附加按钮走 #extra 插槽。
- */
 const props = defineProps({
   submitRequest: { type: Function, required: true },
   autocomplete: { type: Boolean, default: false }

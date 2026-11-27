@@ -18,13 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 用户账号管理（宠物主人）。
- *
- * 禁用/恢复改的是 sys_user.status：被禁用账号的在线 token 会在下一个请求
- * 被拦截器回查 status 时挡掉（与医生账号停用同一套口径）。
- * 详情里带该用户的宠物档案与最近预约，便于核对异常账号。
- */
 @Tag(name = "管理后台-用户")
 @RestController
 @RequestMapping("/admin/user")

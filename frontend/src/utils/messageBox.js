@@ -1,12 +1,7 @@
 import { ElMessageBox as RawElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message-box/style/css'
 
-/**
- * 命令式 ElMessageBox 统一收口封装：
- * 1. 按需模式下集中绑定 message-box 样式，同时将其 JS+CSS 隔离出首屏入口包；
- * 2. 在调用方未显式传入按钮文案时补充中文默认文案，避免脱离 <el-config-provider>
- *    上下文后回退到英文 OK / Cancel。
- */
+// 原因: 按需模式下统一兜底中文按钮文案，防止脱离 ConfigProvider 后回退英文按钮
 const DEFAULT_CONFIRM_OPTS = { confirmButtonText: '确定', cancelButtonText: '取消' }
 const DEFAULT_ALERT_OPTS = { confirmButtonText: '确定' }
 
@@ -23,7 +18,7 @@ function mergeDefaults(defaults, options) {
 
 function wrapBoxMethod(fn, defaults) {
   return (message, title, options, appContext) => {
-    // 兼容 2 参形式：(message, options[, appContext])
+    // 原因: 兼容 Element Plus 两参调用形式，即第二个参数直接传入配置对象
     if (title !== null && typeof title === 'object') {
       const merged = mergeDefaults(defaults, title)
       return options === undefined

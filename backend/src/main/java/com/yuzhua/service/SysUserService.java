@@ -22,9 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-/**
- * 用户端账号（宠物主人）。
- */
 @Service
 @RequiredArgsConstructor
 public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
@@ -34,6 +31,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
     private final PetService petService;
     private final AppointmentService appointmentService;
 
+    /** 校验账号与手机号唯一后创建用户端账号（初始令牌版本为 1）并签发登录令牌。 */
     @Transactional
     public LoginVo register(AuthDto.Register req) {
         if (exists(Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, req.getUsername()))) {
@@ -58,7 +56,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
     public LoginVo login(AuthDto.Login req) {
         SysUser u = baseMapper.selectForLogin(req.getUsername());
         if (u == null || !passwordEncoder.matches(req.getPassword(), u.getPassword())) {
-            // 不区分"账号不存在"和"密码错误"，避免账号枚举
+            // 原因: 不区分账号不存在与密码错误，避免登录接口被用于枚举注册账号
             throw new BizException("账号或密码错误");
         }
         if (!Integer.valueOf(1).equals(u.getStatus())) {
@@ -71,7 +69,6 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         return issueToken(u);
     }
 
-    /** 返回实体而不是 LoginVo：编辑资料页要回填 gender/birthday/city/address。 */
     public SysUser current() {
         SysUser u = getById(UserContext.requireId());
         if (u == null) {
@@ -80,12 +77,6 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         return u;
     }
 
-    /**
-     * 逐列更新当前用户资料，使选填项可以清空。
-     *
-     * @param req 资料表单；phone、email、city、address 经 emptyToNull 转换后显式写入，
-     *            nickname、avatar、gender 按传入值写入
-     */
     public void updateProfile(AuthDto.UpdateProfile req) {
         String phone = emptyToNull(req.getPhone());
         if (phone != null && exists(Wrappers.<SysUser>lambdaQuery()
@@ -119,7 +110,6 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
                 .eq(SysUser::getId, u.getId()));
     }
 
-    /** 后台改用户状态。禁用后其在线 token 会在下一个请求被拦截器挡掉 */
     public void changeStatus(Long userId, Integer status) {
         if (getById(userId) == null) {
             throw BizException.notFound("用户");
@@ -129,7 +119,6 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
                 .eq(SysUser::getId, userId));
     }
 
-    /** 后台用户分页：昵称/手机号/账号关键字 + 状态 */
     public PageResult<SysUser> pageForAdmin(UserQuery q) {
         LambdaQueryWrapper<SysUser> qw = Wrappers.<SysUser>lambdaQuery()
                 .and(q.getKeyword() != null && !q.getKeyword().isBlank(), w -> w
@@ -141,7 +130,6 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         return PageResult.of(page(new Page<>(q.getPageNum(), q.getPageSize()), qw));
     }
 
-    /** 后台用户详情：账号 + 宠物档案 + 最近 20 条预约 */
     public UserDetailVo detailForAdmin(Long userId) {
         SysUser u = getById(userId);
         if (u == null) {

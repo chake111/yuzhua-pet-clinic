@@ -8,15 +8,11 @@ import { ACCOUNT_STATUS, APPT_STATUS, PERIOD, PET_GENDER, USER_GENDER, options, 
 import { money, toDate, toDateTime } from '@/utils/format'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 用户账号管理：查询 → 禁用/恢复 → 详情（宠物档案与预约记录）。
- * 禁用改的是 sys_user.status，被禁账号的在线 token 会在下一个请求被拦截器回查挡掉。
- */
 const rows = ref([])
 const total = ref(0)
 const loading = ref(false)
 const q = reactive({ pageNum: 1, pageSize: 20, keyword: '', status: null })
-// 查询时提交筛选快照，翻页和操作后的刷新沿用已提交条件。
+// 原因: 翻页与操作刷新沿用已提交筛选快照，避免未点查询的草稿生效
 let applied = { ...q }
 
 const open = ref(false)

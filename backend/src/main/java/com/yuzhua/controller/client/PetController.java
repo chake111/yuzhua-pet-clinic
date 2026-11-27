@@ -11,10 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 我的宠物档案。入参直接用实体，服务端强制覆盖 userId，
- * 前端传谁的 id 都没用——归属只由登录态决定。
- */
 @Tag(name = "用户端-宠物档案")
 @RestController
 @RequestMapping("/client/pet")

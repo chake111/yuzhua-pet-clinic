@@ -6,7 +6,6 @@ import { doctorPage, recordPage } from '@/api/admin'
 import { useAdminStore } from '@/stores/admin'
 import { toDate } from '@/utils/format'
 
-/** 病历处方列表。医生账号只看自己写的，管理员可全院检索。 */
 const store = useAdminStore()
 const router = useRouter()
 const rows = ref([])
@@ -14,7 +13,7 @@ const total = ref(0)
 const loading = ref(false)
 const doctors = ref([])
 const q = reactive({ pageNum: 1, pageSize: 20, doctorId: null, keyword: '' })
-// 查询时提交筛选快照，翻页和操作后的刷新沿用已提交条件。
+// 原因: 翻页与操作刷新沿用已提交筛选快照，避免未点查询的草稿生效
 let applied = { ...q }
 
 async function load() {

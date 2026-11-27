@@ -14,12 +14,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * 医生评价管理：医生回复自己收到的评价，管理员负责屏蔽违规评价。
- *
- * 隐藏一条评价会重算该医生的评分聚合（统计 SQL 只认 status=1），
- * 这一步写在 Service 里，不放前端。
- */
 @Tag(name = "管理后台-医生评价")
 @RestController
 @RequestMapping("/admin/review")

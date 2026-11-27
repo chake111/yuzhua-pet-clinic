@@ -1,10 +1,4 @@
-/**
- * 首屏关键路径（http.js、Login.vue、admin/Login.vue）轻量原生提示条。
- *
- * 复用 Element Plus 的 .el-message / .el-message--<type> DOM 结构与 main.css 令牌变量，
- * 避免为了错误/登录提示在首屏入口静态捆绑 element-plus 的 ElMessage 及其图标/Popper 依赖链，
- * 同时保证断网报错时无需发起异步 chunk 请求即可立即展示提示。
- */
+// 原因: 首屏关键路径复用原生 DOM 与 .el-message 样式，避免静态捆绑 Element Plus 运行时并支持断网即时提示
 const activeToasts = []
 const BASE_TOP = 20
 const GAP = 16

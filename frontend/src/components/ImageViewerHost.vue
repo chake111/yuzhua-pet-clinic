@@ -3,10 +3,6 @@ import { computed, nextTick, watch } from 'vue'
 import { PictureFilled } from '@element-plus/icons-vue'
 import { closeImageViewer, imageViewer, onViewerSwitch } from '@/utils/imageViewer'
 
-/**
- * 全站图片查看器的唯一渲染出口：放大 / 旋转 / 翻转 / 键盘操作交给 el-image-viewer，
- * 这里只补它没有的两件事——每张图的来源说明，以及图片加载失败时的交代。
- */
 const multi = computed(() => imageViewer.urls.length > 1)
 const caption = computed(() => imageViewer.captions[imageViewer.index])
 const hint = computed(() =>
@@ -16,7 +12,7 @@ const hint = computed(() =>
 )
 const fileName = (src) => String(src || '').split('/').pop() || '未知文件'
 
-/* el-image-viewer 的 img 没有 alt 通道，组件也不支持透传；打开和切图后补上语义 alt */
+// 原因: el-image-viewer 的 img 不支持透传 alt 属性，打开与切图后需手动补写语义 alt
 const altText = computed(() => {
   const name = caption.value || imageViewer.title || '图片'
   return multi.value ? `${name}（第 ${imageViewer.index + 1} 张，共 ${imageViewer.urls.length} 张）` : name

@@ -9,7 +9,6 @@ import { toDateTime } from '@/utils/format'
 import { openImageViewer } from '@/utils/imageViewer'
 import StatusChip from '@/components/StatusChip.vue'
 
-/** 公告详情。正文是纯文本，用 pre-wrap 排版，不走 v-html。 */
 const route = useRoute()
 const router = useRouter()
 const row = ref(null)

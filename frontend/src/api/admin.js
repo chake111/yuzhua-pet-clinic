@@ -1,26 +1,17 @@
 import { del, get, post, put } from './http'
 
-/**
- * 后台接口。医生账号与管理员共用 /admin/**，
- * 差别只在返回口径（列表会被限定成本人）与个别写操作的 @RequireRole。
- */
-
-// —— 认证 ——
 export const login = (d) => post('/admin/auth/login', d)
 export const profile = () => get('/admin/auth/profile')
 export const changePassword = (d) => put('/admin/auth/password', d)
 
-// —— 看板 ——
 export const dashboard = (days) => get('/admin/stats/dashboard', { days })
 
-// —— 预约工单 ——
 export const appointmentPage = (params) => get('/admin/appointment/page', params)
 export const appointmentDetail = (id) => get(`/admin/appointment/${id}`)
 export const accept = (id) => post(`/admin/appointment/${id}/accept`)
 export const finish = (id) => post(`/admin/appointment/${id}/finish`)
 export const cancel = (id, d) => post(`/admin/appointment/${id}/cancel`, d)
 
-// —— 排班号源 ——
 export const schedulePage = (params) => get('/admin/schedule/page', params)
 export const createSchedule = (d) => post('/admin/schedule', d)
 export const batchSchedule = (d) => post('/admin/schedule/batch', d)
@@ -29,7 +20,6 @@ export const removeSchedule = (id) => del(`/admin/schedule/${id}`)
 export const stopSchedule = (id) => put(`/admin/schedule/${id}/stop`)
 export const resumeSchedule = (id) => put(`/admin/schedule/${id}/resume`)
 
-// —— 医生与科室 ——
 export const doctorPage = (params) => get('/admin/doctor/page', params)
 export const doctorDetail = (id) => get(`/admin/doctor/${id}`)
 export const createDoctor = (d) => post('/admin/doctor', d)
@@ -44,18 +34,15 @@ export const updateDepartment = (id, d) => put(`/admin/department/${id}`, d)
 export const removeDepartment = (id) => del(`/admin/department/${id}`)
 export const toggleDepartment = (id, status) => put(`/admin/department/${id}/status`, null, { params: { status } })
 
-// —— 病历处方 ——
 export const recordPage = (params) => get('/admin/record/page', params)
 export const recordDetail = (id) => get(`/admin/record/${id}`)
 export const recordOfAppointment = (appointmentId) => get(`/admin/record/appointment/${appointmentId}`)
 export const saveRecord = (appointmentId, d) => post(`/admin/record/appointment/${appointmentId}`, d)
 
-// —— 评价 ——
 export const reviewPage = (params) => get('/admin/review/page', params)
 export const replyReview = (id, d) => post(`/admin/review/${id}/reply`, d)
 export const reviewStatus = (id, status) => put(`/admin/review/${id}/status`, null, { params: { status } })
 
-// —— 公告科普 ——
 export const noticePage = (params) => get('/admin/notice/page', params)
 export const noticeDetail = (id) => get(`/admin/notice/${id}`)
 export const createNotice = (d) => post('/admin/notice', d)
@@ -63,26 +50,20 @@ export const updateNotice = (id, d) => put(`/admin/notice/${id}`, d)
 export const noticeStatus = (id, status) => put(`/admin/notice/${id}/status`, null, { params: { status } })
 export const removeNotice = (id) => del(`/admin/notice/${id}`)
 
-// —— 用户账号（宠物主人） ——
 export const userPage = (params) => get('/admin/user/page', params)
 export const userDetail = (id) => get(`/admin/user/${id}`)
 export const userStatus = (id, status) => put(`/admin/user/${id}/status`, null, { params: { status } })
 
-// —— 宠物档案（后台视角，不校验归属） ——
 export const petPage = (params) => get('/admin/pet/page', params)
 export const updatePet = (id, d) => put(`/admin/pet/${id}`, d)
 export const removePet = (id) => del(`/admin/pet/${id}`)
 
-// —— 图文问诊：医生工作台 + 管理员只读记录 ——
 export const consultSessions = (params) => get('/admin/consult/sessions', params)
 export const consultDetail = (id) => get(`/admin/consult/sessions/${id}`)
 export const consultPage = (params) => get('/admin/consult/page', params)
 export const acceptConsult = (id) => post(`/admin/consult/${id}/accept`)
 export const closeConsult = (id, d) => post(`/admin/consult/${id}/close`, d)
 export const consultUnread = () => get('/admin/consult/unread', null, { silent: true })
-/** 历史消息：医生（参与方）与管理员（只读）共用 */
 export const consultMessages = (id, params) => get(`/admin/consult/${id}/messages`, params)
-/** 处置：屏蔽 / 恢复单条消息（仅管理员） */
 export const hideConsultMessage = (msgId, hidden, reason) => put(`/admin/consult/message/${msgId}/hidden`, null, { params: { hidden, reason } })
-/** 处置：会话级 1 无效关闭 / 2 违规屏蔽 / 0 撤销（仅管理员；非 0 连带关闭会话） */
 export const moderateConsult = (id, moderateStatus, reason) => put(`/admin/consult/${id}/moderate`, null, { params: { moderateStatus, reason } })

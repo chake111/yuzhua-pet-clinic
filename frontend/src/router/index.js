@@ -6,14 +6,6 @@ import AdminLogin from '@/views/admin/Login.vue'
 import { useAdminStore } from '@/stores/admin'
 import { useUserStore } from '@/stores/client'
 
-/**
- * 路由表。一个工程里放两套界面：/ 是宠物主人端，/admin 是医院后台。
- *
- * meta.auth  → 需要用户端登录
- * meta.admin → 需要后台登录；meta.roles 再细分管理员/医生
- * 未登录可浏览首页、医生列表与详情，这是需求里明确要的（G3）。
- * 首屏高频直达的 /、/login、/admin/login 均已去 Element Plus 化并直入入口包，消除二次 chunk 瀑布。
- */
 const routes = [
   { path: '/login', name: 'login', component: ClientLogin },
   { path: '/register', name: 'register', component: () => import('@/views/client/Register.vue') },
@@ -66,8 +58,7 @@ const routes = [
       { path: 'pets', name: 'admin-pets', component: () => import('@/views/admin/Pets.vue'), meta: { roles: ['ADMIN'] } },
       { path: 'records', name: 'admin-records', component: () => import('@/views/admin/Records.vue') },
       { path: 'record/:id', name: 'admin-record-detail', component: () => import('@/views/admin/RecordDetail.vue') },
-      // 接诊工作台整页都是临床动作（接诊/结束/写病历），按 R4 只开放给医生；
-      // 管理员从工单列表进只读详情，不再落到这一页。真正的拦截在后端，这里只是不把入口摆出来。
+      // 原因: 接诊工作台整页为临床动作，仅对医生开放入口；实际鉴权仍以后端为准
       { path: 'workbench/:orderId', name: 'admin-workbench', component: () => import('@/views/admin/Workbench.vue'), meta: { roles: ['DOCTOR'] } },
       { path: 'reviews', name: 'admin-reviews', component: () => import('@/views/admin/Reviews.vue') },
       { path: 'notices', name: 'admin-notices', component: () => import('@/views/admin/Notices.vue'), meta: { roles: ['ADMIN'] } },
@@ -92,7 +83,7 @@ router.beforeEach((to) => {
     const store = useAdminStore()
     if (!store.logged) return { path: '/admin/login', query: { redirect: to.fullPath } }
     if (to.meta.roles && !to.meta.roles.includes(store.role)) {
-      // 医生误入管理项、管理员误入接诊会话，都退回各自的首页而不是给一个空白页
+      // 原因: 角色越界访问管理或临床页面时退回各自工作台首页，避免空白页
       return { path: '/admin/dashboard' }
     }
     return true
@@ -103,11 +94,7 @@ router.beforeEach((to) => {
   return true
 })
 
-/**
- * 用户端作用域类挂在 body 上：Element 的弹窗 teleport 到 body、Login/Register 又不在
- * ClientLayout 内，只有 body 级选择器（styles/main.css 的 body.client-mode）能覆盖全。
- * 管理端挂 admin-mode，限定后台与弹窗的样式范围。
- */
+// 原因: Element Plus 弹窗挂载在 body 上且登录/注册不在布局内，需挂 body 级作用域类覆盖全局样式
 router.afterEach((to) => {
   document.body.classList.toggle('client-mode', !to.path.startsWith('/admin'))
   document.body.classList.toggle('admin-mode', to.path.startsWith('/admin'))

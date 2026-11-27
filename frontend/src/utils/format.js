@@ -1,5 +1,3 @@
-/** 后端时间格式由 JacksonConfig 统一为 "yyyy-MM-dd HH:mm:ss"（空格分隔），这里只做展示层的裁剪。 */
-
 const pad = (n) => String(n).padStart(2, '0')
 
 export function toDate(v) {
@@ -22,20 +20,13 @@ export function today() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-/**
- * 号源时间窗是否已过。workDate "YYYY-MM-DD"、endTime "HH:mm:ss"（LocalDate/LocalTime 序列化），
- * 与 today() 同为本地零填充字符串，逐字典序比较即安全，不走 Date 解析。
- * 前提：浏览器时区与后端 Asia/Shanghai 一致（serverTimezone=Asia/Shanghai）。
- * nowStr 由调用方的响应式时钟提供：普通函数里的 new Date() 不会触发 Vue 更新，
- * 页面跨过结束时间要靠调用侧定时刷新才禁用。
- */
+// 原因: 需由调用方注入响应式时钟触发更新；同本地时区零填充字符串按字典序比较可避开 Date 解析差异
 export function slotEnded(s, todayStr, nowHHmm) {
   if (!s?.workDate || !s?.endTime) return false
   return s.workDate < todayStr ||
          (s.workDate === todayStr && s.endTime.slice(0, 5) <= nowHHmm)
 }
 
-/** 距今多久。聊天页时间轴用它做分隔 */
 export function since(v) {
   if (!v) return ''
   const t = new Date(String(v).replace('T', ' ')).getTime()
@@ -56,7 +47,6 @@ export function canPay(row, now = Date.now()) {
     new Date(String(row.payDeadline).replace(' ', 'T')).getTime() > now
 }
 
-/** 列表页手机号中间四位打码；后端 VO 已脱敏的字段这里不会再处理 */
 export function maskPhone(v) {
   const s = String(v || '')
   return s.length === 11 ? `${s.slice(0, 3)}****${s.slice(7)}` : s || '—'

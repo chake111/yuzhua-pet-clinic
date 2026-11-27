@@ -5,10 +5,6 @@ import { Notebook, Setting, Sunny, Tickets } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/client'
 import { maskPhone } from '@/utils/format'
 
-/**
- * 「我的」外壳：账号信息 + 四个子页导航。
- * 子页用嵌套路由，切换时不重复请求 profile。
- */
 const store = useUserStore()
 const route = useRoute()
 
@@ -20,14 +16,14 @@ const nav = [
 ]
 
 onMounted(() => {
-  // 首屏先用登录时缓存的信息画出来，再静默补一次最新资料
+  // 原因: 首屏先渲染本地缓存资料避免阻塞，再静默刷新最新用户信息
   store.refresh().catch(() => {})
 })
 const on = (to) => route.path === to
 </script>
 
 <template>
-  <!-- 四个子页都在这里渲染，页面边距统一挂在外壳上 -->
+  <!-- 原因: 四个个人中心子页共用此外壳容器，统一控制页面边距 -->
   <div class="pc-narrow">
     <section class="pc-card prof">
       <el-avatar :size="52" :src="store.user?.avatar" alt="">{{ store.nickname?.[0] }}</el-avatar>

@@ -12,9 +12,6 @@ import ImageUpload from '@/components/ImageUpload.vue'
 import StatusChip from '@/components/StatusChip.vue'
 import LoadFailure from '@/components/LoadFailure.vue'
 
-/**
- * 医生到院接诊工作台：查看预约病情、填写病历、结束就诊。
- */
 const route = useRoute()
 const router = useRouter()
 const id = computed(() => Number(route.params.orderId))
@@ -33,7 +30,7 @@ const blank = () => ({
   treatment: '', advice: '', nextVisitDate: '', images: ''
 })
 const form = reactive(blank())
-// 固定字段顺序，并把日期清空后的 null 与空字符串视作同一内容。
+// 原因: 固定字段顺序并将清空后的 null 与空串归一，保证脏状态比对稳定
 const snapshot = (record = form) => JSON.stringify(Object.fromEntries(Object.keys(form).map(key => [key, record[key] || ''])))
 const baseline = ref(snapshot())
 const dirty = computed(() => snapshot() !== baseline.value)
@@ -45,7 +42,7 @@ const saveState = computed(() => {
 })
 
 const imgs = computed(() => (order.value?.images || '').split(',').filter(Boolean))
-// R7：后端白名单只放已接诊(1)/已完成(2)。按钮跟着口径走，但仍以后端判定为准。
+// 原因: 后端白名单仅允许已接诊(1)与已完成(2)写病历，按钮显隐与该状态对齐
 const canRecord = computed(() => order.value?.status === 1 || order.value?.status === 2)
 const canAccept = computed(() => order.value?.status === 0 && order.value?.payStatus === 1)
 
@@ -75,7 +72,7 @@ async function doAccept() {
     order.value.status = 1
     ElMessage.success('已开始接诊')
   } catch {
-    // 请求层显示失败原因，保留当前页面以便重试。
+    // 原因: 请求层已提示失败原因，保留当前表单内容以便重试
   } finally {
     action.value = ''
   }
@@ -89,7 +86,7 @@ async function persistRecord() {
   const submitted = snapshot()
   const payload = JSON.parse(submitted)
   const record = await saveRecord(id.value, { ...payload, nextVisitDate: payload.nextVisitDate || null })
-  // 只确认这次实际提交的内容；异步上传等随后产生的变化仍属于未保存修改。
+  // 原因: 基线仅确认本次提交的内容，异步上传等请求期间的新增修改仍保留为脏状态
   baseline.value = snapshot(record)
   if (snapshot() === submitted) Object.assign(form, JSON.parse(baseline.value))
   saved.value = true
@@ -102,7 +99,7 @@ async function save() {
   try {
     if (await persistRecord()) ElMessage.success(dirty.value ? '病历已保存，还有新的修改待保存' : '病历已保存')
   } catch {
-    // 保存失败时不修改基线，也不清空输入。
+    // 原因: 保存失败时不修改基线也不清空输入，保留未落库修改供重试
   } finally {
     action.value = ''
   }
@@ -122,12 +119,12 @@ async function doFinish(mode) {
     }
     await finish(id.value)
     order.value.status = 2
-    // 只有明确选择放弃，且等待期间没有新变化时才恢复已存内容。
+    // 原因: 仅在明确放弃且请求等待期间无新改动时才回退至已存基线
     if (mode === 'discard' && snapshot() === discarded) Object.assign(form, JSON.parse(baseline.value))
     finishOpen.value = false
     ElMessage.success(dirty.value ? '就诊已结束，当前修改仍未保存' : '本次就诊已完成')
   } catch {
-    // 保存或结束失败，保留输入与弹窗，允许继续编辑或重试。
+    // 原因: 保存或结束失败时保留输入与弹窗，允许继续编辑或重试
   } finally {
     action.value = ''
   }

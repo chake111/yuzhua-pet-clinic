@@ -9,15 +9,11 @@ import { toDate } from '@/utils/format'
 import ImageUpload from '@/components/ImageUpload.vue'
 import StatusChip from '@/components/StatusChip.vue'
 
-/**
- * 公告与科普。列表接口不返回正文，编辑前再单独取一次详情，
- * 避免整页数据被长文本撑大。
- */
 const rows = ref([])
 const total = ref(0)
 const loading = ref(false)
 const q = reactive({ pageNum: 1, pageSize: 20, type: null, status: null, keyword: '' })
-// 查询时提交筛选快照，翻页和操作后的刷新沿用已提交条件。
+// 原因: 翻页与操作刷新沿用已提交筛选快照，避免未点查询的草稿生效
 let applied = { ...q }
 
 const open = ref(false)
@@ -63,7 +59,7 @@ async function openEdit(row) {
 
 async function submit() {
   if (!form.value.title?.trim()) return ElMessage.warning('请填写标题')
-  // 草稿允许空正文；只有发布状态才要求正文，与 NoticeService.validate 保持一致
+  // 原因: 草稿允许空正文，仅发布态要求正文以对齐 NoticeService.validate
   if (form.value.status === 1 && !form.value.content?.trim()) return ElMessage.warning('请填写正文')
   busy.value = true
   try {
@@ -90,7 +86,7 @@ async function setStatus(row, status) {
 }
 
 async function toggleTop(row) {
-  // 保存接口是整体覆盖，列表行不一定带正文，先取一次完整详情
+  // 原因: 更新接口为全量覆盖而列表行不含正文，置顶前须拉取完整详情防清空正文
   const full = await noticeDetail(row.id)
   await updateNotice(row.id, { ...full, topFlag: row.topFlag === 1 ? 0 : 1 })
   ElMessage.success(row.topFlag === 1 ? '已取消置顶' : '已置顶')

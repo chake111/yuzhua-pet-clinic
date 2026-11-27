@@ -32,9 +32,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 医生评价。写侧（提交、回复）在预约完成后开放，这里先提供展示侧。
- */
 @Service
 @RequiredArgsConstructor
 public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorReview> {
@@ -45,10 +42,21 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
     private final AppointmentMapper appointmentMapper;
     private final PetMapper petMapper;
 
-    /** 用户提交评价：一单一评，且只有完成的预约才有资格评 */
+    /** 同一事务内落库评价、标记已评并刷新医生均分；仅已完成且未评价的本人预约可提交。 */
     @Transactional
     public DoctorReview submit(ReviewForm req) {
-        if (req.getRating() == null || req.getRating() < 1 || req.getRating() > 5) throw new BizException("评分为 1-5 星");
+        Appointment a = validateSubmitEligibility(req);
+        DoctorReview r = buildReview(req, a);
+        save(r);
+        appointmentService.markReviewed(a.getId());
+        doctorMapper.refreshStats(a.getDoctorId());
+        return r;
+    }
+
+    private Appointment validateSubmitEligibility(ReviewForm req) {
+        if (req.getRating() == null || req.getRating() < 1 || req.getRating() > 5) {
+            throw new BizException("评分为 1-5 星");
+        }
         if (req.getRating() < 5 && (req.getContent() == null || req.getContent().isBlank())) {
             throw new BizException("低于 5 星请填写评价说明");
         }
@@ -60,10 +68,13 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
             throw new BizException("这个预约已经评价过了");
         }
         if (exists(Wrappers.<DoctorReview>lambdaQuery().eq(DoctorReview::getAppointmentId, a.getId()))) {
-            // 兜底：is_reviewed 被手工改过时仍然守住院里的唯一键
+            // 原因: 兜底 is_reviewed 被手工改写时仍受唯一键语义保护
             throw new BizException("这个预约已经评价过了");
         }
+        return a;
+    }
 
+    private DoctorReview buildReview(ReviewForm req, Appointment a) {
         DoctorReview r = new DoctorReview();
         r.setAppointmentId(a.getId());
         r.setUserId(a.getUserId());
@@ -76,10 +87,6 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         r.setImages(req.getImages() == null || req.getImages().isBlank() ? null : req.getImages());
         r.setIsAnonymous(Integer.valueOf(1).equals(req.getIsAnonymous()) ? 1 : 0);
         r.setStatus(1);
-        save(r);
-
-        appointmentService.markReviewed(a.getId());
-        doctorMapper.refreshStats(a.getDoctorId());
         return r;
     }
 
@@ -127,7 +134,6 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         return r;
     }
 
-    /** 用户端看某位医生的评价：只出显示的，匿名的要脱敏 */
     public PageResult<ReviewVo> pageForDoctor(Long doctorId, PageQuery q) {
         Page<DoctorReview> page = page(new Page<>(q.getPageNum(), q.getPageSize()),
                 Wrappers.<DoctorReview>lambdaQuery()
@@ -137,10 +143,6 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         return toVoPage(page, true);
     }
 
-    /**
-     * 后台评价管理：要能追到具体是谁评的，所以不脱敏。
-     * 医生账号只看得到自己收到的评价，入参 doctorId 对医生无效。
-     */
     public PageResult<ReviewVo> pageForStaff(Long doctorId, Integer status, PageQuery q) {
         LoginUser u = UserContext.require();
         Long scoped = u.isDoctor() ? UserContext.requireDoctorId() : doctorId;
@@ -153,7 +155,7 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
 
     private PageResult<ReviewVo> toVoPage(Page<DoctorReview> page, boolean anonymousMasked) {
         Map<Long, SysUser> users = usersOf(page.getRecords());
-        // 医生归属与预约上下文只给后台：公开展示以医生主页为上下文，不需要再冗余一份。
+        // 原因: 医生归属与预约上下文仅后台需要，公开展示以医生主页为上下文不冗余查询
         Map<Long, Doctor> doctors = anonymousMasked ? Map.of() : doctorsOf(page.getRecords());
         Map<Long, Appointment> appointments = anonymousMasked ? Map.of() : appointmentsOf(page.getRecords());
         Map<Long, PetDisplayVo> pets = petsOf(appointments.values());
@@ -203,10 +205,6 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
                 BatchLookup.ids(rows, DoctorReview::getAppointmentId), Appointment::getId);
     }
 
-    /**
-     * 评价与预约、病历、问诊共用同一套历史展示口径：宠物档案被逻辑删除后，
-     * 后台评价仍要能回答"这条评价是哪只宠物的"。预约行被逻辑删除时查不到，前端退回显示预约编号。
-     */
     private Map<Long, PetDisplayVo> petsOf(Collection<Appointment> appointments) {
         return BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
                 BatchLookup.ids(appointments, Appointment::getPetId), PetDisplayVo::getId);

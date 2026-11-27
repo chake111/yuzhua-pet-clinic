@@ -15,11 +15,6 @@ import ImageUpload from '@/components/ImageUpload.vue'
 import PetForm from '@/components/PetForm.vue'
 import PetPicker, { pickAfterLoad } from '@/components/PetPicker.vue'
 
-/**
- * 到院挂号页。一个页面串完「选宠物 → 选时段 → 填症状 → 模拟支付」，
- * 分步向导在这个场景里只会多几次点击，反而更容易半途退出。
- * 图文问诊不走这里：免费、不占号源，在医生主页直接发起。
- */
 const route = useRoute()
 const router = useRouter()
 const doctorId = Number(route.params.doctorId)
@@ -34,8 +29,7 @@ const busy = ref(false)
 const petOpen = ref(false)
 const payOpen = ref(false)
 const paidOrder = ref(null)
-// 下单幂等键跟着"这一次下单意图"走：首次提交与网络失败后的原样重试共用一个键，
-// 否则服务端会把重试当新单、二次占号。
+// 原因: 同一次下单意图与网络失败后的原样重试共用同一个幂等键，防止服务端二次占号
 const idemKey = ref(newIdempotencyKey())
 const selectedDate = ref('')
 const errors = reactive({ scheduleId: '', petId: '', symptom: '' })
@@ -64,7 +58,7 @@ const slotLabel = computed(() => picked.value
   ? `${toDate(picked.value.workDate).slice(5).replace('-', '/')} ${text(PERIOD, picked.value.period)} ${picked.value.startTime?.slice(0, 5)}–${picked.value.endTime?.slice(0, 5)}`
   : '')
 
-// nowTick 驱动 bookable 重新求值：页面跨过结束时间后 60 秒内自动禁用已结束时段
+// 原因: nowTick 每分钟刷新一次以驱动 bookable 自动禁用跨过结束时间的时段
 const nowTick = ref('')
 let nowTimer = null
 const clockNow = () => {
@@ -76,15 +70,12 @@ const bookable = (s) => {
   return (!doctor.value || doctor.value.status === 1) && s.doctorAvailable !== false && s.status === 1 && s.remainNum > 0
 }
 
-/** 日期条上的号源数：当天所有可约时段剩余号源合计，0 时显示“无号” */
 const dayRemain = (g) => g.list.filter(bookable).reduce((sum, s) => sum + s.remainNum, 0)
 
-/** 七天里一个可约号都没有时，提交按钮不该假装能点 */
 const hasBookable = computed(() => grouped.value.some((g) => g.list.some(bookable)))
 
-/** 固定底栏始终说清“下一步还差什么”，而不是只说时段——宠物和症状也在这一页完成 */
 const nextHint = computed(() => {
-  // 停诊原因由医生区下方的说明条承担，这里只说结果，避免同一句话出现两遍
+  // 原因: 停诊原因已在医生卡片下方展示，底栏仅显示结果文案避免重复提示
   if (doctor.value?.status !== 1) return '暂不可挂号'
   if (!grouped.value.length) return '该医生近 7 天暂无排班'
   if (!hasBookable.value) return '近期号源已约满，换个日期或医生'
@@ -99,17 +90,14 @@ function selectDate(date) {
 }
 
 function selectSlot(slot) {
-  // 切日的离场动画期间，旧时段仍可能收到点击。
+  // 原因: 切换日期的离场动画期间旧时段仍可能接收点击，须校验所属日期匹配
   if (slot.workDate === selectedDate.value && bookable(slot)) form.scheduleId = slot.id
 }
 
 watch(() => form.petId, (value) => { if (value) errors.petId = '' })
 watch(() => form.scheduleId, (value) => { if (value) errors.scheduleId = '' })
 watch(() => form.symptom, (value) => { if (value.trim()) errors.symptom = '' })
-// 换宠物或时段是新的一次下单意图，键必须换新；网络失败后原表单重试则沿用旧键，
-// 这样服务端才能把重试认成同一单而不是重复占号。
-// 请求在途时不换键：期间改表单不影响已经发出的那次请求；否则超时重试会换新键，
-// 把可能已提交的原单又下一遍。
+// 原因: 更换宠物或时段属于新下单意图须换新键；请求在途时冻结换键，防止超时重试重复建单
 watch(() => [form.petId, form.scheduleId], () => {
   if (busy.value) return
   idemKey.value = newIdempotencyKey()
@@ -137,7 +125,7 @@ async function focusError(field) {
   section.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
 }
 
-// 页面停留期间跨过已选时段的结束时间：立即取消选中，别让旧选择带进提交
+// 原因: 页面停留期间若跨过已选时段结束时间，立即清空选中防带入提交
 watch(nowTick, () => {
   if (!form.scheduleId || !picked.value) return
   if (slotEnded(picked.value, nowTick.value.slice(0, 10), nowTick.value.slice(11, 16))) {
@@ -152,7 +140,7 @@ async function loadPets(keep) {
     myPets.value = (await pets()) || []
     form.petId = pickAfterLoad(myPets.value, form.petId, keep)
   } catch {
-    // 宠物档案单独失败时，医生和号源照常可用，只把这一块换成重试入口。
+    // 原因: 宠物档案加载失败不影响医生与号源展示，仅将该区块切换为局部重试
     myPets.value = []
     form.petId = null
     petsFailed.value = true
@@ -177,8 +165,7 @@ async function submit() {
   errors.scheduleId = form.scheduleId ? '' : '请选择就诊时段'
   errors.petId = form.petId ? '' : '请选择就诊宠物'
   errors.symptom = form.symptom.trim() ? '' : '请描述宠物的症状'
-  // 提交前的兜底重校验：选中到点击之间时段可能过期，且 60 秒时钟可能尚未走到，
-  // 这里必须取提交时刻的实时时间，不能用 nowTick 的缓存值
+  // 原因: 60 秒轮询时钟可能未触发更新，提交前必须取当前实时时刻兜底重校
   const n = localNow()
   if (form.scheduleId && (!picked.value || !bookable(picked.value) || slotEnded(picked.value, n.date, n.hhmm))) {
     form.scheduleId = null
@@ -193,11 +180,11 @@ async function submit() {
       { headers: { 'Idempotency-Key': idemKey.value } }
     )
     paidOrder.value = vo
-    // 下单成功即结束这次意图：换新键，避免之后的新单复用旧键命中已完成预约
+    // 原因: 下单成功后即结束当前意图并换新键，避免后续新单复用旧键命中已完成预约
     idemKey.value = newIdempotencyKey()
     payOpen.value = true
   } catch {
-    // 提交失败保留宠物、时段和症状，提示由请求层负责。
+    // 原因: 请求层已提示失败原因，此处保留表单输入与当前幂等键供重试
   } finally {
     busy.value = false
   }
@@ -207,7 +194,6 @@ function leavePayment() {
   if (paidOrder.value) router.replace(`/order/${paidOrder.value.id}`)
 }
 
-/** 从医生主页进来就回上一页；直接打开链接时没有上一页，退回该医生主页 */
 function goBack() {
   if (window.history.state?.back) router.back()
   else router.replace(`/doctor/${doctorId}`)
@@ -264,7 +250,7 @@ onMounted(load)
       <span class="dot" aria-hidden="true" />该医生目前停诊，暂时无法挂号
     </p>
 
-    <!-- 时段放在第一位：它会被别的宠物主人占掉，而且多数入口已带号进来，先确认它最省事。 -->
+    <!-- 原因: 排班时段会被其他用户抢占且多数入口已带号进来，置于首位优先确认 -->
     <section ref="scheduleSection" class="pc-card blk" :class="{ invalid: errors.scheduleId }" tabindex="-1">
       <h2 class="bh-t">就诊时段</h2>
       <div v-if="grouped.length" class="days">

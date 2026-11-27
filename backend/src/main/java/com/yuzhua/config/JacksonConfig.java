@@ -16,14 +16,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
-/**
- * 统一 JSR-310 时间的 JSON 格式。
- *
- * 不配置的话 Jackson 默认走 ISO-8601（"2026-09-13T00:18:38"），
- * 而 Element Plus 的 date-picker / time-picker 用 value-format 提交的是
- * "2026-09-13" / "09:00:00"，反序列化会直接报 400。这里让出参入参都用同一套格式，
- * 前端无需任何转换。spring.jackson.date-format 只管 java.util.Date，管不到这几个类型。
- */
 @Configuration
 public class JacksonConfig {
 

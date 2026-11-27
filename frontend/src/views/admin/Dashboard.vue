@@ -34,10 +34,6 @@ import { useAdminStore } from '@/stores/admin'
 import { APPT_STATUS, tagType, text } from '@/utils/dict'
 import { money, today } from '@/utils/format'
 
-/**
- * 后台看板。图表子模块动态按需加载，不阻塞 KPI 卡片与待办区块先渲染。
- */
-
 const store = useAdminStore()
 const router = useRouter()
 const days = ref(14)
@@ -69,7 +65,7 @@ function disposeCharts() {
 }
 
 function mount(echarts, el, option) {
-  // 空数据时容器隐藏；等内容可见再创建画布。
+  // 原因: 空数据时图表容器隐藏，待节点可见且宽高非零后再创建画布
   if (!el?.isConnected || !el.clientWidth || !el.clientHeight) return
   const c = echarts.getInstanceByDom(el) || echarts.init(el)
   c.setOption(option, true)
@@ -80,11 +76,10 @@ function mount(echarts, el, option) {
   }
 }
 
-/* 图表色板不借用品牌红（红在这套系统里只表示动作/错误），用语义色 + 中性灰 */
+// 原因: 图表渲染在 canvas 上无法读取 CSS 变量，且语义色板需避开仅表动作的品牌红
 const ONGOING = '#1d63c8'
 const SUCCESS = '#1f7a4d'
 const WARNING = '#b3541e'
-/** 与 main.css 的 --color-* 同值：ECharts 画在 canvas 上，吃不到 CSS 变量 */
 const TONE_COLOR = { ongoing: ONGOING, success: SUCCESS, warning: WARNING, danger: '#c13515', terminated: '#6a6a6a' }
 const NEUTRAL = '#929292'
 
@@ -120,8 +115,7 @@ async function draw(v, current) {
     series: [{
       type: 'pie', radius: ['46%', '68%'], center: ['50%', '44%'], avoidLabelOverlap: true,
       label: { formatter: '{b}\n{c}' },
-      // 色随字典的 tag 走：statusDist 是 GROUP BY status 的结果，某状态没有数据就不会出现，
-      // 用位置色板会整体错位一格
+      // 原因: statusDist 按 GROUP BY 返回，缺失状态不会占位，须按字典 tag 映射颜色防错位
       data: (v.statusDist || []).map((x) => ({
         name: text(APPT_STATUS, x.status),
         value: x.cnt,
@@ -166,7 +160,7 @@ async function load() {
   } finally {
     if (current === requestId) loading.value = false
   }
-  // 图表容器在 v-if="vo" 里，不等这一帧 ref 还是 null
+  // 原因: 图表容器位于 v-if="vo" 内部，须等一帧 DOM 挂载后 ref 才非空
   await nextTick()
   if (current !== requestId) return
   await draw(vo.value, current)

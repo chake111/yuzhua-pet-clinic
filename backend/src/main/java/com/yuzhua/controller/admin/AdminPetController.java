@@ -19,12 +19,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 宠物档案管理（后台视角）。
- *
- * 与用户端的区别：不校验归属，供管理员按宠物名或主人信息检索、
- * 纠正明显错误（改字段）与处理重复录入（逻辑删除）。
- */
 @Tag(name = "管理后台-宠物档案")
 @RestController
 @RequestMapping("/admin/pet")

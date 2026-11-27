@@ -8,10 +8,6 @@ import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * OpenAPI 3 接口文档（springdoc + Swagger UI）。访问 http://localhost:8081/api/swagger-ui/index.html
- * 按端拆两组，便于联调时对着点。
- */
 @Configuration
 @RequiredArgsConstructor
 public class OpenApiConfig {
