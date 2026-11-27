@@ -37,6 +37,8 @@
 
 ## Strict JSON 输出契约
 
+- `findings` **只允许**包含需要删除、修改或补充该注释的可执行缺陷条目；**严禁**输出认可或夸奖类条目（例如 `Keep as is`、`Good summary`、`No changes needed`、`无需修改`、`保持原样`）。若所有待审注释均合格，必须返回 `"findings": []`。
+
 模型在 Pass 2 必须仅输出符合以下 Schema 的 JSON（`additionalProperties: false`）：
 
 ```json
