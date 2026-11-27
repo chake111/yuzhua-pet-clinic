@@ -1,5 +1,7 @@
 package com.yuzhua.security;
 
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.TokenType;
 import com.yuzhua.entity.AdminUser;
 import com.yuzhua.entity.SysUser;
 import com.yuzhua.mapper.AdminUserMapper;
@@ -35,16 +37,17 @@ public class AccountGuard {
         }
         if (u.isClient()) {
             SysUser db = sysUserMapper.selectById(u.getId());
-            return db != null && Integer.valueOf(1).equals(db.getStatus())
+            return db != null && db.getStatus() == EnableStatus.ENABLED
                     && versionMatches(db.getTokenVersion(), u.getTokenVersion());
         }
-        if (!LoginUser.TYP_ADMIN.equals(u.getTyp())) {
+        if (u.getTyp() != TokenType.ADMIN) {
             return false;
         }
         AdminUser db = adminUserMapper.selectById(u.getId());
         // 原因: 角色或医生绑定变化后旧令牌须失效，避免沿用旧身份访问后台数据
-        return db != null && Integer.valueOf(1).equals(db.getStatus())
-                && Objects.equals(db.getRole(), u.getRole())
+        return db != null && db.getStatus() == EnableStatus.ENABLED
+                && Objects.equals(db.getRole() == null ? null : db.getRole().code(),
+                u.getRole() == null ? null : u.getRole().code())
                 && Objects.equals(db.getDoctorId(), u.getDoctorId())
                 && versionMatches(db.getTokenVersion(), u.getTokenVersion());
     }

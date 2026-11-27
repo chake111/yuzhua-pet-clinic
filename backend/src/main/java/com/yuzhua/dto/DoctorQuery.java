@@ -1,5 +1,6 @@
 package com.yuzhua.dto;
 
+import com.yuzhua.domain.enums.EnableStatus;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
@@ -14,5 +15,5 @@ public class DoctorQuery extends PageQuery {
 
     private @Nullable String sort;
 
-    private @Nullable Integer status;
+    private @Nullable EnableStatus status;
 }

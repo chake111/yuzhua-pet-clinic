@@ -1,5 +1,9 @@
 package com.yuzhua.security;
 
+import com.yuzhua.domain.enums.AdminRole;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.entity.AdminUser;
 import com.yuzhua.entity.SysUser;
 import com.yuzhua.mapper.AdminUserMapper;
@@ -36,14 +40,14 @@ class AccountGuardTest {
     private static LoginUser client(Integer tokenVersion) {
         LoginUser u = new LoginUser();
         u.setId(7L);
-        u.setTyp(LoginUser.TYP_CLIENT);
-        u.setRole(LoginUser.ROLE_USER);
+        u.setTyp(TokenType.CLIENT);
+        u.setRole(UserRole.USER);
         u.setTokenVersion(tokenVersion);
         u.setExpiresAt(Instant.now().plusSeconds(3600));
         return u;
     }
 
-    private static SysUser dbUser(Integer status, Integer tokenVersion) {
+    private static SysUser dbUser(EnableStatus status, Integer tokenVersion) {
         SysUser u = new SysUser();
         u.setId(7L);
         u.setStatus(status);
@@ -54,67 +58,67 @@ class AccountGuardTest {
     private static LoginUser doctor(Integer tokenVersion, Long doctorId) {
         LoginUser u = new LoginUser();
         u.setId(3L);
-        u.setTyp(LoginUser.TYP_ADMIN);
-        u.setRole(LoginUser.ROLE_DOCTOR);
+        u.setTyp(TokenType.ADMIN);
+        u.setRole(UserRole.DOCTOR);
         u.setDoctorId(doctorId);
         u.setTokenVersion(tokenVersion);
         u.setExpiresAt(Instant.now().plusSeconds(3600));
         return u;
     }
 
-    private static AdminUser dbDoctor(Integer status, Integer tokenVersion, Long doctorId) {
+    private static AdminUser dbDoctor(EnableStatus status, Integer tokenVersion, Long doctorId) {
         AdminUser a = new AdminUser();
         a.setId(3L);
         a.setStatus(status);
         a.setTokenVersion(tokenVersion);
-        a.setRole(LoginUser.ROLE_DOCTOR);
+        a.setRole(AdminRole.DOCTOR);
         a.setDoctorId(doctorId);
         return a;
     }
 
     @Test
     void acceptTokenWhoseVersionMatches() {
-        assertTrue(guard(dbUser(1, 1), null).active(client(1)));
+        assertTrue(guard(dbUser(EnableStatus.ENABLED, 1), null).active(client(1)));
     }
 
     @Test
     void rejectTokenAfterPasswordChangeBumpedVersion() {
         // 改密把库中版本推到 2，令牌里仍是签发时的 1
-        assertFalse(guard(dbUser(1, 2), null).active(client(1)));
+        assertFalse(guard(dbUser(EnableStatus.ENABLED, 2), null).active(client(1)));
     }
 
     @Test
     void rejectTokenWithoutVersionClaim() {
         // 升级前签发、没有 ver 声明的旧令牌：无法证明未被撤销，一律拒绝
-        assertFalse(guard(dbUser(1, 1), null).active(client(null)));
+        assertFalse(guard(dbUser(EnableStatus.ENABLED, 1), null).active(client(null)));
     }
 
     @Test
     void rejectWhenDatabaseVersionIsMissing() {
         // 迁移未执行或列被清空时不能退化成"放行"
-        assertFalse(guard(dbUser(1, null), null).active(client(1)));
+        assertFalse(guard(dbUser(EnableStatus.ENABLED, null), null).active(client(1)));
     }
 
     @Test
     void rejectDisabledAccount() {
-        assertFalse(guard(dbUser(0, 1), null).active(client(1)));
+        assertFalse(guard(dbUser(EnableStatus.DISABLED, 1), null).active(client(1)));
     }
 
     @Test
     void rejectExpiredToken() {
         LoginUser u = client(1);
         u.setExpiresAt(Instant.now().minusSeconds(1));
-        assertFalse(guard(dbUser(1, 1), null).active(u));
+        assertFalse(guard(dbUser(EnableStatus.ENABLED, 1), null).active(u));
     }
 
     @Test
     void acceptDoctorWhoseBindingIsUnchanged() {
-        assertTrue(guard(null, dbDoctor(1, 4, 12L)).active(doctor(4, 12L)));
+        assertTrue(guard(null, dbDoctor(EnableStatus.ENABLED, 4, 12L)).active(doctor(4, 12L)));
     }
 
     @Test
     void rejectDoctorAfterBindingChangedOrVersionBumped() {
-        assertFalse(guard(null, dbDoctor(1, 4, 99L)).active(doctor(4, 12L)));
-        assertFalse(guard(null, dbDoctor(1, 5, 12L)).active(doctor(4, 12L)));
+        assertFalse(guard(null, dbDoctor(EnableStatus.ENABLED, 4, 99L)).active(doctor(4, 12L)));
+        assertFalse(guard(null, dbDoctor(EnableStatus.ENABLED, 5, 12L)).active(doctor(4, 12L)));
     }
 }

@@ -87,4 +87,23 @@ class ObservabilityIT extends MySqlITSupport {
                 .contains("\"openapi\":\"3.1.0\"")
                 .contains("/client/catalog/home");
     }
+
+    @Test
+    void publicCatalogAllowsAnonymousAndUnknownAdminPathReturnsBusiness404() throws Exception {
+        String home = rest().get().uri("/client/catalog/home")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .returnResult().getResponseBody();
+        assertThat(home).contains("\"code\":200");
+
+        String adminToken = loginAdminToken(mockMvc, "itadmin");
+        String notFound = rest().get().uri("/admin/nonexistent")
+                .header(authHeaderName(), bearer(adminToken))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .returnResult().getResponseBody();
+        assertThat(notFound).contains("\"code\":404");
+    }
 }

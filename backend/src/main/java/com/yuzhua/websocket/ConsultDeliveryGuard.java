@@ -1,5 +1,6 @@
 package com.yuzhua.websocket;
 
+import com.yuzhua.domain.enums.ConsultModerationStatus;
 import com.yuzhua.entity.ConsultSession;
 import com.yuzhua.mapper.ConsultSessionMapper;
 import com.yuzhua.security.AccountGuard;
@@ -36,7 +37,7 @@ public class ConsultDeliveryGuard {
 
     /**
      * 业务帧：账号有效、会话存在、接收方仍是会话当事人、会话未被处置。
-     * 正常结束（status=2）的会话仍放行，历史查询与收尾通知不受影响。
+     * 正常结束（{@code ConsultSessionStatus.CLOSED}）的会话仍放行，历史查询与收尾通知不受影响。
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Decision checkBusiness(LoginUser receiver, Long sessionId) {
@@ -50,7 +51,7 @@ public class ConsultDeliveryGuard {
         if (s == null || !isMember(receiver, s)) {
             return Decision.SESSION_DENIED;
         }
-        if (s.getModerateStatus() != null && s.getModerateStatus() != ConsultSession.MV_NORMAL) {
+        if (s.getModerateStatus() != null && s.getModerateStatus() != ConsultModerationStatus.NORMAL) {
             return Decision.SESSION_DENIED;
         }
         return Decision.OK;

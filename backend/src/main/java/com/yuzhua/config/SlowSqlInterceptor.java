@@ -39,6 +39,8 @@ import java.util.function.LongSupplier;
 })
 public class SlowSqlInterceptor implements Interceptor {
 
+    private static final long NANOS_PER_MILLI = 1_000_000L;
+
     private final AppProperties appProperties;
     private final LongSupplier nanoClock;
 
@@ -52,11 +54,14 @@ public class SlowSqlInterceptor implements Interceptor {
         this.nanoClock = nanoClock;
     }
 
-    /** 仅当 slowSqlThresholdMs 大于 0 时对单条语句计时，耗时达到或超过阈值时记 WARN。 */
+    /**
+     * 无状态可重入的只读观察者（不修改 SQL 返回值或异常）；配置阈值小于等于 0 时跳过监控，
+     * 开启后在 {@code finally} 中以单调时钟计时（SQL 抛异常亦记录 {@code failed=true}），耗时达阈值及以上时记 WARN。
+     */
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
         long thresholdMs = appProperties.getObservability().getSlowSqlThresholdMs();
-        // 原因: 阈值为 0 表示关闭慢 SQL 监控，直接放行避免额外计时开销
+        // 原因: 阈值小于等于 0 视作关闭慢 SQL 监控，跳过计时以省去额外时钟读取与告警判断开销
         if (thresholdMs <= 0) {
             return invocation.proceed();
         }
@@ -70,7 +75,7 @@ public class SlowSqlInterceptor implements Interceptor {
             failed = true;
             throw t;
         } finally {
-            long elapsedMs = (nanoClock.getAsLong() - startNanos) / 1_000_000L;
+            long elapsedMs = (nanoClock.getAsLong() - startNanos) / NANOS_PER_MILLI;
             // 原因: 契约语义为达到或超过阈值即告警
             if (elapsedMs >= thresholdMs) {
                 log.warn("慢 SQL statement={} type={} elapsed={}ms failed={}",

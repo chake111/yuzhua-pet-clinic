@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.PageResult;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.dto.AuthDto;
 import com.yuzhua.dto.UserQuery;
 import com.yuzhua.entity.SysUser;
@@ -48,7 +51,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         u.setPhone(req.getPhone());
         u.setEmail(req.getEmail());
         u.setGender(req.getGender() == null ? 0 : req.getGender());
-        u.setStatus(1);
+        u.setStatus(EnableStatus.ENABLED);
         u.setTokenVersion(1);
         save(u);
         return issueToken(u);
@@ -63,7 +66,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
             // 原因: 不区分账号不存在与密码错误，避免登录接口被用于枚举注册账号
             throw new BizException("账号或密码错误");
         }
-        if (!Integer.valueOf(1).equals(u.getStatus())) {
+        if (u.getStatus() != EnableStatus.ENABLED) {
             throw new BizException("账号已被停用，请联系医院客服");
         }
         SysUser touch = new SysUser();
@@ -114,7 +117,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
                 .eq(SysUser::getId, u.getId()));
     }
 
-    public void changeStatus(Long userId, Integer status) {
+    public void changeStatus(Long userId, EnableStatus status) {
         if (getById(userId) == null) {
             throw BizException.notFound("用户");
         }
@@ -134,6 +137,8 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         return PageResult.of(page(new Page<>(q.getPageNum(), q.getPageSize()), qw));
     }
 
+    private static final int DETAIL_APPOINTMENT_LIMIT = 20;
+
     public UserDetailVo detailForAdmin(Long userId) {
         SysUser u = getById(userId);
         if (u == null) {
@@ -142,7 +147,7 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         UserDetailVo vo = new UserDetailVo();
         vo.setUser(u);
         vo.setPets(petService.listByUser(userId));
-        vo.setAppointments(appointmentService.listByUserForAdmin(userId, 20));
+        vo.setAppointments(appointmentService.listByUserForAdmin(userId, DETAIL_APPOINTMENT_LIMIT));
         return vo;
     }
 
@@ -152,8 +157,8 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         lu.setUsername(u.getUsername());
         lu.setName(u.getNickname());
         lu.setAvatar(u.getAvatar());
-        lu.setTyp(LoginUser.TYP_CLIENT);
-        lu.setRole(LoginUser.ROLE_USER);
+        lu.setTyp(TokenType.CLIENT);
+        lu.setRole(UserRole.USER);
         lu.setTokenVersion(u.getTokenVersion());
 
         LoginVo vo = new LoginVo();
@@ -169,8 +174,8 @@ public class SysUserService extends ServiceImpl<SysUserMapper, SysUser> {
         vo.setAvatar(u.getAvatar());
         vo.setPhone(u.getPhone());
         vo.setEmail(u.getEmail());
-        vo.setTyp(LoginUser.TYP_CLIENT);
-        vo.setRole(LoginUser.ROLE_USER);
+        vo.setTyp(TokenType.CLIENT);
+        vo.setRole(UserRole.USER);
     }
 
     private static @Nullable String emptyToNull(@Nullable String s) {

@@ -1,6 +1,7 @@
 package com.yuzhua.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.yuzhua.domain.enums.ConsultSenderRole;
 import com.yuzhua.entity.ConsultMessage;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -42,7 +43,7 @@ public interface ConsultMessageMapper extends BaseMapper<ConsultMessage> {
             ORDER BY id FOR UPDATE
             """)
     List<Long> unreadPeerIdsForUpdate(@Param("sessionId") Long sessionId,
-                                      @Param("myRole") String myRole);
+                                      @Param("myRole") ConsultSenderRole myRole);
 
     // 原因: ID 集合来自同一事务的 FOR UPDATE 查询，调用方须确保非空避免 IN () 语法错误
     @Update("""
@@ -57,6 +58,6 @@ public interface ConsultMessageMapper extends BaseMapper<ConsultMessage> {
             </script>
             """)
     int markPeerRead(@Param("sessionId") Long sessionId,
-                     @Param("myRole") String myRole,
+                     @Param("myRole") ConsultSenderRole myRole,
                      @Param("ids") List<Long> ids);
 }

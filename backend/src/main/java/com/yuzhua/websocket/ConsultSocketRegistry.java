@@ -38,9 +38,10 @@ public class ConsultSocketRegistry implements DoctorPresenceGateway {
         private final Set<Long> rooms = ConcurrentHashMap.newKeySet();
     }
 
-    /** 生成账号维度连接键（供 {@link #open} 顶替同账号旧连接并防跨端碰撞），须保证 {@code typ} 与 {@code id} 非空。 */
+    /** 生成账号维度连接键（供 {@link #open} 顶替旧连接并防跨端碰撞）；{@code typ} 为空回退 {@code "UNKNOWN"}，{@code id} 须非空以免碰撞成 {@code typ + ":null"}。 */
     public static String keyOf(LoginUser u) {
-        return u.getTyp() + ":" + u.getId();
+        String typ = u.getTyp() == null ? "UNKNOWN" : u.getTyp().code();
+        return typ + ":" + u.getId();
     }
 
     /** 原子替换同账号键的映射（非幂等，重复登记必顶替前连接）；仅返回旧连接而不关闭，调用方须主动关闭以防重复推送。 */

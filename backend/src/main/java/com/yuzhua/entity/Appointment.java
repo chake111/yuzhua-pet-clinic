@@ -6,6 +6,11 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.yuzhua.domain.enums.AppointmentStatus;
+import com.yuzhua.domain.enums.CancelSource;
+import com.yuzhua.domain.enums.ConsultType;
+import com.yuzhua.domain.enums.PayStatus;
+import com.yuzhua.domain.enums.SchedulePeriod;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -17,19 +22,6 @@ import java.time.LocalTime;
 @Data
 @TableName("appointment")
 public class Appointment {
-
-    public static final int ST_PENDING = 0;
-    public static final int ST_ACCEPTED = 1;
-    public static final int ST_FINISHED = 2;
-    public static final int ST_CANCELLED = 3;
-    public static final int ST_MISSED = 4;
-
-    public static final int CT_ONLINE = 1;
-    public static final int CT_VISIT = 2;
-
-    public static final int PAY_NONE = 0;
-    public static final int PAY_PAID = 1;
-    public static final int PAY_REFUNDED = 2;
 
     @TableId(type = IdType.AUTO)
     private @Nullable Long id;
@@ -45,9 +37,9 @@ public class Appointment {
     private @Nullable Long departmentId;
     private @Nullable Long scheduleId;
 
-    private @Nullable Integer consultType;
+    private @Nullable ConsultType consultType;
     private @Nullable LocalDate appointmentDate;
-    private @Nullable Integer period;
+    private @Nullable SchedulePeriod period;
     private @Nullable LocalTime startTime;
     private @Nullable LocalTime endTime;
     private @Nullable Integer queueNo;
@@ -56,16 +48,16 @@ public class Appointment {
     private @Nullable String images;
 
     private @Nullable BigDecimal amount;
-    private @Nullable Integer payStatus;
+    private @Nullable PayStatus payStatus;
     private @Nullable LocalDateTime payTime;
     private @Nullable String payType;
-    private @Nullable Integer status;
+    private @Nullable AppointmentStatus status;
 
     private @Nullable LocalDateTime acceptTime;
     private @Nullable LocalDateTime finishTime;
     private @Nullable String cancelReason;
     private @Nullable LocalDateTime cancelTime;
-    private @Nullable String cancelBy;
+    private @Nullable CancelSource cancelBy;
     private @Nullable Integer isReviewed;
 
     @TableField(fill = FieldFill.INSERT)

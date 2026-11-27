@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.yuzhua.common.BatchLookup;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.PageResult;
+import com.yuzhua.domain.enums.AppointmentStatus;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.SchedulePeriod;
 import com.yuzhua.dto.PageQuery;
 import com.yuzhua.dto.ScheduleBatchForm;
 import com.yuzhua.dto.ScheduleEditForm;
@@ -41,28 +44,38 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, DoctorSchedule> {
 
+    private static final int DEFAULT_BOOKABLE_DAYS = 7;
+    private static final int MAX_BOOKABLE_DAYS = 30;
+    private static final int MAX_BATCH_DAYS = 90;
+    private static final int MORNING_START_HOUR = 8;
+    private static final int MORNING_END_HOUR = 12;
+    private static final int AFTERNOON_START_HOUR = 13;
+    private static final int AFTERNOON_END_HOUR = 18;
+    private static final int EVENING_START_HOUR = 18;
+    private static final int EVENING_END_HOUR = 22;
+
     private final DoctorMapper doctorMapper;
     private final AppointmentMapper appointmentMapper;
     private final DepartmentMapper departmentMapper;
 
-    public List<ScheduleVo> listBookable(Long doctorId, LocalDate from, Integer days) {
+    public List<ScheduleVo> listBookable(Long doctorId, @Nullable LocalDate from, @Nullable Integer days) {
         LocalDate start = from == null ? LocalDate.now() : from;
-        int span = days == null ? 7 : Math.max(1, Math.min(days, 30));
+        int span = days == null ? DEFAULT_BOOKABLE_DAYS : Math.max(1, Math.min(days, MAX_BOOKABLE_DAYS));
         List<DoctorSchedule> rows = list(Wrappers.<DoctorSchedule>lambdaQuery()
                 .eq(DoctorSchedule::getDoctorId, doctorId)
-                .eq(DoctorSchedule::getStatus, 1)
+                .eq(DoctorSchedule::getStatus, EnableStatus.ENABLED)
                 .ge(DoctorSchedule::getWorkDate, start)
                 .le(DoctorSchedule::getWorkDate, start.plusDays(span - 1L))
                 .orderByAsc(DoctorSchedule::getWorkDate)
                 .orderByAsc(DoctorSchedule::getPeriod));
         Doctor doctor = doctorMapper.selectById(doctorId);
-        Map<Long, Doctor> doctorDict = doctor == null ? Map.of() : Map.of(doctor.getId(), doctor);
+        Map<Long, Doctor> doctorDict = doctor == null ? Map.of() : Map.of(Objects.requireNonNull(doctor.getId()), doctor);
         Map<Long, Department> deptDict = departmentsOf(doctorDict.values());
         return rows.stream().map(s -> toVo(s, doctorDict, deptDict)).collect(Collectors.toList());
     }
 
-    public PageResult<ScheduleVo> pageAdmin(Long doctorId, LocalDate start, LocalDate end,
-                                            Integer status, PageQuery query) {
+    public PageResult<ScheduleVo> pageAdmin(@Nullable Long doctorId, @Nullable LocalDate start, @Nullable LocalDate end,
+                                            @Nullable EnableStatus status, PageQuery query) {
         LambdaQueryWrapper<DoctorSchedule> qw = Wrappers.<DoctorSchedule>lambdaQuery()
                 .eq(doctorId != null, DoctorSchedule::getDoctorId, doctorId)
                 .ge(start != null, DoctorSchedule::getWorkDate, start)
@@ -82,7 +95,10 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         });
     }
 
-    /** 校验医生在诊、时段范围与唯一性后新建排班，初始余量等于总量。 */
+    /**
+     * 校验医生在诊、时段范围及应用层判重（{@code exists}，并发同排班由库表 {@code uk_doctor_date_period} 唯一约束兜底）后新建排班；
+     * 初始余量等于总量，{@code status} 为 {@code null} 时默认 {@code EnableStatus.ENABLED}。
+     */
     @Transactional
     public DoctorSchedule create(ScheduleForm req) {
         requireSchedulable(req.getDoctorId());
@@ -102,14 +118,15 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         s.setEndTime(req.getEndTime());
         s.setTotalNum(req.getTotalNum());
         s.setRemainNum(req.getTotalNum());
-        s.setStatus(req.getStatus() == null ? 1 : req.getStatus());
+        s.setStatus(req.getStatus() == null ? EnableStatus.ENABLED : req.getStatus());
         save(s);
         return s;
     }
 
     /**
-     * 在排班行锁内更新排班（不修改 status，仅停诊/恢复入口写状态）；
-     * 已存在任何预约引用时禁止改动医生、日期、时段或起止时间，且新总量不得小于有效预约数。
+     * 在排班行锁内更新排班（不修改 status，创建后仅由 stopClinic/resumeClinic 变更状态）；
+     * 经 {@code referencedById} 检出任何未软删预约（含已取消）时即禁止改动医生、日期、时段或起止时间，
+     * 而新总量下限与 {@code remainNum} 重算仅计非 {@code CANCELLED} 有效预约数。
      */
     @Transactional
     public void update(Long id, ScheduleEditForm req) {
@@ -120,7 +137,7 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         validateUpdateFields(id, cur, req);
         int booked = appointmentMapper.selectCount(Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getScheduleId, id)
-                .ne(Appointment::getStatus, Appointment.ST_CANCELLED)).intValue();
+                .ne(Appointment::getStatus, AppointmentStatus.CANCELLED)).intValue();
         Integer totalNum = req.getTotalNum();
         if (totalNum == null || totalNum < booked) {
             throw new BizException("该时段已有 " + booked + " 个有效预约，总量不能改到 " + booked + " 以下");
@@ -239,7 +256,7 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         if (startDate.isAfter(endDate)) {
             throw new BizException("开始日期不能晚于结束日期");
         }
-        if (endDate.toEpochDay() - startDate.toEpochDay() + 1 > 90) {
+        if (endDate.toEpochDay() - startDate.toEpochDay() + 1 > MAX_BATCH_DAYS) {
             throw new BizException("一次最多批量排 90 天");
         }
         List<ScheduleBatchForm.PeriodTemplate> templates = req.getPeriods();
@@ -247,7 +264,7 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         if (templates == null || templates.isEmpty() || weekDays == null || weekDays.isEmpty()) {
             throw new BizException("请配置排班星期与时段");
         }
-        Set<Integer> periods = new HashSet<>();
+        Set<SchedulePeriod> periods = new HashSet<>();
         for (ScheduleBatchForm.PeriodTemplate t : templates) {
             checkPeriodTime(t.getPeriod(), t.getStartTime(), t.getEndTime());
             if (t.getPeriod() != null && !periods.add(t.getPeriod())) {
@@ -268,14 +285,15 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
                 req.getOverrideTotalNum() != null ? req.getOverrideTotalNum() : t.getTotalNum());
         s.setTotalNum(total);
         s.setRemainNum(total);
-        s.setStatus(1);
+        s.setStatus(EnableStatus.ENABLED);
         return s;
     }
 
     /**
-     * 删除排班前，在排班行锁内统计未软删预约引用（含已取消预约）；存在引用时拒绝删除，可改为停诊。
+     * 删除排班前在排班行锁内通过 {@code referencedById} 统计未软删预约引用（由实体 {@code @TableLogic} 自动过滤 {@code deleted = 0}）；
+     * 与 {@link #update} 排除已取消预约不同，删除有意将 {@code CANCELLED} 订单视为历史引用，存在则拒绝物理删除并引导改用停诊。
      *
-     * @param id 排班 ID；仅统计 deleted=0 的预约
+     * @param id 排班主键
      */
     @Transactional
     public void remove(Long id) {
@@ -295,23 +313,15 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
     }
 
     /**
-     * 停诊（R6）：只关可预约状态，不动余量。
-     * 已成交的订单保持原样，由前台线下联系改约——这是单店场景下最简单的收敛方式。
-     * 之前这里会把 remain_num 一并清零、恢复时再按存活订单重算，页面就分不出
-     * "真余量"和"停诊清零"（跟踪表 I07/D2）；余量是事实，不该被一个状态开关改写。
-     *
-     * <p>状态列<strong>只</strong>在这里和 {@link #resumeClinic} 写入：编辑接口
-     * {@link #update} 的入参不含 status，避免旧的编辑表单把停诊覆盖回去。
-     *
-     * <p>这里用 <code>require</code>（普通读）确认存在，互斥靠 UPDATE 自身的行锁——
-     * 不是 <code>selectByIdForUpdate</code>。窄窗口下若记录刚被并发删除，
-     * UPDATE 影响 0 行，此时抛 404，不把"没改到"报成"已停诊"。
+     * 停诊（R6）：仅将状态置为停诊而保留 {@code remain_num} 原值（余量与停诊开关解耦，已成交订单保持原样由前台改约）。
+     * 状态列创建后仅由本方法与 {@link #resumeClinic} 变更（{@link #create} 按表单初始化，{@link #update} 不接收 status 以防覆盖停诊态）；
+     * 先经 {@code require} 普通读判存，再靠条件 {@code UPDATE} 自身行锁互斥，影响 0 行（并发被删）时抛 404。
      */
     @Transactional
     public void stopClinic(Long id) {
         require(id);
         boolean changed = update(Wrappers.<DoctorSchedule>lambdaUpdate()
-                .set(DoctorSchedule::getStatus, 0)
+                .set(DoctorSchedule::getStatus, EnableStatus.DISABLED)
                 .eq(DoctorSchedule::getId, id));
         if (!changed) {
             throw BizException.notFound("排班");
@@ -329,7 +339,7 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         DoctorSchedule s = require(id);
         requireSchedulable(s.getDoctorId());
         boolean changed = update(Wrappers.<DoctorSchedule>lambdaUpdate()
-                .set(DoctorSchedule::getStatus, 1)
+                .set(DoctorSchedule::getStatus, EnableStatus.ENABLED)
                 .eq(DoctorSchedule::getId, id));
         if (!changed) {
             throw BizException.notFound("排班");
@@ -356,13 +366,13 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
     }
 
     private void requireSchedulable(@Nullable Long doctorId) {
-        if (!Integer.valueOf(1).equals(requireDoctor(doctorId).getStatus())) {
+        if (requireDoctor(doctorId).getStatus() != EnableStatus.ENABLED) {
             throw new BizException("该医生处于停诊状态，请先在医生管理里恢复出诊再排班");
         }
     }
 
-    private void checkPeriod(@Nullable Integer period) {
-        if (period == null || period < 1 || period > 3) {
+    private void checkPeriod(@Nullable SchedulePeriod period) {
+        if (period == null) {
             throw new BizException("时段只能是 1 上午 / 2 下午 / 3 夜间");
         }
     }
@@ -375,16 +385,28 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         checkTimeOrder(start, end);
     }
 
-    private void checkPeriodTime(@Nullable Integer period, @Nullable LocalTime start, @Nullable LocalTime end) {
+    private void checkPeriodTime(@Nullable SchedulePeriod period, @Nullable LocalTime start, @Nullable LocalTime end) {
         checkPeriod(period);
         checkTimeOrder(start, end);
-        int p = Objects.requireNonNull(period);
+        SchedulePeriod p = Objects.requireNonNull(period);
         LocalTime s = Objects.requireNonNull(start);
         LocalTime e = Objects.requireNonNull(end);
-        LocalTime min = LocalTime.of(switch (p) { case 1 -> 8; case 2 -> 13; default -> 18; }, 0);
-        LocalTime max = LocalTime.of(switch (p) { case 1 -> 12; case 2 -> 18; default -> 22; }, 0);
+        LocalTime min = LocalTime.of(switch (p) {
+            case MORNING -> MORNING_START_HOUR;
+            case AFTERNOON -> AFTERNOON_START_HOUR;
+            case EVENING -> EVENING_START_HOUR;
+        }, 0);
+        LocalTime max = LocalTime.of(switch (p) {
+            case MORNING -> MORNING_END_HOUR;
+            case AFTERNOON -> AFTERNOON_END_HOUR;
+            case EVENING -> EVENING_END_HOUR;
+        }, 0);
         if (s.isBefore(min) || e.isAfter(max)) {
-            String label = switch (p) { case 1 -> "上午"; case 2 -> "下午"; default -> "夜间"; };
+            String label = switch (p) {
+                case MORNING -> "上午";
+                case AFTERNOON -> "下午";
+                case EVENING -> "夜间";
+            };
             throw new BizException(label + "排班时间须在 " + min + "–" + max + " 内");
         }
     }
@@ -438,7 +460,7 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
         vo.setDoctorAvatar(d.getAvatar());
         vo.setDepartmentId(d.getDepartmentId());
         vo.setConsultationFee(d.getConsultationFee());
-        vo.setDoctorAvailable(Integer.valueOf(1).equals(d.getStatus()));
+        vo.setDoctorAvailable(d.getStatus() == EnableStatus.ENABLED);
         Department dept = deptDict.get(d.getDepartmentId());
         if (dept != null) {
             vo.setDepartmentName(dept.getName());

@@ -1,5 +1,7 @@
 package com.yuzhua.security;
 
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.props.AppProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -32,6 +34,7 @@ public class JwtUtils {
     private static final String CLAIM_AVATAR = "avatar";
     private static final String CLAIM_DOCTOR_ID = "doctorId";
     private static final String CLAIM_VER = "ver";
+    private static final int MIN_SECRET_BYTES = 32;
 
     // 原因: 历史示例密钥已公开，配置命中时在启动自检阶段直接失败阻断启动
     private static final Set<String> RETIRED_DEFAULTS = Set.of(
@@ -52,7 +55,7 @@ public class JwtUtils {
                     "yuzhua.jwt.secret 仍是仓库内置的示例密钥：该密钥已公开，必须更换后再启动");
         }
         int length = secret.getBytes(StandardCharsets.UTF_8).length;
-        if (length < 32) {
+        if (length < MIN_SECRET_BYTES) {
             throw new IllegalStateException(
                     "yuzhua.jwt.secret 长度不足：当前 " + length + " 字节，至少需要 32 字节");
         }
@@ -64,7 +67,7 @@ public class JwtUtils {
             throw new IllegalStateException("yuzhua.jwt.secret 未配置");
         }
         byte[] raw = secret.getBytes(StandardCharsets.UTF_8);
-        if (raw.length < 32) {
+        if (raw.length < MIN_SECRET_BYTES) {
             throw new IllegalStateException("yuzhua.jwt.secret 长度必须不小于 32 字节");
         }
         return Keys.hmacShaKeyFor(raw);
@@ -75,8 +78,8 @@ public class JwtUtils {
         Instant now = Instant.now();
         var builder = Jwts.builder()
                 .subject(String.valueOf(u.getId()))
-                .claim(CLAIM_TYP, u.getTyp())
-                .claim(CLAIM_ROLE, u.getRole())
+                .claim(CLAIM_TYP, u.getTyp() == null ? null : u.getTyp().code())
+                .claim(CLAIM_ROLE, u.getRole() == null ? null : u.getRole().code())
                 .claim(CLAIM_NAME, u.getName())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(props.getJwt().getExpireSeconds())))
@@ -112,8 +115,10 @@ public class JwtUtils {
             LoginUser u = new LoginUser();
             u.setExpiresAt(c.getExpiration().toInstant());
             u.setId(Long.valueOf(c.getSubject()));
-            u.setTyp(c.get(CLAIM_TYP, String.class));
-            u.setRole(c.get(CLAIM_ROLE, String.class));
+            String typRaw = c.get(CLAIM_TYP, String.class);
+            String roleRaw = c.get(CLAIM_ROLE, String.class);
+            u.setTyp(typRaw == null ? null : TokenType.fromCode(typRaw));
+            u.setRole(roleRaw == null ? null : UserRole.fromCode(roleRaw));
             u.setName(c.get(CLAIM_NAME, String.class));
             u.setAvatar(c.get(CLAIM_AVATAR, String.class));
             Number did = c.get(CLAIM_DOCTOR_ID, Number.class);

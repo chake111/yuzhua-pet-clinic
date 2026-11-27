@@ -8,6 +8,8 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.yuzhua.domain.enums.AdminRole;
+import com.yuzhua.domain.enums.EnableStatus;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -31,9 +33,9 @@ public class AdminUser {
     private @Nullable String phone;
     private @Nullable String email;
 
-    private @Nullable String role;
+    private @Nullable AdminRole role;
     private @Nullable Long doctorId;
-    private @Nullable Integer status;
+    private @Nullable EnableStatus status;
 
     @JsonIgnore
     private @Nullable Integer tokenVersion;

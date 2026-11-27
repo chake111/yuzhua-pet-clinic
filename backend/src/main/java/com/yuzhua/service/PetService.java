@@ -31,6 +31,9 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class PetService extends ServiceImpl<PetMapper, Pet> {
 
+    private static final int MAX_PET_NAME_LEN = 20;
+    private static final int MAX_PET_AGE_MONTH = 360;
+
     private final SysUserMapper sysUserMapper;
 
     public List<Pet> listMine() {
@@ -173,7 +176,7 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
         if (form.getName() == null || form.getName().isBlank()) {
             throw new BizException("请填写宠物昵称");
         }
-        if (form.getName().length() > 20) {
+        if (form.getName().length() > MAX_PET_NAME_LEN) {
             throw new BizException("宠物昵称不超过 20 字");
         }
         if (form.getSpecies() == null || form.getSpecies().isBlank()) {
@@ -183,7 +186,9 @@ public class PetService extends ServiceImpl<PetMapper, Pet> {
 
     static @Nullable Integer deriveAgeMonth(@Nullable LocalDate birthday, @Nullable Integer manualAge) {
         if (birthday == null) {
-            if (manualAge != null && (manualAge < 0 || manualAge > 360)) throw new BizException("月龄须在 0～360 之间");
+            if (manualAge != null && (manualAge < 0 || manualAge > MAX_PET_AGE_MONTH)) {
+                throw new BizException("月龄须在 0～360 之间");
+            }
             return manualAge;
         }
         if (birthday.isAfter(LocalDate.now())) {

@@ -15,6 +15,10 @@ import org.springframework.web.socket.server.standard.ServletServerContainerFact
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketConfigurer {
 
+    private static final int BYTES_PER_KIB = 1024;
+    private static final int MAX_TEXT_BUFFER_BYTES = 16 * BYTES_PER_KIB;
+    private static final int MAX_BINARY_BUFFER_BYTES = 4 * BYTES_PER_KIB;
+
     private final ConsultWebSocketHandler consultHandler;
     private final WsHandshakeInterceptor handshakeInterceptor;
 
@@ -29,8 +33,8 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Bean
     public ServletServerContainerFactoryBean webSocketContainer() {
         ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
-        container.setMaxTextMessageBufferSize(16 * 1024);
-        container.setMaxBinaryMessageBufferSize(4 * 1024);
+        container.setMaxTextMessageBufferSize(MAX_TEXT_BUFFER_BYTES);
+        container.setMaxBinaryMessageBufferSize(MAX_BINARY_BUFFER_BYTES);
         return container;
     }
 }

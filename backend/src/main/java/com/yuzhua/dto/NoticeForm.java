@@ -1,5 +1,7 @@
 package com.yuzhua.dto;
 
+import com.yuzhua.domain.enums.NoticeStatus;
+import com.yuzhua.domain.enums.NoticeType;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -11,9 +13,9 @@ public class NoticeForm {
     private @Nullable String summary;
     private @Nullable String content;
 
-    private @Nullable Integer type;
+    private @Nullable NoticeType type;
 
     private @Nullable Integer topFlag;
 
-    private @Nullable Integer status;
+    private @Nullable NoticeStatus status;
 }

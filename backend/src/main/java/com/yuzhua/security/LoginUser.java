@@ -1,5 +1,8 @@
 package com.yuzhua.security;
 
+import com.yuzhua.domain.enums.AdminRole;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,35 +19,44 @@ import java.time.Instant;
 @AllArgsConstructor
 public class LoginUser {
 
-    public static final String TYP_CLIENT = "CLIENT";
-    public static final String TYP_ADMIN = "ADMIN";
-
-    public static final String ROLE_ADMIN = "ADMIN";
-    public static final String ROLE_DOCTOR = "DOCTOR";
-    public static final String ROLE_USER = "USER";
-
     private @Nullable Long id;
     private @Nullable String username;
     private @Nullable String name;
     private @Nullable String avatar;
-    private @Nullable String typ;
-    private @Nullable String role;
+    private @Nullable TokenType typ;
+    private @Nullable UserRole role;
     private @Nullable Long doctorId;
     private @Nullable Integer tokenVersion;
     private @Nullable Instant expiresAt;
 
     /** 判定当前登录态是否为后台管理员角色（须同时满足 typ=ADMIN 与 role=ADMIN）。 */
     public boolean isAdmin() {
-        return TYP_ADMIN.equals(typ) && ROLE_ADMIN.equals(role);
+        return typ == TokenType.ADMIN && role == UserRole.ADMIN;
     }
 
     /** 判定当前登录态是否为后台接诊医生角色（须同时满足 typ=ADMIN 与 role=DOCTOR）。 */
     public boolean isDoctor() {
-        return TYP_ADMIN.equals(typ) && ROLE_DOCTOR.equals(role);
+        return typ == TokenType.ADMIN && role == UserRole.DOCTOR;
     }
 
     /** 判定当前登录态是否属于用户端登录体系（typ=CLIENT）。 */
     public boolean isClient() {
-        return TYP_CLIENT.equals(typ);
+        return typ == TokenType.CLIENT;
+    }
+
+    /**
+     * 校验当前后台登录态是否命中给定后台角色集合：必须同时满足 {@code typ == TokenType.ADMIN} 且 {@code role != null}；
+     * 用户端令牌（即使 {@code role} 同名）或 {@code roles} 为空时均按 fail-closed 返回 {@code false}。
+     */
+    public boolean matchesAny(AdminRole... roles) {
+        if (typ != TokenType.ADMIN || role == null) {
+            return false;
+        }
+        for (AdminRole allowed : roles) {
+            if (allowed.code().equals(role.code())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

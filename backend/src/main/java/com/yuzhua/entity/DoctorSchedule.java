@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.SchedulePeriod;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -22,7 +24,7 @@ public class DoctorSchedule {
     private @Nullable Long doctorId;
     private @Nullable LocalDate workDate;
 
-    private @Nullable Integer period;
+    private @Nullable SchedulePeriod period;
     private @Nullable LocalTime startTime;
     private @Nullable LocalTime endTime;
     private @Nullable Integer totalNum;
@@ -30,7 +32,7 @@ public class DoctorSchedule {
 
     private @Nullable Integer lastQueueNo;
 
-    private @Nullable Integer status;
+    private @Nullable EnableStatus status;
 
     @TableField(fill = FieldFill.INSERT)
     private @Nullable LocalDateTime createTime;

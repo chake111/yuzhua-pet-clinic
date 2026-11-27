@@ -1,5 +1,7 @@
 package com.yuzhua.dto;
 
+import com.yuzhua.domain.enums.AppointmentStatus;
+import com.yuzhua.domain.enums.PayStatus;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
@@ -13,8 +15,8 @@ public class AppointmentQuery extends PageQuery {
 
     private @Nullable Long doctorId;
     private @Nullable Long userId;
-    private @Nullable Integer status;
-    private @Nullable Integer payStatus;
+    private @Nullable AppointmentStatus status;
+    private @Nullable PayStatus payStatus;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private @Nullable LocalDate start;

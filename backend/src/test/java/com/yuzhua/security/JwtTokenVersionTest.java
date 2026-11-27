@@ -1,5 +1,7 @@
 package com.yuzhua.security;
 
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.props.AppProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -34,8 +36,8 @@ class JwtTokenVersionTest {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject("7")
-                .claim("typ", LoginUser.TYP_CLIENT)
-                .claim("role", LoginUser.ROLE_USER)
+                .claim("typ", TokenType.CLIENT.code())
+                .claim("role", UserRole.USER.code())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(3600)))
                 .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
@@ -46,8 +48,8 @@ class JwtTokenVersionTest {
     void versionSurvivesSignAndParse() {
         LoginUser user = new LoginUser();
         user.setId(7L);
-        user.setTyp(LoginUser.TYP_CLIENT);
-        user.setRole(LoginUser.ROLE_USER);
+        user.setTyp(TokenType.CLIENT);
+        user.setRole(UserRole.USER);
         user.setTokenVersion(5);
 
         LoginUser parsed = utils().parse(utils().create(user));

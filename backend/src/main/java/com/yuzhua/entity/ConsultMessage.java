@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.yuzhua.domain.enums.ConsultMsgType;
+import com.yuzhua.domain.enums.ConsultSenderRole;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -13,15 +15,6 @@ import java.time.LocalDateTime;
 @Data
 @TableName("consult_message")
 public class ConsultMessage {
-
-    public static final String ROLE_USER = "USER";
-    public static final String ROLE_DOCTOR = "DOCTOR";
-    public static final String ROLE_SYSTEM = "SYSTEM";
-
-    public static final String TYPE_TEXT = "TEXT";
-    public static final String TYPE_IMAGE = "IMAGE";
-    public static final String TYPE_SYSTEM = "SYSTEM";
-    public static final String TYPE_SUGGEST = "SUGGEST";
 
     public static final int HIDE_NO = 0;
     public static final int HIDE_YES = 1;
@@ -32,10 +25,10 @@ public class ConsultMessage {
     private @Nullable Long sessionId;
 
     private @Nullable Long senderId;
-    private @Nullable String senderRole;
+    private @Nullable ConsultSenderRole senderRole;
     private @Nullable String senderName;
     private @Nullable String senderAvatar;
-    private @Nullable String msgType;
+    private @Nullable ConsultMsgType msgType;
     private @Nullable String content;
     private @Nullable Integer isRead;
 

@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.yuzhua.common.PageResult;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.dto.PageQuery;
 import com.yuzhua.entity.Appointment;
 import com.yuzhua.entity.Doctor;
@@ -143,8 +145,8 @@ class DoctorReviewHistoryTest {
 
         LoginUser admin = new LoginUser();
         admin.setId(99L);
-        admin.setTyp(LoginUser.TYP_ADMIN);
-        admin.setRole(LoginUser.ROLE_ADMIN);
+        admin.setTyp(TokenType.ADMIN);
+        admin.setRole(UserRole.ADMIN);
         UserContext.set(admin);
 
         PageResult<ReviewVo> page = s.pageForStaff(null, null, new PageQuery());

@@ -1,8 +1,9 @@
 package com.yuzhua.dto;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.SchedulePeriod;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -19,7 +20,7 @@ public class ScheduleForm {
     private @Nullable LocalDate workDate;
 
     @NotNull(message = "请选择时段")
-    private @Nullable Integer period;
+    private @Nullable SchedulePeriod period;
 
     @NotNull(message = "请选择开始时间")
     private @Nullable LocalTime startTime;
@@ -31,7 +32,5 @@ public class ScheduleForm {
     @Min(value = 1, message = "号源数至少为 1")
     private @Nullable Integer totalNum;
 
-    @Min(value = 0, message = "状态只能是 0 停诊或 1 正常")
-    @Max(value = 1, message = "状态只能是 0 停诊或 1 正常")
-    private @Nullable Integer status;
+    private @Nullable EnableStatus status;
 }

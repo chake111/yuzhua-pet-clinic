@@ -7,6 +7,11 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.BatchLookup;
 import com.yuzhua.common.PageResult;
+import com.yuzhua.domain.enums.AppointmentStatus;
+import com.yuzhua.domain.enums.CancelSource;
+import com.yuzhua.domain.enums.ConsultType;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.PayStatus;
 import com.yuzhua.props.AppProperties;
 import com.yuzhua.dto.AppointmentForm;
 import com.yuzhua.dto.AppointmentQuery;
@@ -62,11 +67,13 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointment> {
 
-    // 原因: 毫秒时间戳后补 8 位随机，将百并发抢号下撞 uk_order_no 的概率压到可忽略（总长 27 字符）
+    // 原因: "PC" 前缀 + 17 位毫秒时间戳 + 8 位零填充随机后缀（共 27 字符）生成订单号，并由 uk_order_no 唯一约束兜底
     private static final DateTimeFormatter NO_STAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
-    // 原因: 收紧幂等键为 8-64 位 URL 安全字符，入口即拒脏键避免落库截断或排序规则差异导致异常重放
+    // 原因: 限定幂等键为 8-64 位 [A-Za-z0-9._:-] 字符集，入口即拒超长或特殊字符避免落库截断及排序规则差异导致异常重放
     private static final Pattern IDEM_KEY = Pattern.compile("[A-Za-z0-9._:-]{8,64}");
+    private static final long IDEM_RETRY_DELAY_MS = 20L;
+    private static final int ORDER_NO_RANDOM_BOUND = 100_000_000;
 
     private final PetService petService;
     private final PetMapper petMapper;
@@ -164,7 +171,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         if (doctor == null) {
             throw BizException.notFound("医生");
         }
-        if (!Integer.valueOf(1).equals(doctor.getStatus())) {
+        if (doctor.getStatus() != EnableStatus.ENABLED) {
             throw new BizException("该医生已停诊，请改约其他医生");
         }
         if (req.getSymptom() == null || req.getSymptom().isBlank()) {
@@ -176,14 +183,14 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         if (!Objects.equals(sch.getDoctorId(), req.getDoctorId())) {
             throw new BizException("所选时段不属于该医生");
         }
-        if (!Integer.valueOf(1).equals(sch.getStatus())) {
+        if (sch.getStatus() != EnableStatus.ENABLED) {
             throw new BizException("该时段已停诊，请换个时间");
         }
         requireNotPast(sch);
         if (count(Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getPetId, pet.getId())
                 .eq(Appointment::getScheduleId, sch.getId())
-                .ne(Appointment::getStatus, Appointment.ST_CANCELLED)) > 0) {
+                .ne(Appointment::getStatus, AppointmentStatus.CANCELLED)) > 0) {
             throw new BizException("该宠物已预约此时段，请在我的预约中查看");
         }
         return doctor;
@@ -198,7 +205,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         a.setPetId(pet.getId());
         a.setDoctorId(doctor.getId());
         a.setDepartmentId(doctor.getDepartmentId());
-        a.setConsultType(Appointment.CT_VISIT);
+        a.setConsultType(ConsultType.VISIT);
         a.setScheduleId(sch.getId());
         a.setAppointmentDate(sch.getWorkDate());
         a.setPeriod(sch.getPeriod());
@@ -208,8 +215,8 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         a.setImages(blankToNull(req.getImages()));
         DoctorService.requireFee(doctor.getConsultationFee());
         a.setAmount(doctor.getConsultationFee());
-        a.setPayStatus(Appointment.PAY_NONE);
-        a.setStatus(Appointment.ST_PENDING);
+        a.setPayStatus(PayStatus.UNPAID);
+        a.setStatus(AppointmentStatus.PENDING);
         a.setIsReviewed(0);
         return a;
     }
@@ -218,10 +225,10 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     @Transactional
     public AppointmentVo pay(Long id) {
         Appointment a = lockOwned(id);
-        if (!Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())) {
+        if (a.getStatus() != AppointmentStatus.PENDING) {
             throw new BizException("当前状态不能支付");
         }
-        if (Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus())) {
+        if (a.getPayStatus() == PayStatus.PAID) {
             return detailOf(a, false);
         }
         if (isPayExpired(a)) {
@@ -230,15 +237,15 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         // 原因: 取一次当前时刻用于落库与响应回填，保持 payTime 一致
         LocalDateTime now = LocalDateTime.now();
         if (baseMapper.update(null, Wrappers.<Appointment>lambdaUpdate()
-                .set(Appointment::getPayStatus, Appointment.PAY_PAID)
+                .set(Appointment::getPayStatus, PayStatus.PAID)
                 .set(Appointment::getPayTime, now)
                 .set(Appointment::getPayType, "MOCK")
                 .eq(Appointment::getId, id)
-                .eq(Appointment::getStatus, Appointment.ST_PENDING)
-                .eq(Appointment::getPayStatus, Appointment.PAY_NONE)) == 0) {
+                .eq(Appointment::getStatus, AppointmentStatus.PENDING)
+                .eq(Appointment::getPayStatus, PayStatus.UNPAID)) == 0) {
             throw new BizException("订单状态已变化，请刷新后重试");
         }
-        a.setPayStatus(Appointment.PAY_PAID);
+        a.setPayStatus(PayStatus.PAID);
         a.setPayTime(now);
         a.setPayType("MOCK");
         return detailOf(a, false);
@@ -247,7 +254,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     /** 用户取消本人待接诊预约：先锁预约再条件更新并退号，已支付订单标记已退款（VisitOverdueException 不回滚）。 */
     @Transactional(noRollbackFor = VisitOverdueException.class)
     public void cancelByUser(Long id, @Nullable String reason) {
-        cancelLocked(lockOwned(id), blankToNull(reason), "USER");
+        cancelLocked(lockOwned(id), blankToNull(reason), CancelSource.USER);
     }
 
     /** 医生或管理员取消待接诊预约：先锁预约校验权限再退号退款（VisitOverdueException 不回滚）。 */
@@ -255,26 +262,27 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     public void cancelByStaff(Long id, @Nullable String reason) {
         Appointment a = lockForUpdate(id);
         requireStaffMayTouch(a);
-        cancelLocked(a, blankToNull(reason), UserContext.require().isDoctor() ? "DOCTOR" : "ADMIN");
+        cancelLocked(a, blankToNull(reason),
+                UserContext.require().isDoctor() ? CancelSource.DOCTOR : CancelSource.ADMIN);
     }
 
-    private void cancelLocked(Appointment a, @Nullable String reason, String by) {
+    private void cancelLocked(Appointment a, @Nullable String reason, CancelSource by) {
         requireVisitNotOverdue(a);
-        if (Integer.valueOf(Appointment.ST_CANCELLED).equals(a.getStatus())) {
+        if (a.getStatus() == AppointmentStatus.CANCELLED) {
             throw new BizException("该预约已取消");
         }
-        if (!Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())) {
+        if (a.getStatus() != AppointmentStatus.PENDING) {
             throw new BizException("已进入接诊流程，无法取消，请联系前台处理");
         }
         if (baseMapper.update(null, Wrappers.<Appointment>lambdaUpdate()
-                .set(Appointment::getStatus, Appointment.ST_CANCELLED)
+                .set(Appointment::getStatus, AppointmentStatus.CANCELLED)
                 .set(Appointment::getCancelReason, reason)
                 .set(Appointment::getCancelBy, by)
                 .set(Appointment::getCancelTime, LocalDateTime.now())
-                .set(Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus()),
-                        Appointment::getPayStatus, Appointment.PAY_REFUNDED)
+                .set(a.getPayStatus() == PayStatus.PAID,
+                        Appointment::getPayStatus, PayStatus.REFUNDED)
                 .eq(Appointment::getId, a.getId())
-                .eq(Appointment::getStatus, Appointment.ST_PENDING)) == 0) {
+                .eq(Appointment::getStatus, AppointmentStatus.PENDING)) == 0) {
             throw new BizException("该预约已取消");
         }
         if (a.getScheduleId() != null) {
@@ -282,45 +290,50 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
     }
 
-    /** 医生接诊：锁行校验归属、未过就诊日、已支付且待接诊后推进至已接诊（VisitOverdueException 不回滚）。 */
+    /**
+     * 医生接诊：先 {@code lockForUpdate} 锁预约行并仅放行接诊医生本人（管理员或他人代操抛 403）；
+     * 若已支付待接诊单已过就诊日，{@code requireVisitNotOverdue} 会先落库 {@code MISSED}（不退号不退款）并抛出
+     * {@code VisitOverdueException}，因 {@code noRollbackFor} 该未到诊状态会提交保留；
+     * 校验已支付待接诊后通过条件更新推进至 {@code ACCEPTED}（0 行受影响抛异常防并发重入）。
+     */
     @Transactional(noRollbackFor = VisitOverdueException.class)
     public void accept(Long id) {
         Appointment a = lockForUpdate(id);
         requireDoctorMayTouch(a);
         requireVisitNotOverdue(a);
-        if (!Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())) {
+        if (a.getStatus() != AppointmentStatus.PENDING) {
             throw new BizException("只有待接诊的预约可以接诊");
         }
-        if (!Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus())) {
+        if (a.getPayStatus() != PayStatus.PAID) {
             throw new BizException("患者尚未支付，不能开始接诊");
         }
         if (baseMapper.update(null, Wrappers.<Appointment>lambdaUpdate()
-                .set(Appointment::getStatus, Appointment.ST_ACCEPTED)
+                .set(Appointment::getStatus, AppointmentStatus.ACCEPTED)
                 .set(Appointment::getAcceptTime, LocalDateTime.now())
                 .eq(Appointment::getId, id)
-                .eq(Appointment::getStatus, Appointment.ST_PENDING)) == 0) {
+                .eq(Appointment::getStatus, AppointmentStatus.PENDING)) == 0) {
             throw new BizException("该预约状态已变化，请刷新后重试");
         }
     }
 
     /**
      * 医生结束本人已接诊预约：先 {@code lockForUpdate} 锁预约行（不存在抛 404），经 {@code requireDoctorMayTouch}
-     * 仅放行接诊医生本人（管理员或他人代操抛 403）并校验 {@code status == ST_ACCEPTED}；
-     * 通过条件更新（{@code WHERE status = ST_ACCEPTED}）推进至 {@code ST_FINISHED} 与 {@code finishTime}，影响 0 行抛异常防并发重复完成，
-     * 仅 CAS 成功后才递增医生接诊量；允许结束后补写病历，不强制病历已存在。
+     * 仅放行接诊医生本人（管理员或他人代操抛 403）并校验 {@code status == AppointmentStatus.ACCEPTED}；
+     * 通过条件更新（{@code WHERE status = AppointmentStatus.ACCEPTED}）推进至 {@code AppointmentStatus.FINISHED} 与 {@code finishTime}，
+     * 影响 0 行抛异常防并发重复完成，仅 CAS 成功后才递增医生接诊量；允许结束后补写病历，不强制病历已存在。
      */
     @Transactional
     public void finish(Long id) {
         Appointment a = lockForUpdate(id);
         requireDoctorMayTouch(a);
-        if (!Integer.valueOf(Appointment.ST_ACCEPTED).equals(a.getStatus())) {
+        if (a.getStatus() != AppointmentStatus.ACCEPTED) {
             throw new BizException("请先接诊再结束");
         }
         if (baseMapper.update(null, Wrappers.<Appointment>lambdaUpdate()
-                .set(Appointment::getStatus, Appointment.ST_FINISHED)
+                .set(Appointment::getStatus, AppointmentStatus.FINISHED)
                 .set(Appointment::getFinishTime, LocalDateTime.now())
                 .eq(Appointment::getId, id)
-                .eq(Appointment::getStatus, Appointment.ST_ACCEPTED)) == 0) {
+                .eq(Appointment::getStatus, AppointmentStatus.ACCEPTED)) == 0) {
             throw new BizException("该预约状态已变化，请刷新后重试");
         }
         Long doctorId = a.getDoctorId();
@@ -329,7 +342,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         }
     }
 
-    public PageResult<AppointmentVo> pageMine(@Nullable Integer status, PageQuery q) {
+    public PageResult<AppointmentVo> pageMine(@Nullable AppointmentStatus status, PageQuery q) {
         LambdaQueryWrapper<Appointment> qw = Wrappers.<Appointment>lambdaQuery()
                 .eq(Appointment::getUserId, UserContext.requireId())
                 .eq(status != null, Appointment::getStatus, status)
@@ -438,12 +451,12 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     @Transactional
     public boolean expireOne(Long id) {
         Appointment a = baseMapper.selectByIdForUpdate(id);
-        if (a == null || !Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())
-                || !Integer.valueOf(Appointment.PAY_NONE).equals(a.getPayStatus())
+        if (a == null || a.getStatus() != AppointmentStatus.PENDING
+                || a.getPayStatus() != PayStatus.UNPAID
                 || !isPayExpired(a)) {
             return false;
         }
-        cancelLocked(a, "超过 " + props.getPayTimeoutMinutes() + " 分钟未支付，系统自动取消", "SYSTEM");
+        cancelLocked(a, "超过 " + props.getPayTimeoutMinutes() + " 分钟未支付，系统自动取消", CancelSource.SYSTEM);
         return true;
     }
 
@@ -460,15 +473,15 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         Appointment a = baseMapper.selectByIdForUpdate(id);
         if (a == null || a.getAppointmentDate() == null
                 || !a.getAppointmentDate().isBefore(LocalDate.now())
-                || !Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())
-                || !Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus())) {
+                || a.getStatus() != AppointmentStatus.PENDING
+                || a.getPayStatus() != PayStatus.PAID) {
             return false;
         }
         return baseMapper.update(null, Wrappers.<Appointment>lambdaUpdate()
-                .set(Appointment::getStatus, Appointment.ST_MISSED)
+                .set(Appointment::getStatus, AppointmentStatus.MISSED)
                 .eq(Appointment::getId, id)
-                .eq(Appointment::getStatus, Appointment.ST_PENDING)
-                .eq(Appointment::getPayStatus, Appointment.PAY_PAID)) > 0;
+                .eq(Appointment::getStatus, AppointmentStatus.PENDING)
+                .eq(Appointment::getPayStatus, PayStatus.PAID)) > 0;
     }
 
     private static @Nullable String normalizeIdemKey(@Nullable String idemKey) {
@@ -500,7 +513,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         Appointment existing = baseMapper.selectByUserAndIdemKey(userId, key);
         for (int attempt = 0; existing == null && attempt < 2; attempt++) {
             try {
-                Thread.sleep(20L);
+                Thread.sleep(IDEM_RETRY_DELAY_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -515,8 +528,8 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
     }
 
     private void requireVisitNotOverdue(Appointment a) {
-        if (Integer.valueOf(Appointment.ST_PENDING).equals(a.getStatus())
-                && Integer.valueOf(Appointment.PAY_PAID).equals(a.getPayStatus())
+        if (a.getStatus() == AppointmentStatus.PENDING
+                && a.getPayStatus() == PayStatus.PAID
                 && a.getAppointmentDate() != null && a.getAppointmentDate().isBefore(LocalDate.now())) {
             Long id = a.getId();
             if (id != null) {
@@ -566,7 +579,7 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
 
     private String nextOrderNo() {
         return "PC" + LocalDateTime.now().format(NO_STAMP)
-                + String.format(Locale.ROOT, "%08d", ThreadLocalRandom.current().nextInt(100_000_000));
+                + String.format(Locale.ROOT, "%08d", ThreadLocalRandom.current().nextInt(ORDER_NO_RANDOM_BOUND));
     }
 
     private AppointmentVo detailOf(Appointment a, boolean withPatient) {

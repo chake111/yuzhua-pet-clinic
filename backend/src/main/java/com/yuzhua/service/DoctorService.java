@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.yuzhua.common.BatchLookup;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.PageResult;
+import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.DoctorForm;
 import com.yuzhua.dto.DoctorQuery;
 import com.yuzhua.entity.AdminUser;
@@ -42,6 +43,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
 
+    private static final int MAX_TOP_LIMIT = 50;
+    private static final int DEFAULT_SORT = 99;
+    private static final BigDecimal MAX_CONSULTATION_FEE = new BigDecimal("9999");
+
     private final DepartmentMapper departmentMapper;
     private final DoctorScheduleMapper scheduleMapper;
     private final AppointmentMapper appointmentMapper;
@@ -60,7 +65,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
                         .or().like(Doctor::getSpecialty, q.getKeyword())
                         .or().like(Doctor::getTitle, q.getKeyword()));
         if (visibleOnly) {
-            qw.eq(Doctor::getStatus, 1);
+            qw.eq(Doctor::getStatus, EnableStatus.ENABLED);
         }
         applySort(qw, q.getSort());
 
@@ -79,10 +84,10 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
 
     public List<DoctorVo> listTopVisible(int limit) {
         List<Doctor> list = list(Wrappers.<Doctor>lambdaQuery()
-                .eq(Doctor::getStatus, 1)
+                .eq(Doctor::getStatus, EnableStatus.ENABLED)
                 .orderByAsc(Doctor::getSort)
                 .orderByDesc(Doctor::getRating)
-                .last("LIMIT " + Math.max(1, Math.min(limit, 50))));
+                .last("LIMIT " + Math.max(1, Math.min(limit, MAX_TOP_LIMIT))));
         Map<Long, Department> dict = departmentNames(list);
         return list.stream().map(d -> toVo(d, dict)).toList();
     }
@@ -95,7 +100,10 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         return d;
     }
 
-    /** 在 READ_COMMITTED 下持目标科室行锁校验科室存在后创建医生，防止与删科并发形成悬空归属。 */
+    /**
+     * 在 READ_COMMITTED 下经 {@code requireDepartment}（持 {@code selectByIdForUpdate} 科室行锁）校验科室存在后创建医生，防止与删科并发形成悬空归属；
+     * 排序默认 {@code DEFAULT_SORT}，{@code status} 默认 {@code EnableStatus.ENABLED}。
+     */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public Doctor create(DoctorForm form) {
         requireName(form.getName());
@@ -119,8 +127,8 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         d.setReviewCount(0);
         d.setAppointmentCount(0);
         d.setOnlineStatus(0);
-        d.setStatus(form.getStatus() == null ? 1 : form.getStatus());
-        d.setSort(form.getSort() == null ? 99 : form.getSort());
+        d.setStatus(form.getStatus() == null ? EnableStatus.ENABLED : form.getStatus());
+        d.setSort(form.getSort() == null ? DEFAULT_SORT : form.getSort());
         save(d);
         return d;
     }
@@ -135,7 +143,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
         requireName(form.getName());
         requireDepartment(form.getDepartmentId());
         requireFee(form.getConsultationFee());
-        Integer status = form.getStatus();
+        EnableStatus status = form.getStatus();
         if (status != null) {
             requireStatus(status);
         }
@@ -163,21 +171,21 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
      * 已经约出去的单子和排班行保持原样，由前台电话联系改约。
      */
     @Transactional
-    public void changeStatus(Long id, Integer status) {
+    public void changeStatus(Long id, @Nullable EnableStatus status) {
         require(id);
         applyStatus(id, status);
     }
 
-    private void applyStatus(Long id, Integer status) {
+    private void applyStatus(Long id, @Nullable EnableStatus status) {
         requireStatus(status);
         update(Wrappers.<Doctor>lambdaUpdate()
                 .set(Doctor::getStatus, status)
-                .set(Doctor::getOnlineStatus, status == 1 && socketRegistry.doctorConnected(id) ? 1 : 0)
+                .set(Doctor::getOnlineStatus, status == EnableStatus.ENABLED && socketRegistry.doctorConnected(id) ? 1 : 0)
                 .eq(Doctor::getId, id));
     }
 
-    private static void requireStatus(Integer status) {
-        if (status == null || (status != 0 && status != 1)) {
+    private static void requireStatus(@Nullable EnableStatus status) {
+        if (status == null) {
             throw new BizException("状态只能是停诊或出诊");
         }
     }
@@ -219,7 +227,7 @@ public class DoctorService extends ServiceImpl<DoctorMapper, Doctor> {
     }
 
     static void requireFee(@Nullable BigDecimal fee) {
-        if (fee == null || fee.signum() < 0 || fee.compareTo(new BigDecimal("9999")) > 0
+        if (fee == null || fee.signum() < 0 || fee.compareTo(MAX_CONSULTATION_FEE) > 0
                 || fee.stripTrailingZeros().scale() > 2) {
             throw new BizException("问诊费须为 0～9999 元，最多两位小数");
         }

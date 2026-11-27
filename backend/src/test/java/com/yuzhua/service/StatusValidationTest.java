@@ -5,6 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.yuzhua.common.BizException;
+import com.yuzhua.domain.enums.AdminRole;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.NoticeStatus;
+import com.yuzhua.domain.enums.NoticeType;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.dto.DepartmentForm;
 import com.yuzhua.dto.DoctorForm;
 import com.yuzhua.dto.NoticeForm;
@@ -108,7 +114,7 @@ class StatusValidationTest {
         }
     }
 
-    static DepartmentForm department(String name, String code, Integer status) {
+    static DepartmentForm department(String name, String code, EnableStatus status) {
         DepartmentForm d = new DepartmentForm();
         d.setName(name);
         d.setCode(code);
@@ -127,12 +133,10 @@ class StatusValidationTest {
     }
 
     @Test
-    void departmentRejectsBlankCodeAndInvalidStatusBeforeWrite() {
+    void departmentRejectsBlankCodeBeforeWrite() {
         DeptService s = new DeptService();
-        reject(() -> s.create(department("内科", null, 1)), "请填写科室编码");
-        reject(() -> s.create(department("内科", "   ", 1)), "请填写科室编码");
-        reject(() -> s.create(department("内科", "NK", 2)), "状态只能是");
-        reject(() -> s.create(department("内科", "NK", -1)), "状态只能是");
+        reject(() -> s.create(department("内科", null, EnableStatus.ENABLED)), "请填写科室编码");
+        reject(() -> s.create(department("内科", "   ", EnableStatus.ENABLED)), "请填写科室编码");
         assertNoWrite(s);
     }
 
@@ -140,7 +144,7 @@ class StatusValidationTest {
     void departmentDefaultsStatusOnCreateAndPreservesItOnEdit() {
         DeptService s = new DeptService();
         s.create(department("内科", "NK", null));
-        assertEquals(1, s.saved.getStatus());
+        assertEquals(EnableStatus.ENABLED, s.saved.getStatus());
         assertEquals(99, s.saved.getSort());
 
         s.saved = null;
@@ -148,7 +152,7 @@ class StatusValidationTest {
         s.current.setId(1L);
         s.current.setName("内科");
         s.current.setCode("NK");
-        s.current.setStatus(0);
+        s.current.setStatus(EnableStatus.DISABLED);
         DepartmentForm edit = department("内科", "NK", null);
         s.update(1L, edit);
         assertEquals(1L, s.saved.getId());
@@ -156,20 +160,18 @@ class StatusValidationTest {
     }
 
     @Test
-    void departmentStatusSwitchRejectsNullAndOutOfRange() {
+    void departmentStatusSwitchRejectsNullAndWritesEnum() {
         DeptService s = new DeptService();
         s.current = new Department();
         s.current.setId(1L);
-        s.current.setStatus(1);
+        s.current.setStatus(EnableStatus.ENABLED);
         reject(() -> s.changeStatus(1L, null), "状态只能是");
-        reject(() -> s.changeStatus(1L, 2), "状态只能是");
-        reject(() -> s.changeStatus(1L, -1), "状态只能是");
         assertEquals(0, s.writes);
 
-        s.changeStatus(1L, 0);
-        assertTrue(values(s.updated).contains(0));
-        s.changeStatus(1L, 1);
-        assertTrue(values(s.updated).contains(1));
+        s.changeStatus(1L, EnableStatus.DISABLED);
+        assertTrue(values(s.updated).contains(EnableStatus.DISABLED));
+        s.changeStatus(1L, EnableStatus.ENABLED);
+        assertTrue(values(s.updated).contains(EnableStatus.ENABLED));
     }
 
     // ---------------------------------------------------------------- 医生
@@ -220,7 +222,7 @@ class StatusValidationTest {
         }
     }
 
-    static DoctorForm doctor(Integer status) {
+    static DoctorForm doctor(EnableStatus status) {
         DoctorForm d = new DoctorForm();
         d.setName("陈明远");
         d.setDepartmentId(1L);
@@ -229,7 +231,7 @@ class StatusValidationTest {
         return d;
     }
 
-    static Doctor doctorEntity(Integer status) {
+    static Doctor doctorEntity(EnableStatus status) {
         Doctor d = new Doctor();
         d.setId(1L);
         d.setName("陈明远");
@@ -241,8 +243,8 @@ class StatusValidationTest {
     static LoginUser doctorUser(long doctorId) {
         LoginUser u = new LoginUser();
         u.setId(99L);
-        u.setTyp(LoginUser.TYP_ADMIN);
-        u.setRole(LoginUser.ROLE_DOCTOR);
+        u.setTyp(TokenType.ADMIN);
+        u.setRole(UserRole.DOCTOR);
         u.setDoctorId(doctorId);
         return u;
     }
@@ -253,18 +255,15 @@ class StatusValidationTest {
     }
 
     @Test
-    void doctorCreateRejectsInvalidStatusAndDefaultsOnlineFlag() {
+    void doctorCreateDefaultsStatusAndOnlineFlag() {
         DocService s = new DocService(new ConsultSocketRegistry());
-        reject(() -> s.create(doctor(2)), "状态只能是");
-        assertNoWrite(s);
-
         s.create(doctor(null));
-        assertEquals(1, s.saved.getStatus());
+        assertEquals(EnableStatus.ENABLED, s.saved.getStatus());
         assertEquals(0, s.saved.getOnlineStatus());
 
         s.saved = null;
-        s.create(doctor(0));
-        assertEquals(0, s.saved.getStatus());
+        s.create(doctor(EnableStatus.DISABLED));
+        assertEquals(EnableStatus.DISABLED, s.saved.getStatus());
         assertEquals(0, s.saved.getOnlineStatus());
     }
 
@@ -272,42 +271,35 @@ class StatusValidationTest {
     void doctorEditAndStatusSwitchShareOneStatusWritePath() {
         ConsultSocketRegistry registry = new ConsultSocketRegistry();
         DocService s = new DocService(registry);
-        s.current = doctorEntity(1);
+        s.current = doctorEntity(EnableStatus.ENABLED);
 
         // 编辑里停诊：通用字段写入时不能带 status，状态与在线标志由 applyStatus 一次写清
-        s.update(1L, doctor(0));
+        s.update(1L, doctor(EnableStatus.DISABLED));
         assertNull(s.saved.getStatus(), "updateById 不应写 status");
         assertEquals(1, s.writes);
-        assertTrue(values(s.updated).contains(0));
-
-        // 编辑里非法状态：在写库之前拒绝
-        s.saved = null;
-        s.writes = 0;
-        reject(() -> s.update(1L, doctor(5)), "状态只能是");
-        assertNoWrite(s);
+        assertTrue(values(s.updated).contains(EnableStatus.DISABLED));
 
         // 恢复出诊且医生仍有活动连接：onlineStatus 跟随为 1
         registry.open(new ConsultSocketRegistry.Conn(
                 ConsultSocketRegistry.keyOf(doctorUser(1L)), doctorUser(1L), null));
-        s.changeStatus(1L, 1);
-        assertTrue(values(s.updated).contains(1), "status 与 onlineStatus 都应为 1");
-        assertEquals(1, s.writes);
+        s.changeStatus(1L, EnableStatus.ENABLED);
+        assertTrue(values(s.updated).contains(EnableStatus.ENABLED), "status 应为 ENABLED");
+        assertTrue(values(s.updated).contains(1), "onlineStatus 应为 1");
+        assertEquals(2, s.writes);
 
         // 没有活动连接时恢复出诊不能误报在线
         ConsultSocketRegistry offline = new ConsultSocketRegistry();
         DocService s2 = new DocService(offline);
-        s2.current = doctorEntity(0);
-        s2.changeStatus(1L, 1);
+        s2.current = doctorEntity(EnableStatus.DISABLED);
+        s2.changeStatus(1L, EnableStatus.ENABLED);
         assertTrue(values(s2.updated).contains(0), "无连接时 onlineStatus 应为 0");
     }
 
     @Test
-    void doctorStatusSwitchRejectsNullAndOutOfRange() {
+    void doctorStatusSwitchRejectsNull() {
         DocService s = new DocService(new ConsultSocketRegistry());
-        s.current = doctorEntity(1);
+        s.current = doctorEntity(EnableStatus.ENABLED);
         reject(() -> s.changeStatus(1L, null), "状态只能是");
-        reject(() -> s.changeStatus(1L, 2), "状态只能是");
-        reject(() -> s.changeStatus(1L, -1), "状态只能是");
         assertNoWrite(s);
     }
 
@@ -335,12 +327,12 @@ class StatusValidationTest {
         }
     }
 
-    static NoticeForm notice(String title, Integer type, Integer topFlag) {
+    static NoticeForm notice(String title, NoticeType type, Integer topFlag) {
         NoticeForm f = new NoticeForm();
         f.setTitle(title);
         f.setType(type);
         f.setTopFlag(topFlag);
-        f.setStatus(0);
+        f.setStatus(NoticeStatus.DRAFT);
         return f;
     }
 
@@ -349,21 +341,18 @@ class StatusValidationTest {
     }
 
     @Test
-    void noticeRejectsInvalidTypeAndTopFlagBeforeWrite() {
+    void noticeRejectsInvalidTopFlagBeforeWrite() {
         NoticeSvc s = new NoticeSvc();
-        reject(() -> s.create(notice("公告", 0, 0)), "类型只能是");
-        reject(() -> s.create(notice("公告", 4, 0)), "类型只能是");
-        reject(() -> s.create(notice("公告", 1, 2)), "置顶标志只能是");
-        reject(() -> s.create(notice("公告", 1, -1)), "置顶标志只能是");
+        reject(() -> s.create(notice("公告", NoticeType.NOTICE, 2)), "置顶标志只能是");
+        reject(() -> s.create(notice("公告", NoticeType.NOTICE, -1)), "置顶标志只能是");
         assertNoWrite(s);
 
         s.current = new Notice();
         s.current.setId(1L);
-        s.current.setType(1);
+        s.current.setType(NoticeType.NOTICE);
         s.current.setTopFlag(0);
-        s.current.setStatus(0);
-        reject(() -> s.update(1L, notice("公告", 4, 0)), "类型只能是");
-        reject(() -> s.update(1L, notice("公告", 1, 2)), "置顶标志只能是");
+        s.current.setStatus(NoticeStatus.DRAFT);
+        reject(() -> s.update(1L, notice("公告", NoticeType.NOTICE, 2)), "置顶标志只能是");
         assertNoWrite(s);
     }
 }

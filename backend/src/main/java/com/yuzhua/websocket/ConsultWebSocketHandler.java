@@ -3,6 +3,7 @@ package com.yuzhua.websocket;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.yuzhua.common.BizException;
+import com.yuzhua.domain.enums.ConsultSenderRole;
 import com.yuzhua.entity.ConsultMessage;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.AccountGuard;
@@ -45,6 +46,10 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
 
     public static final String ATTR_CONN = "wsConn";
 
+    private static final int WS_SEND_TIME_LIMIT_MS = 5000;
+    private static final int WS_BUFFER_SIZE_BYTES = 256 * 1024;
+    private static final int RECENT_HISTORY_LIMIT = 20;
+
     private final ConsultService consultService;
     private final ConsultSocketRegistry registry;
     private final ConsultPush consultPush;
@@ -61,7 +66,7 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         LoginUser user = user(session);
         // 原因: 同账号可能同时收到广播与回执写帧，用串行化包装避免 WebSocket 并发写异常
         Conn conn = new Conn(ConsultSocketRegistry.keyOf(user), user,
-                new ConcurrentWebSocketSessionDecorator(session, 5000, 256 * 1024));
+                new ConcurrentWebSocketSessionDecorator(session, WS_SEND_TIME_LIMIT_MS, WS_BUFFER_SIZE_BYTES));
         session.getAttributes().put(ATTR_CONN, conn);
 
         Conn stale = registry.open(conn);
@@ -168,7 +173,7 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         join(conn, sessionId);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("sessionId", sessionId);
-        data.put("messages", consultService.recent(sessionId, 20));
+        data.put("messages", consultService.recent(sessionId, RECENT_HISTORY_LIMIT));
         write(conn, sessionId, envelope("HISTORY", data));
         write(conn, sessionId, envelope("PRESENCE", Map.of("sessionId", sessionId, "doctorOnline",
                 registry.inRoom(sessionId).stream().anyMatch(c -> c.getUser().isDoctor()))));
@@ -199,7 +204,9 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void broadcastRead(Conn conn, Long sessionId, List<Long> ids) {
-        String role = conn.getUser().isDoctor() ? ConsultMessage.ROLE_DOCTOR : ConsultMessage.ROLE_USER;
+        ConsultSenderRole role = conn.getUser().isDoctor()
+                ? ConsultSenderRole.DOCTOR
+                : ConsultSenderRole.USER;
         if (ids.isEmpty()) {
             broadcast(sessionId, envelope("READ", Map.of(
                     "sessionId", sessionId, "role", role, "readMessageIds", List.of())), conn.getKey());

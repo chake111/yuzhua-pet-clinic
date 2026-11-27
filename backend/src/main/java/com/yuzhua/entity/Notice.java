@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.yuzhua.domain.enums.NoticeStatus;
+import com.yuzhua.domain.enums.NoticeType;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -23,9 +25,9 @@ public class Notice {
     private @Nullable String summary;
     private @Nullable String content;
 
-    private @Nullable Integer type;
+    private @Nullable NoticeType type;
     private @Nullable Integer topFlag;
-    private @Nullable Integer status;
+    private @Nullable NoticeStatus status;
     private @Nullable Integer viewCount;
     private @Nullable LocalDateTime publishTime;
     private @Nullable Long publishBy;

@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.yuzhua.domain.enums.ConsultModerationStatus;
+import com.yuzhua.domain.enums.ConsultSessionStatus;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -13,14 +15,6 @@ import java.time.LocalDateTime;
 @Data
 @TableName("consult_session")
 public class ConsultSession {
-
-    public static final int ST_PENDING = 0;
-    public static final int ST_ACTIVE = 1;
-    public static final int ST_CLOSED = 2;
-
-    public static final int MV_NORMAL = 0;
-    public static final int MV_INVALID = 1;
-    public static final int MV_VIOLATION = 2;
 
     @TableId(type = IdType.AUTO)
     private @Nullable Long id;
@@ -35,9 +29,9 @@ public class ConsultSession {
 
     private @Nullable String summary;
 
-    private @Nullable Integer status;
+    private @Nullable ConsultSessionStatus status;
 
-    private @Nullable Integer moderateStatus;
+    private @Nullable ConsultModerationStatus moderateStatus;
     private @Nullable String moderateReason;
     private @Nullable Long moderateBy;
     private @Nullable LocalDateTime moderateTime;

@@ -1,5 +1,6 @@
 package com.yuzhua.dto;
 
+import com.yuzhua.domain.enums.EnableStatus;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
@@ -10,5 +11,5 @@ public class UserQuery extends PageQuery {
 
     private @Nullable String keyword;
 
-    private @Nullable Integer status;
+    private @Nullable EnableStatus status;
 }

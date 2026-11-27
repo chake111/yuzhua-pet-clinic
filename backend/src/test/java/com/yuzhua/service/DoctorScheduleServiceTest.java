@@ -5,6 +5,9 @@ import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.yuzhua.common.BizException;
+import com.yuzhua.domain.enums.CodedEnum;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.SchedulePeriod;
 import com.yuzhua.dto.ScheduleBatchForm;
 import com.yuzhua.dto.ScheduleEditForm;
 import com.yuzhua.dto.ScheduleForm;
@@ -127,11 +130,11 @@ class DoctorScheduleServiceTest {
         ArgumentCaptor<Wrapper<DoctorSchedule>> captor = ArgumentCaptor.forClass(Wrapper.class);
         verify(scheduleMapper, times(3)).selectList(captor.capture());
         assertThat(values(captor.getAllValues().get(0)))
-                .contains(10L, 1);
+                .contains(10L, EnableStatus.ENABLED);
         assertThat(values(captor.getAllValues().get(1)))
-                .contains(10L, 1, today, today);
+                .contains(10L, EnableStatus.ENABLED, today, today);
         assertThat(values(captor.getAllValues().get(2)))
-                .contains(10L, 1, today, today.plusDays(29));
+                .contains(10L, EnableStatus.ENABLED, today, today.plusDays(29));
     }
 
     // ---------------------------------------------------------------- 新建校验
@@ -163,9 +166,6 @@ class DoctorScheduleServiceTest {
         when(doctorMapper.selectById(10L)).thenReturn(doctor(10L, 5L, 1));
         LocalDate date = LocalDate.now().plusDays(1);
 
-        assertThat(biz(() -> service.create(form(10L, date, 0,
-                LocalTime.of(9, 0), LocalTime.of(11, 0), 10, null))).getMessage())
-                .contains("时段只能是");
         assertThat(biz(() -> service.create(form(10L, date, null,
                 LocalTime.of(9, 0), LocalTime.of(11, 0), 10, null))).getMessage())
                 .contains("时段只能是");
@@ -217,7 +217,7 @@ class DoctorScheduleServiceTest {
                 LocalTime.of(11, 0), LocalTime.of(11, 0), 10)));
         assertThat(badTime.getMessage()).contains("结束时间必须晚于开始时间");
 
-        BizException badPeriod = biz(() -> service.update(1L, edit(10L, current.getWorkDate(), 4,
+        BizException badPeriod = biz(() -> service.update(1L, edit(10L, current.getWorkDate(), null,
                 LocalTime.of(9, 0), LocalTime.of(11, 0), 10)));
         assertThat(badPeriod.getMessage()).contains("时段只能是");
         verify(scheduleMapper, never()).updateById(any(DoctorSchedule.class));
@@ -306,7 +306,7 @@ class DoctorScheduleServiceTest {
 
         ArgumentCaptor<DoctorSchedule> captor = ArgumentCaptor.forClass(DoctorSchedule.class);
         verify(scheduleMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getPeriod()).isEqualTo(2);
+        assertThat(captor.getValue().getPeriod()).isEqualTo(SchedulePeriod.AFTERNOON);
         assertThat(captor.getValue().getStartTime()).isEqualTo(LocalTime.of(13, 0));
         assertThat(captor.getValue().getEndTime()).isEqualTo(LocalTime.of(15, 0));
         assertThat(captor.getValue().getRemainNum()).isEqualTo(10);
@@ -328,7 +328,7 @@ class DoctorScheduleServiceTest {
         DoctorSchedule written = captor.getValue();
         assertThat(written.getDoctorId()).isEqualTo(11L);
         assertThat(written.getWorkDate()).isEqualTo(newDate);
-        assertThat(written.getPeriod()).isEqualTo(2);
+        assertThat(written.getPeriod()).isEqualTo(SchedulePeriod.AFTERNOON);
         assertThat(written.getStartTime()).isEqualTo(LocalTime.of(13, 0));
         assertThat(written.getEndTime()).isEqualTo(LocalTime.of(15, 0));
         assertThat(written.getTotalNum()).isEqualTo(12);
@@ -372,7 +372,7 @@ class DoctorScheduleServiceTest {
 
         BizException badPeriod = biz(() -> service.batchCreate(batch(10L, date, date,
                 List.of(date.getDayOfWeek().getValue()),
-                List.of(template(4, 9, 11, 10)), null)));
+                List.of(template(null, 9, 11, 10)), null)));
         assertThat(badPeriod.getMessage()).contains("时段只能是");
 
         BizException badWindow = biz(() -> service.batchCreate(batch(10L, date, date,
@@ -438,12 +438,12 @@ class DoctorScheduleServiceTest {
         assertThat(saved).singleElement().satisfies(slot -> {
             assertThat(slot.getDoctorId()).isEqualTo(10L);
             assertThat(slot.getWorkDate()).isEqualTo(date);
-            assertThat(slot.getPeriod()).isEqualTo(1);
+            assertThat(slot.getPeriod()).isEqualTo(SchedulePeriod.MORNING);
             assertThat(slot.getStartTime()).isEqualTo(LocalTime.of(9, 0));
             assertThat(slot.getEndTime()).isEqualTo(LocalTime.of(11, 0));
             assertThat(slot.getTotalNum()).isEqualTo(10);
             assertThat(slot.getRemainNum()).isEqualTo(10);
-            assertThat(slot.getStatus()).isEqualTo(1);
+            assertThat(slot.getStatus()).isEqualTo(EnableStatus.ENABLED);
         });
     }
 
@@ -505,7 +505,7 @@ class DoctorScheduleServiceTest {
 
         ArgumentCaptor<Wrapper<DoctorSchedule>> captor = ArgumentCaptor.forClass(Wrapper.class);
         verify(scheduleMapper).update(isNull(), captor.capture());
-        assertThat(values(captor.getValue())).contains(0, 1L);
+        assertThat(values(captor.getValue())).contains(EnableStatus.DISABLED, 1L);
     }
 
     @Test
@@ -514,7 +514,7 @@ class DoctorScheduleServiceTest {
         assertThat(biz(() -> service.resumeClinic(1L)).getCode()).isEqualTo(404);
 
         DoctorSchedule schedule = schedule(1L, 10L, LocalDate.now().plusDays(1));
-        schedule.setStatus(0);
+        schedule.setStatus(EnableStatus.DISABLED);
         when(scheduleMapper.selectById(1L)).thenReturn(schedule);
         when(doctorMapper.selectById(10L)).thenReturn(doctor(10L, 5L, 0));
         BizException stopped = biz(() -> service.resumeClinic(1L));
@@ -532,7 +532,7 @@ class DoctorScheduleServiceTest {
     @SuppressWarnings("unchecked")
     void resumeClinicWritesOnStatus() {
         DoctorSchedule schedule = schedule(1L, 10L, LocalDate.now().plusDays(1));
-        schedule.setStatus(0);
+        schedule.setStatus(EnableStatus.DISABLED);
         when(scheduleMapper.selectById(1L)).thenReturn(schedule);
         when(doctorMapper.selectById(10L)).thenReturn(doctor(10L, 5L, 1));
 
@@ -540,7 +540,7 @@ class DoctorScheduleServiceTest {
 
         ArgumentCaptor<Wrapper<DoctorSchedule>> captor = ArgumentCaptor.forClass(Wrapper.class);
         verify(scheduleMapper).update(isNull(), captor.capture());
-        assertThat(values(captor.getValue())).contains(1, 1L);
+        assertThat(values(captor.getValue())).contains(EnableStatus.ENABLED, 1L);
     }
 
     // ---------------------------------------------------------------- 内存替身：时段边界与状态写入
@@ -608,11 +608,11 @@ class DoctorScheduleServiceTest {
         current = new DoctorSchedule();
         current.setId(9L);
         current.setDoctorId(1L);
-        current.setPeriod(1);
+        current.setPeriod(SchedulePeriod.MORNING);
         current.setWorkDate(LocalDate.now().minusDays(1));
         current.setStartTime(LocalTime.of(14, 0));
         current.setEndTime(LocalTime.of(16, 0));
-        current.setStatus(0);
+        current.setStatus(EnableStatus.DISABLED);
 
         ScheduleForm base = form(1, "14:00", "16:00");
         base.setWorkDate(current.getWorkDate());
@@ -633,7 +633,7 @@ class DoctorScheduleServiceTest {
         assertThat(saved.getStartTime()).as("修正时间失败").isEqualTo(LocalTime.of(9, 0));
         old.setEndTime(LocalTime.of(13, 0));
         reject(() -> s.update(9L, old), "排班时间须在");
-        old.setPeriod(2);
+        old.setPeriod(SchedulePeriod.AFTERNOON);
         old.setStartTime(LocalTime.of(9, 0));
         old.setEndTime(LocalTime.of(11, 0));
         reject(() -> s.update(9L, old), "排班时间须在");
@@ -650,11 +650,11 @@ class DoctorScheduleServiceTest {
         current = new DoctorSchedule();
         current.setId(9L);
         current.setDoctorId(1L);
-        current.setPeriod(1);
+        current.setPeriod(SchedulePeriod.MORNING);
         current.setWorkDate(LocalDate.now().minusDays(1));
         current.setStartTime(LocalTime.of(14, 0));
         current.setEndTime(LocalTime.of(16, 0));
-        current.setStatus(1);
+        current.setStatus(EnableStatus.ENABLED);
 
         doctorStatus = 0;
         ScheduleForm base = form(1, "14:00", "16:00");
@@ -667,7 +667,7 @@ class DoctorScheduleServiceTest {
         // 状态只能由专用入口翻：行内停诊写一次，编辑路径沿路不碰这一列
         s.stopClinic(9L);
         assertThat(statusWrites).as("行内停诊失败").isEqualTo(1);
-        current.setStatus(0);
+        current.setStatus(EnableStatus.DISABLED);
         s.update(9L, maintenance);
         assertThat(saved.getStatus()).as("编辑路径不应写 status").isNull();
 
@@ -700,7 +700,7 @@ class DoctorScheduleServiceTest {
             super(mapper(DoctorMapper.class, name -> {
                 Doctor d = new Doctor();
                 d.setId(1L);
-                d.setStatus(doctorStatus);
+                d.setStatus(doctorStatus == 1 ? EnableStatus.ENABLED : EnableStatus.DISABLED);
                 return d;
             }), mapper(AppointmentMapper.class, name -> refs), null);
             baseMapper = mapper(DoctorScheduleMapper.class, name -> current);
@@ -764,7 +764,7 @@ class DoctorScheduleServiceTest {
         Doctor doctor = new Doctor();
         doctor.setId(id);
         doctor.setDepartmentId(departmentId);
-        doctor.setStatus(status);
+        doctor.setStatus(status == 1 ? EnableStatus.ENABLED : EnableStatus.DISABLED);
         doctor.setName("陈明远");
         doctor.setTitle("主任医师");
         doctor.setAvatar("doctor.png");
@@ -777,12 +777,12 @@ class DoctorScheduleServiceTest {
         schedule.setId(id);
         schedule.setDoctorId(doctorId);
         schedule.setWorkDate(workDate);
-        schedule.setPeriod(1);
+        schedule.setPeriod(SchedulePeriod.MORNING);
         schedule.setStartTime(LocalTime.of(9, 0));
         schedule.setEndTime(LocalTime.of(11, 0));
         schedule.setTotalNum(10);
         schedule.setRemainNum(10);
-        schedule.setStatus(1);
+        schedule.setStatus(EnableStatus.ENABLED);
         return schedule;
     }
 
@@ -791,11 +791,11 @@ class DoctorScheduleServiceTest {
         ScheduleForm form = new ScheduleForm();
         form.setDoctorId(doctorId);
         form.setWorkDate(date);
-        form.setPeriod(period);
+        form.setPeriod(period == null ? null : CodedEnum.fromCode(SchedulePeriod.class, period));
         form.setStartTime(start);
         form.setEndTime(end);
         form.setTotalNum(total);
-        form.setStatus(status);
+        form.setStatus(status == null ? null : CodedEnum.fromCode(EnableStatus.class, status));
         return form;
     }
 
@@ -804,11 +804,11 @@ class DoctorScheduleServiceTest {
         ScheduleForm f = new ScheduleForm();
         f.setDoctorId(1L);
         f.setWorkDate(LocalDate.now().plusDays(1));
-        f.setPeriod(period);
+        f.setPeriod(CodedEnum.fromCode(SchedulePeriod.class, period));
         f.setStartTime(LocalTime.parse(start));
         f.setEndTime(LocalTime.parse(end));
         f.setTotalNum(20);
-        f.setStatus(1);
+        f.setStatus(EnableStatus.ENABLED);
         return f;
     }
 
@@ -817,7 +817,7 @@ class DoctorScheduleServiceTest {
         ScheduleEditForm form = new ScheduleEditForm();
         form.setDoctorId(doctorId);
         form.setWorkDate(date);
-        form.setPeriod(period);
+        form.setPeriod(period == null ? null : CodedEnum.fromCode(SchedulePeriod.class, period));
         form.setStartTime(start);
         form.setEndTime(end);
         form.setTotalNum(total);
@@ -868,7 +868,7 @@ class DoctorScheduleServiceTest {
     private static ScheduleBatchForm.PeriodTemplate template(Integer period,
                                                              int startHour, int endHour, int total) {
         ScheduleBatchForm.PeriodTemplate template = new ScheduleBatchForm.PeriodTemplate();
-        template.setPeriod(period);
+        template.setPeriod(period == null ? null : CodedEnum.fromCode(SchedulePeriod.class, period));
         template.setStartTime(LocalTime.of(startHour, 0));
         template.setEndTime(LocalTime.of(endHour, 0));
         template.setTotalNum(total);

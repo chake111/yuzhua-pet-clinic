@@ -560,6 +560,8 @@ function validateStrictFile({ relPath, isBackend, isVue, rawText, scanResult, te
     )
   }
 
+  const fileLines = rawText.split(/\r?\n/)
+
   // 2. Check doc blocks
   for (const c of scanResult.comments) {
     if (c.kind !== 'doc_block') continue
@@ -576,7 +578,13 @@ function validateStrictFile({ relPath, isBackend, isVue, rawText, scanResult, te
         addViolation('COMMENT-UNEXPECTED-DOC', c.startLine, '全站禁止在 JSDoc 中使用 @param {type}')
       }
     } else {
-      if (relPath.endsWith('/package-info.java') || BANNED_BE_DOC_PATH_PARTS.some((p) => relPath.includes(p))) {
+      const nextLines = fileLines.slice(c.endLine, c.endLine + 6).join('\n')
+      const isPublicMutationDoc =
+        relPath.includes('/controller/') && /@PublicEndpoint\s*\(\s*allowMutation\s*=\s*true\s*\)/.test(nextLines)
+      if (
+        !isPublicMutationDoc &&
+        (relPath.endsWith('/package-info.java') || BANNED_BE_DOC_PATH_PARTS.some((p) => relPath.includes(p)))
+      ) {
         addViolation('COMMENT-UNEXPECTED-DOC', c.startLine, `禁止在 ${relPath} 使用 Javadoc`)
       }
     }
@@ -595,7 +603,6 @@ function validateStrictFile({ relPath, isBackend, isVue, rawText, scanResult, te
   // 3. Check non-doc comments in code
   const nonDoc = scanResult.comments.filter((c) => c.kind !== 'doc_block')
   const groups = groupConsecutiveLineComments(nonDoc)
-  const fileLines = rawText.split(/\r?\n/)
 
   for (const g of groups) {
     if (g.kind === 'single') {

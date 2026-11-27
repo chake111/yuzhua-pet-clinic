@@ -2,10 +2,11 @@ package com.yuzhua.controller.admin;
 
 import com.yuzhua.common.PageResult;
 import com.yuzhua.common.Result;
+import com.yuzhua.domain.enums.AdminRole;
+import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.DoctorForm;
 import com.yuzhua.dto.DoctorQuery;
 import com.yuzhua.entity.Doctor;
-import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.DoctorService;
 import com.yuzhua.vo.DoctorVo;
@@ -26,14 +27,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin/doctor")
 @RequiredArgsConstructor
-@RequireRole(LoginUser.ROLE_ADMIN)
+@RequireRole(AdminRole.ADMIN)
 public class DoctorController {
 
     private final DoctorService doctorService;
 
     @Operation(summary = "医生分页（含停诊的）")
     @GetMapping("/page")
-    @RequireRole({LoginUser.ROLE_ADMIN, LoginUser.ROLE_DOCTOR})
+    @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     public Result<PageResult<DoctorVo>> page(DoctorQuery query) {
         return Result.ok(doctorService.pageVo(query, false));
     }
@@ -59,7 +60,7 @@ public class DoctorController {
 
     @Operation(summary = "停诊/恢复出诊。status: 0 停诊 1 正常")
     @PutMapping("/{id}/status")
-    public Result<Void> changeStatus(@PathVariable Long id, @RequestParam Integer status) {
+    public Result<Void> changeStatus(@PathVariable Long id, @RequestParam EnableStatus status) {
         doctorService.changeStatus(id, status);
         return Result.ok("已更新", null);
     }

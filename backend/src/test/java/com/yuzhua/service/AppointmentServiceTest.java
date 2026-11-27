@@ -7,6 +7,13 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yuzhua.common.BizException;
 import com.yuzhua.common.PageResult;
+import com.yuzhua.domain.enums.AppointmentStatus;
+import com.yuzhua.domain.enums.CancelSource;
+import com.yuzhua.domain.enums.EnableStatus;
+import com.yuzhua.domain.enums.PayStatus;
+import com.yuzhua.domain.enums.SchedulePeriod;
+import com.yuzhua.domain.enums.TokenType;
+import com.yuzhua.domain.enums.UserRole;
 import com.yuzhua.props.AppProperties;
 import com.yuzhua.dto.AppointmentForm;
 import com.yuzhua.dto.AppointmentQuery;
@@ -199,7 +206,7 @@ class AppointmentServiceTest {
     void createRejectsStoppedSchedule() {
         when(doctorMapper.selectById(2L)).thenReturn(doctor(2L, 3L, 1, new BigDecimal("50")));
         DoctorSchedule schedule = schedule(4L, 2L, LocalDate.now().plusDays(1));
-        schedule.setStatus(0);
+        schedule.setStatus(EnableStatus.DISABLED);
         when(scheduleMapper.selectByIdForUpdate(4L)).thenReturn(schedule);
 
         BizException e = biz(() -> service.create(form(1L, 2L, 4L, "发热")));
@@ -240,7 +247,7 @@ class AppointmentServiceTest {
 
         assertThat(vo.getAppointmentDate()).isEqualTo(LocalDate.now());
         assertThat(vo.getQueueNo()).isEqualTo(5);
-        assertThat(vo.getStatus()).isEqualTo(Appointment.ST_PENDING);
+        assertThat(vo.getStatus()).isEqualTo(AppointmentStatus.PENDING);
         verify(scheduleMapper).tryOccupy(4L);
     }
 
@@ -347,13 +354,13 @@ class AppointmentServiceTest {
         service.cancelByStaff(1L, "临时停诊");
         ArgumentCaptor<Wrapper<Appointment>> doctorCaptor = ArgumentCaptor.forClass(Wrapper.class);
         verify(appointmentMapper, times(1)).update(isNull(), doctorCaptor.capture());
-        assertThat(values(doctorCaptor.getValue())).contains("临时停诊", "DOCTOR");
+        assertThat(values(doctorCaptor.getValue())).contains("临时停诊", CancelSource.DOCTOR);
 
         UserContext.set(admin());
         service.cancelByStaff(1L, "前台改约");
         ArgumentCaptor<Wrapper<Appointment>> adminCaptor = ArgumentCaptor.forClass(Wrapper.class);
         verify(appointmentMapper, times(2)).update(isNull(), adminCaptor.capture());
-        assertThat(values(adminCaptor.getValue())).contains("前台改约", "ADMIN");
+        assertThat(values(adminCaptor.getValue())).contains("前台改约", CancelSource.ADMIN);
     }
 
     @Test
@@ -392,14 +399,14 @@ class AppointmentServiceTest {
             assertThat(vo.getUserNickname()).isNull();
         });
 
-        PageResult<AppointmentVo> filtered = service.pageMine(1, new PageQuery());
+        PageResult<AppointmentVo> filtered = service.pageMine(AppointmentStatus.ACCEPTED, new PageQuery());
         assertThat(filtered.getRecords()).hasSize(1);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Wrapper<Appointment>> captor = ArgumentCaptor.forClass(Wrapper.class);
         verify(appointmentMapper, times(2)).selectPage(any(), captor.capture());
-        assertThat(values(captor.getAllValues().get(0))).contains(7L).doesNotContain(1);
-        assertThat(values(captor.getAllValues().get(1))).contains(7L, 1);
+        assertThat(values(captor.getAllValues().get(0))).contains(7L).doesNotContain(AppointmentStatus.ACCEPTED);
+        assertThat(values(captor.getAllValues().get(1))).contains(7L, AppointmentStatus.ACCEPTED);
     }
 
     @Test
@@ -496,7 +503,7 @@ class AppointmentServiceTest {
     void cancelByUserMarksOverduePaidOrderAsMissed() {
         UserContext.set(client(7L));
         Appointment overdue = pendingAppointment(1L, 7L);
-        overdue.setPayStatus(Appointment.PAY_PAID);
+        overdue.setPayStatus(PayStatus.PAID);
         overdue.setAppointmentDate(LocalDate.now().minusDays(1));
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(overdue);
 
@@ -506,7 +513,7 @@ class AppointmentServiceTest {
         assertThat(thrown.getMessage()).contains("已标记未到诊");
         ArgumentCaptor<Wrapper<Appointment>> captor = ArgumentCaptor.forClass(Wrapper.class);
         verify(appointmentMapper).update(isNull(), captor.capture());
-        assertThat(values(captor.getValue())).contains(Appointment.ST_MISSED);
+        assertThat(values(captor.getValue())).contains(AppointmentStatus.MISSED);
     }
 
     @Test
@@ -528,7 +535,7 @@ class AppointmentServiceTest {
         UserContext.set(doctor(2L));
         Appointment accepted = pendingAppointment(1L, 7L);
         accepted.setDoctorId(2L);
-        accepted.setStatus(Appointment.ST_ACCEPTED);
+        accepted.setStatus(AppointmentStatus.ACCEPTED);
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(accepted);
         assertThat(biz(() -> service.accept(1L)).getMessage()).contains("只有待接诊");
 
@@ -545,7 +552,7 @@ class AppointmentServiceTest {
         UserContext.set(doctor(2L));
         Appointment overdue = pendingAppointment(1L, 7L);
         overdue.setDoctorId(2L);
-        overdue.setPayStatus(Appointment.PAY_PAID);
+        overdue.setPayStatus(PayStatus.PAID);
         overdue.setAppointmentDate(LocalDate.now().minusDays(1));
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(overdue);
 
@@ -560,7 +567,7 @@ class AppointmentServiceTest {
         UserContext.set(doctor(2L));
         Appointment paid = pendingAppointment(1L, 7L);
         paid.setDoctorId(2L);
-        paid.setPayStatus(Appointment.PAY_PAID);
+        paid.setPayStatus(PayStatus.PAID);
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(paid);
         when(appointmentMapper.update(any(), any())).thenReturn(0);
 
@@ -576,21 +583,21 @@ class AppointmentServiceTest {
         UserContext.set(doctor(2L));
         Appointment paid = pendingAppointment(1L, 7L);
         paid.setDoctorId(2L);
-        paid.setPayStatus(Appointment.PAY_PAID);
+        paid.setPayStatus(PayStatus.PAID);
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(paid);
 
         service.accept(1L);
 
         ArgumentCaptor<Wrapper<Appointment>> captor = ArgumentCaptor.forClass(Wrapper.class);
         verify(appointmentMapper).update(isNull(), captor.capture());
-        assertThat(values(captor.getValue())).contains(Appointment.ST_ACCEPTED, 1L);
+        assertThat(values(captor.getValue())).contains(AppointmentStatus.ACCEPTED, 1L);
     }
 
     @Test
     void finishEnforcesDoctorAndAcceptedState() {
         Appointment accepted = pendingAppointment(1L, 7L);
         accepted.setDoctorId(2L);
-        accepted.setStatus(Appointment.ST_ACCEPTED);
+        accepted.setStatus(AppointmentStatus.ACCEPTED);
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(accepted);
 
         UserContext.set(admin());
@@ -616,7 +623,7 @@ class AppointmentServiceTest {
         UserContext.set(doctor(2L));
         Appointment accepted = pendingAppointment(1L, 7L);
         accepted.setDoctorId(2L);
-        accepted.setStatus(Appointment.ST_ACCEPTED);
+        accepted.setStatus(AppointmentStatus.ACCEPTED);
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(accepted);
 
         service.finish(1L);
@@ -631,20 +638,20 @@ class AppointmentServiceTest {
         assertThat(service.markMissedOne(1L)).isFalse();
 
         Appointment noDate = pendingAppointment(1L, 7L);
-        noDate.setPayStatus(Appointment.PAY_PAID);
+        noDate.setPayStatus(PayStatus.PAID);
         noDate.setAppointmentDate(null);
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(noDate);
         assertThat(service.markMissedOne(1L)).isFalse();
 
         Appointment today = pendingAppointment(1L, 7L);
-        today.setPayStatus(Appointment.PAY_PAID);
+        today.setPayStatus(PayStatus.PAID);
         today.setAppointmentDate(LocalDate.now());
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(today);
         assertThat(service.markMissedOne(1L)).isFalse();
 
         Appointment accepted = pendingAppointment(1L, 7L);
-        accepted.setPayStatus(Appointment.PAY_PAID);
-        accepted.setStatus(Appointment.ST_ACCEPTED);
+        accepted.setPayStatus(PayStatus.PAID);
+        accepted.setStatus(AppointmentStatus.ACCEPTED);
         accepted.setAppointmentDate(LocalDate.now().minusDays(1));
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(accepted);
         assertThat(service.markMissedOne(1L)).isFalse();
@@ -660,7 +667,7 @@ class AppointmentServiceTest {
     @SuppressWarnings("unchecked")
     void markMissedOneWritesMissedStatusOnlyWhenConditionalUpdateMatches() {
         Appointment stale = pendingAppointment(1L, 7L);
-        stale.setPayStatus(Appointment.PAY_PAID);
+        stale.setPayStatus(PayStatus.PAID);
         stale.setAppointmentDate(LocalDate.now().minusDays(1));
         when(appointmentMapper.selectByIdForUpdate(1L)).thenReturn(stale);
 
@@ -668,7 +675,7 @@ class AppointmentServiceTest {
         ArgumentCaptor<Wrapper<Appointment>> captor = ArgumentCaptor.forClass(Wrapper.class);
         verify(appointmentMapper).update(isNull(), captor.capture());
         assertThat(values(captor.getValue()))
-                .contains(Appointment.ST_MISSED, Appointment.ST_PENDING, Appointment.PAY_PAID, 1L);
+                .contains(AppointmentStatus.MISSED, AppointmentStatus.PENDING, PayStatus.PAID, 1L);
 
         when(appointmentMapper.update(any(), any())).thenReturn(0);
         assertThat(service.markMissedOne(1L)).isFalse();
@@ -688,7 +695,7 @@ class AppointmentServiceTest {
         Doctor doctor = new Doctor();
         doctor.setId(id);
         doctor.setDepartmentId(departmentId);
-        doctor.setStatus(status);
+        doctor.setStatus(status == 1 ? EnableStatus.ENABLED : EnableStatus.DISABLED);
         doctor.setConsultationFee(fee);
         doctor.setName("陈明远");
         return doctor;
@@ -699,12 +706,12 @@ class AppointmentServiceTest {
         schedule.setId(id);
         schedule.setDoctorId(doctorId);
         schedule.setWorkDate(workDate);
-        schedule.setPeriod(1);
+        schedule.setPeriod(SchedulePeriod.MORNING);
         schedule.setStartTime(LocalTime.of(9, 0));
         schedule.setEndTime(LocalTime.of(11, 0));
         schedule.setTotalNum(10);
         schedule.setRemainNum(10);
-        schedule.setStatus(1);
+        schedule.setStatus(EnableStatus.ENABLED);
         return schedule;
     }
 
@@ -717,11 +724,11 @@ class AppointmentServiceTest {
         appointment.setDepartmentId(3L);
         appointment.setScheduleId(4L);
         appointment.setAppointmentDate(LocalDate.now().plusDays(1));
-        appointment.setPeriod(1);
+        appointment.setPeriod(SchedulePeriod.MORNING);
         appointment.setStartTime(LocalTime.of(9, 0));
         appointment.setEndTime(LocalTime.of(11, 0));
-        appointment.setStatus(Appointment.ST_PENDING);
-        appointment.setPayStatus(Appointment.PAY_NONE);
+        appointment.setStatus(AppointmentStatus.PENDING);
+        appointment.setPayStatus(PayStatus.UNPAID);
         appointment.setAmount(new BigDecimal("50"));
         return appointment;
     }
@@ -739,8 +746,8 @@ class AppointmentServiceTest {
     private static LoginUser client(long id) {
         LoginUser user = new LoginUser();
         user.setId(id);
-        user.setTyp(LoginUser.TYP_CLIENT);
-        user.setRole(LoginUser.ROLE_USER);
+        user.setTyp(TokenType.CLIENT);
+        user.setRole(UserRole.USER);
         user.setUsername("client" + id);
         return user;
     }
@@ -748,8 +755,8 @@ class AppointmentServiceTest {
     private static LoginUser doctor(long doctorId) {
         LoginUser user = new LoginUser();
         user.setId(900L);
-        user.setTyp(LoginUser.TYP_ADMIN);
-        user.setRole(LoginUser.ROLE_DOCTOR);
+        user.setTyp(TokenType.ADMIN);
+        user.setRole(UserRole.DOCTOR);
         user.setDoctorId(doctorId);
         user.setUsername("doctor" + doctorId);
         return user;
@@ -758,8 +765,8 @@ class AppointmentServiceTest {
     private static LoginUser admin() {
         LoginUser user = new LoginUser();
         user.setId(901L);
-        user.setTyp(LoginUser.TYP_ADMIN);
-        user.setRole(LoginUser.ROLE_ADMIN);
+        user.setTyp(TokenType.ADMIN);
+        user.setRole(UserRole.ADMIN);
         user.setUsername("admin");
         return user;
     }

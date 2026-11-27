@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.yuzhua.domain.enums.EnableStatus;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
 
@@ -38,7 +39,7 @@ public class Doctor {
 
     private @Nullable Integer onlineStatus;
 
-    private @Nullable Integer status;
+    private @Nullable EnableStatus status;
     private @Nullable Integer sort;
 
     @TableField(fill = FieldFill.INSERT)
