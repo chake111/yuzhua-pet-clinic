@@ -132,7 +132,11 @@ public class ConsultWebSocketHandler extends TextWebSocketHandler {
         });
     }
 
-    /** 原子条件注销当前连接；仅当该医生无其余活动连接时才广播离线并更新在线状态。 */
+    /**
+     * 原子条件注销当前连接（已被顶号替换则直接返回，不触碰新连接与在线态）；
+     * 医生连接注销后向其原订阅房间广播 {@code PRESENCE(doctorOnline=false)}，
+     * 并仅当该医生已无其余活动连接（{@code !registry.doctorConnected}）时才将库内在线状态置为离线。
+     */
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         Conn conn = conn(session);

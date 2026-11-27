@@ -397,7 +397,10 @@ public class AppointmentService extends ServiceImpl<AppointmentMapper, Appointme
         return a;
     }
 
-    /** 先锁预约行，供病历首次落库等下游写入在同一临界区内判空与插库（锁顺序：预约在前）。 */
+    /**
+     * 先锁预约行（不存在抛 404），供病历首次落库等下游写入在同一临界区内判空与插库（锁顺序：预约在前）；
+     * 默认传播为 {@code REQUIRED}，调用方必须在已开启的外层 {@code @Transactional} 事务内调用，否则方法返回即提交并释放行锁。
+     */
     @Transactional
     public Appointment lockForWrite(Long id) {
         return lockForUpdate(id);

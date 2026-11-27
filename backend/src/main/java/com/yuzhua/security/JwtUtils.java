@@ -95,8 +95,9 @@ public class JwtUtils {
     }
 
     /**
-     * 解析并校验 HMAC-SHA JWT 签名与过期时间：空串、缺 {@code exp} 声明或验签/过期异常统一返回 {@code null}，
-     * 由调用方决定 401 或放行；本方法仅提取 {@code ver} 声明，不校验账号停用或令牌撤销（由 {@link AccountGuard} 核验）。
+     * 解析并校验 HMAC-SHA JWT 签名与过期时间：入参为 {@code null}/空白、缺 {@code exp} 声明，
+     * 或抛出 {@code JwtException}/{@code IllegalArgumentException}（含非数字 {@code sub}）时均返回 {@code null}；
+     * 本方法仅随载荷提取 {@code ver} 等字段，不校验令牌撤销或账号停用（交由 {@link AccountGuard} 核验）。
      */
     public @Nullable LoginUser parse(@Nullable String token) {
         if (token == null || token.isBlank()) {
