@@ -10,8 +10,8 @@ import org.jspecify.annotations.Nullable;
 public interface DoctorScheduleMapper extends BaseMapper<DoctorSchedule> {
 
     /**
-     * 原子扣减余量并递增发号计数，返回 1 成功、0 已满（调用方须回滚事务）。
-     * 本表为物理删除，调用前须先持有 {@link #selectByIdForUpdate} 行锁。
+     * 原子扣减余量并递增发号计数（配合前置 {@link #selectByIdForUpdate} 串行化排队号读取与删改并发）。
+     * 返回 1 成功；返回 0 表示 {@code status != 1}、{@code remain_num <= 0} 或记录不存在（调用方须抛异常回滚）。
      */
     @Update("UPDATE doctor_schedule SET remain_num = remain_num - 1, "
             + "last_queue_no = last_queue_no + 1 "

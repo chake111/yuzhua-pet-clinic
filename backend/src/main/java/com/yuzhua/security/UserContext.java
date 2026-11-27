@@ -42,7 +42,7 @@ public final class UserContext {
         return u;
     }
 
-    /** 读取当前登录账号主键，未登录时抛 401。 */
+    /** 读取当前登录账号的非空主键：未登录或 {@code LoginUser.getId()} 为 {@code null} 时均抛 401。 */
     public static Long requireId() {
         Long id = require().getId();
         if (id == null) {
