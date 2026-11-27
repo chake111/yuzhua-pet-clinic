@@ -51,7 +51,7 @@ public final class UserContext {
         return id;
     }
 
-    /** 取当前医生的 doctorId；管理员调用则抛 403 */
+    /** 校验已登录（未登录抛 401）并返回绑定的 {@code doctorId}；未绑定医生身份（{@code doctorId == null}）时抛 403。 */
     public static Long requireDoctorId() {
         LoginUser u = require();
         Long doctorId = u.getDoctorId();

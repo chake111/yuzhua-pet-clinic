@@ -30,16 +30,13 @@ import java.util.Objects;
 /**
  * 图文问诊的 WebSocket 端点。
  *
- * 协议是四类上行 / 五类下行，都用 {type: ...} 的 JSON 信封：
- *   上行 SUBSCRIBE / CHAT / READ / PING
- *   下行 READY / HISTORY / MSG / READ / PRESENCE / ERROR / PONG
- * 消息一律先落库再推送：连接只是投递通道，历史以库为准，
- * 所以断线重连后前端重新 SUBSCRIBE 就能补齐，不依赖推送不丢。
- * SUBSCRIBE 只补历史，不写已读；已读只认显式 READ 帧（见 subscribe / read 的注释）。
- *
- * 握手线程和这里都不是 MVC 的 HandlerInterceptor 管辖范围，
- * 所以进入业务方法前手动把登录态塞进 UserContext、出来时清掉——
- * 这是这套 ThreadLocal 方案唯一需要额外小心的地方。
+ * 协议统一使用 {@code {type: ...}} JSON 信封：
+ *   本端点处理上行：SUBSCRIBE / CHAT / READ / PING；
+ *   本端点下发下行：READY / HISTORY / MSG / ACK / READ / PRESENCE / ERROR / PONG
+ *   （会话状态变更与治理类下行帧由 {@link ConsultPush} 推送）。
+ * 消息先落库再推送：连接仅作实时通道，重连后靠 SUBSCRIBE 拉取 DB 历史补齐，
+ * 且 SUBSCRIBE 只补历史不标已读，已读仅由显式 READ 帧触发。
+ * 握手与消息线程不受 MVC {@code HandlerInterceptor} 管辖，入口经 {@code runAs} 注入并在 finally 清理 {@link UserContext}。
  */
 @Slf4j
 @Component

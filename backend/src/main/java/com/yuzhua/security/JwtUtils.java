@@ -123,7 +123,11 @@ public class JwtUtils {
         }
     }
 
-    /** 从 "Bearer xxx" 里取出裸 token */
+    /**
+     * 剥离请求头中的令牌前缀（取值自 {@code yuzhua.jwt.prefix}）并返回去首尾空白的裸 token：
+     * 入参为 {@code null} 或全空白时返回 {@code null}；未匹配该前缀时不报错，原样返回 {@code header.trim()}，
+     * 本方法不做签名或过期校验。
+     */
     public @Nullable String strip(@Nullable String header) {
         if (header == null || header.isBlank()) {
             return null;

@@ -18,7 +18,7 @@ public interface AppointmentMapper extends BaseMapper<Appointment> {
     @Select("SELECT * FROM appointment WHERE id = #{id} AND deleted = 0 FOR UPDATE")
     @Nullable Appointment selectByIdForUpdate(@Param("id") Long id);
 
-    /** 幂等键当前读：raw @Select 须显式过滤 deleted = 0，避免已删历史单阻断重用同键。 */
+    /** 按 {@code (userId, idemKey)} 查询未软删预约供幂等重放判定：自定义 {@code @Select} 不自动注入逻辑删除过滤，须显式加 {@code deleted = 0}，避免已软删历史单阻断同键重试。 */
     @Select("SELECT * FROM appointment WHERE user_id = #{userId} AND idem_key = #{idemKey} AND deleted = 0 LIMIT 1")
     @Nullable Appointment selectByUserAndIdemKey(@Param("userId") Long userId, @Param("idemKey") String idemKey);
 

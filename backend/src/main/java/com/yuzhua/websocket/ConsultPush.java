@@ -62,7 +62,10 @@ public class ConsultPush implements ConsultPushGateway {
         });
     }
 
-    /** 单条连接的普通业务帧（Handler 的 HISTORY / MSG / ACK / READ / PRESENCE） */
+    /**
+     * 向单条连接发送帧：{@code sessionId == null} 时转交 {@link #sendControl} 仅核验账号状态；
+     * 非空时经 {@code guard.checkBusiness} 核验账号、成员归属与未处置状态后再下发业务帧（HISTORY / MSG / ACK / READ / PRESENCE）。
+     */
     public void send(Conn conn, @Nullable Long sessionId, Map<String, Object> payload) {
         if (sessionId == null) {
             sendControl(conn, payload);

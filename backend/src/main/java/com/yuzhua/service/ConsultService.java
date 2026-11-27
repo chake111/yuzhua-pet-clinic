@@ -56,7 +56,10 @@ public class ConsultService extends ServiceImpl<ConsultSessionMapper, ConsultSes
     private final DoctorMapper doctorMapper;
     private final SysUserMapper sysUserMapper;
 
-    /** 校验宠物归属与医生在诊状态后创建免费图文问诊会话。 */
+    /**
+     * 校验宠物归属、医生存在且在诊（{@code status == 1}）及症状非空白后创建免费图文问诊会话（初始待接诊，未读数归零）。
+     * 本接口无幂等键去重，重复提交会创建独立会话。
+     */
     @Transactional
     public ConsultSessionVo create(ConsultForm req) {
         if (req.getPetId() == null) {

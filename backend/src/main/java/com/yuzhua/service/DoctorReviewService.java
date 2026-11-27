@@ -95,7 +95,11 @@ public class DoctorReviewService extends ServiceImpl<DoctorReviewMapper, DoctorR
         return r;
     }
 
-    /** 医生（或管理员）回复评价 */
+    /**
+     * 医生或管理员回复评价：要求已登录，校验非空白且原串长度不超过 500 字（{@code trim()} 后落库）；
+     * 医生身份仅可回复归属本人 {@code doctorId} 的评价（越权抛 403），管理员可代回复。
+     * 直接覆写 {@code reply} 与 {@code replyTime}，不校验评价显示状态（{@code status}）或是否已有旧回复。
+     */
     @Transactional
     public void reply(Long id, @Nullable String reply) {
         if (reply == null || reply.isBlank()) {

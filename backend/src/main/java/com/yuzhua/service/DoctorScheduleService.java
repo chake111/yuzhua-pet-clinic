@@ -273,9 +273,9 @@ public class DoctorScheduleService extends ServiceImpl<DoctorScheduleMapper, Doc
     }
 
     /**
-     * 删除排班前，在排班行锁内统计有效预约引用；存在引用时拒绝删除，可改为停诊。
+     * 删除排班前，在排班行锁内统计未软删预约引用（含已取消预约）；存在引用时拒绝删除，可改为停诊。
      *
-     * @param id 排班 ID；引用统计包含已取消预约，仅统计 deleted=0 的预约
+     * @param id 排班 ID；仅统计 deleted=0 的预约
      */
     @Transactional
     public void remove(Long id) {

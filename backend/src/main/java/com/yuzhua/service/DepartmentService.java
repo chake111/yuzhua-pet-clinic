@@ -73,7 +73,10 @@ public class DepartmentService extends ServiceImpl<DepartmentMapper, Department>
         return d;
     }
 
-    /** 校验科室存在与编码唯一后更新科室配置。 */
+    /**
+     * 校验科室存在、{@code name} 与 {@code code} 必填，并在编码变更时排除自身 {@code id} 校验唯一性后更新；
+     * {@code status} 仅在非 {@code null} 时校验合法性。
+     */
     @Transactional
     public void update(Long id, DepartmentForm form) {
         Department d = require(id);
