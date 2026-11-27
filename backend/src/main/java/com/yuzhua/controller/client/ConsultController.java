@@ -5,8 +5,8 @@ import com.yuzhua.common.Result;
 import com.yuzhua.dto.ConsultForm;
 import com.yuzhua.dto.ConsultQuery;
 import com.yuzhua.dto.ConsultMessageQuery;
-import com.yuzhua.entity.ConsultMessage;
 import com.yuzhua.service.ConsultService;
+import com.yuzhua.vo.ConsultMessageVo;
 import com.yuzhua.vo.ConsultSessionVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -47,7 +47,7 @@ public class ConsultController {
 
     @Operation(summary = "会话历史消息，新→旧分页")
     @GetMapping("/{id}/messages")
-    public Result<PageResult<ConsultMessage>> messages(@PathVariable Long id, @Valid ConsultMessageQuery query) {
+    public Result<PageResult<ConsultMessageVo>> messages(@PathVariable Long id, @Valid ConsultMessageQuery query) {
         return Result.ok(consultService.history(id, query));
     }
 

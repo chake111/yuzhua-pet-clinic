@@ -35,11 +35,11 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
     private final DepartmentMapper departmentMapper;
 
     public LoginVo login(AuthDto.Login req) {
-        if (req.getUsername() == null || req.getPassword() == null) {
+        if (req.username() == null || req.password() == null) {
             throw new BizException("账号或密码错误");
         }
-        AdminUser a = baseMapper.selectForLogin(req.getUsername());
-        if (a == null || !passwordEncoder.matches(req.getPassword(), a.getPassword())) {
+        AdminUser a = baseMapper.selectForLogin(req.username());
+        if (a == null || !passwordEncoder.matches(req.password(), a.getPassword())) {
             throw new BizException("账号或密码错误");
         }
         if (a.getStatus() != EnableStatus.ENABLED) {
@@ -57,20 +57,18 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
         if (a == null) {
             throw new BizException(401, "账号不存在");
         }
-        LoginVo vo = new LoginVo();
-        fill(vo, a, doctorOf(a));
-        return vo;
+        return toLoginVo(null, a, doctorOf(a));
     }
 
-    /** 同用户端：密码与令牌版本同一条 UPDATE 提交，使此前签发的后台令牌立即失效 */
+    /** 校验当前登录账号与原密码后，同一条 {@code UPDATE} 写入新密码并递增 {@code token_version}，使此前签发的后台令牌在 {@code AccountGuard} 立即失效。 */
     @Transactional
     public void changePassword(AuthDto.ChangePassword req) {
         AdminUser a = baseMapper.selectWithPassword(UserContext.requireId());
-        if (a == null || !passwordEncoder.matches(req.getOldPassword(), a.getPassword())) {
+        if (a == null || !passwordEncoder.matches(req.oldPassword(), a.getPassword())) {
             throw new BizException("原密码不正确");
         }
         update(Wrappers.<AdminUser>lambdaUpdate()
-                .set(AdminUser::getPassword, passwordEncoder.encode(req.getNewPassword()))
+                .set(AdminUser::getPassword, passwordEncoder.encode(req.newPassword()))
                 .setSql("token_version = token_version + 1")
                 .eq(AdminUser::getId, a.getId()));
     }
@@ -87,28 +85,30 @@ public class AdminUserService extends ServiceImpl<AdminUserMapper, AdminUser> {
         lu.setDoctorId(a.getDoctorId());
         lu.setTokenVersion(a.getTokenVersion());
 
-        LoginVo vo = new LoginVo();
-        vo.setToken(jwtUtils.create(lu));
-        fill(vo, a, d);
-        return vo;
+        return toLoginVo(jwtUtils.create(lu), a, d);
     }
 
-    private void fill(LoginVo vo, AdminUser a, @Nullable Doctor d) {
-        vo.setId(a.getId());
-        vo.setUsername(a.getUsername());
-        vo.setName(a.getRealName());
-        vo.setAvatar(avatarOf(a, d));
-        vo.setPhone(a.getPhone());
-        vo.setEmail(a.getEmail());
-        vo.setTyp(TokenType.ADMIN);
-        vo.setRole(a.getRole() == null ? null : UserRole.fromCode(a.getRole().code()));
-        vo.setDoctorId(a.getDoctorId());
-
+    private LoginVo toLoginVo(@Nullable String token, AdminUser a, @Nullable Doctor d) {
+        String doctorName = d == null ? null : d.getName();
+        String departmentName = null;
         if (d != null) {
-            vo.setDoctorName(d.getName());
             Department dep = departmentMapper.selectById(d.getDepartmentId());
-            vo.setDepartmentName(dep == null ? null : dep.getName());
+            departmentName = dep == null ? null : dep.getName();
         }
+        return new LoginVo(
+                token,
+                a.getId(),
+                a.getUsername(),
+                a.getRealName(),
+                avatarOf(a, d),
+                a.getPhone(),
+                a.getEmail(),
+                TokenType.ADMIN,
+                a.getRole() == null ? null : UserRole.fromCode(a.getRole().code()),
+                a.getDoctorId(),
+                doctorName,
+                departmentName
+        );
     }
 
     private @Nullable Doctor doctorOf(AdminUser a) {

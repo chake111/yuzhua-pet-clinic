@@ -5,10 +5,10 @@ import com.yuzhua.common.Result;
 import com.yuzhua.domain.enums.AdminRole;
 import com.yuzhua.domain.enums.EnableStatus;
 import com.yuzhua.dto.UserQuery;
-import com.yuzhua.entity.SysUser;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.service.SysUserService;
 import com.yuzhua.vo.UserDetailVo;
+import com.yuzhua.vo.UserVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class AdminUserController {
 
     @Operation(summary = "用户分页（昵称/手机号/账号、状态）")
     @GetMapping("/page")
-    public Result<PageResult<SysUser>> page(UserQuery query) {
+    public Result<PageResult<UserVo>> page(UserQuery query) {
         return Result.ok(sysUserService.pageForAdmin(query));
     }
 

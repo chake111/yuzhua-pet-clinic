@@ -8,10 +8,10 @@ import com.yuzhua.dto.PageQuery;
 import com.yuzhua.dto.ScheduleBatchForm;
 import com.yuzhua.dto.ScheduleEditForm;
 import com.yuzhua.dto.ScheduleForm;
-import com.yuzhua.entity.DoctorSchedule;
 import com.yuzhua.security.RequireRole;
 import com.yuzhua.security.UserContext;
 import com.yuzhua.service.DoctorScheduleService;
+import com.yuzhua.vo.ScheduleBatchSummaryVo;
 import com.yuzhua.vo.ScheduleVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -56,14 +56,14 @@ public class ScheduleController {
 
     @Operation(summary = "单条排班")
     @PostMapping
-    public Result<DoctorSchedule> create(@Valid @RequestBody ScheduleForm req) {
+    public Result<ScheduleVo> create(@Valid @RequestBody ScheduleForm req) {
         return Result.ok("已排班", scheduleService.create(req));
     }
 
     @Operation(summary = "按星期模板批量排班")
     @PostMapping("/batch")
-    public Result<DoctorScheduleService.BatchSummary> batch(@Valid @RequestBody ScheduleBatchForm req) {
-        DoctorScheduleService.BatchSummary s = scheduleService.batchCreate(req);
+    public Result<ScheduleBatchSummaryVo> batch(@Valid @RequestBody ScheduleBatchForm req) {
+        ScheduleBatchSummaryVo s = scheduleService.batchCreate(req);
         return Result.ok("新增 " + s.created() + " 条，跳过 " + s.skipped() + " 条已存在", s);
     }
 

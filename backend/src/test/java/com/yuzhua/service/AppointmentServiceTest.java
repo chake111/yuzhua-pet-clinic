@@ -245,9 +245,9 @@ class AppointmentServiceTest {
 
         AppointmentVo vo = service.create(form(1L, 2L, 4L, "发热"));
 
-        assertThat(vo.getAppointmentDate()).isEqualTo(LocalDate.now());
-        assertThat(vo.getQueueNo()).isEqualTo(5);
-        assertThat(vo.getStatus()).isEqualTo(AppointmentStatus.PENDING);
+        assertThat(vo.appointmentDate()).isEqualTo(LocalDate.now());
+        assertThat(vo.queueNo()).isEqualTo(5);
+        assertThat(vo.status()).isEqualTo(AppointmentStatus.PENDING);
         verify(scheduleMapper).tryOccupy(4L);
     }
 
@@ -395,8 +395,8 @@ class AppointmentServiceTest {
         PageResult<AppointmentVo> all = service.pageMine(null, new PageQuery());
         assertThat(all.getTotal()).isEqualTo(1);
         assertThat(all.getRecords()).singleElement().satisfies(vo -> {
-            assertThat(vo.getId()).isEqualTo(10L);
-            assertThat(vo.getUserNickname()).isNull();
+            assertThat(vo.id()).isEqualTo(10L);
+            assertThat(vo.userNickname()).isNull();
         });
 
         PageResult<AppointmentVo> filtered = service.pageMine(AppointmentStatus.ACCEPTED, new PageQuery());
@@ -439,8 +439,8 @@ class AppointmentServiceTest {
 
         AppointmentVo vo = service.detail(1L);
 
-        assertThat(vo.getId()).isEqualTo(1L);
-        assertThat(vo.getUserNickname()).isNull();
+        assertThat(vo.id()).isEqualTo(1L);
+        assertThat(vo.userNickname()).isNull();
 
         when(appointmentMapper.selectById(2L)).thenReturn(pendingAppointment(2L, 8L));
         BizException foreign = biz(() -> service.detail(2L));
@@ -461,8 +461,8 @@ class AppointmentServiceTest {
 
         UserContext.set(doctor(2L));
         AppointmentVo own = service.detail(1L);
-        assertThat(own.getUserNickname()).isEqualTo("小王");
-        assertThat(own.getUserPhone()).isEqualTo("13800000000");
+        assertThat(own.userNickname()).isEqualTo("小王");
+        assertThat(own.userPhone()).isEqualTo("13800000000");
 
         UserContext.set(doctor(3L));
         BizException forbidden = biz(() -> service.detail(1L));
@@ -470,7 +470,7 @@ class AppointmentServiceTest {
         assertThat(forbidden.getMessage()).contains("只能查看自己接诊的单子");
 
         UserContext.set(admin());
-        assertThat(service.detail(1L).getId()).isEqualTo(1L);
+        assertThat(service.detail(1L).id()).isEqualTo(1L);
     }
 
     @Test
@@ -734,13 +734,7 @@ class AppointmentServiceTest {
     }
 
     private static AppointmentForm form(Long petId, Long doctorId, Long scheduleId, String symptom) {
-        AppointmentForm form = new AppointmentForm();
-        form.setPetId(petId);
-        form.setDoctorId(doctorId);
-        form.setScheduleId(scheduleId);
-        form.setSymptom(symptom);
-        form.setImages("   ");
-        return form;
+        return new AppointmentForm(petId, doctorId, scheduleId, symptom, "   ");
     }
 
     private static LoginUser client(long id) {

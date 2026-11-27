@@ -26,7 +26,6 @@ import com.yuzhua.vo.MedicalRecordVo;
 import com.yuzhua.vo.PetDisplayVo;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,7 +53,7 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
 
     /** 先锁预约行再查改病历，仅接诊医生可写且仅允许已接诊/已完成状态（R7），防止并发双写或未到院开方。 */
     @Transactional
-    public MedicalRecord saveOrUpdateForAppointment(Long appointmentId, MedicalRecordForm req) {
+    public MedicalRecordVo saveOrUpdateForAppointment(Long appointmentId, MedicalRecordForm req) {
         // 原因: 查空后插入必须在预约行锁内串行化，避免并发首次保存写出同预约双份病历
         Appointment a = requireStaffAppointmentLocked(appointmentId);
         // 原因: R7 状态用白名单仅放行已接诊与已完成，避免黑名单漏态导致未就诊开处方
@@ -92,7 +91,8 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
             update(r, Wrappers.<MedicalRecord>lambdaUpdate().eq(MedicalRecord::getId, exist.getId())
                     .set(req.isNextVisitDateSubmitted(), MedicalRecord::getNextVisitDate, req.getNextVisitDate()));
         }
-        return getById(r.getId());
+        MedicalRecord saved = getById(r.getId());
+        return saved == null ? toVo(r, null, null, null) : fillSingle(saved);
     }
 
     public MedicalRecord require(Long id) {
@@ -131,30 +131,18 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
     private List<MedicalRecordVo> fillNames(List<MedicalRecord> rows) {
         // 原因: 宠物档案逻辑删除后历史病历仍须展示宠物信息，故走历史查询而非普通 selectBatchIds
         Map<Long, PetDisplayVo> pets = BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
-                BatchLookup.ids(rows, MedicalRecord::getPetId), PetDisplayVo::getId);
+                BatchLookup.ids(rows, MedicalRecord::getPetId), PetDisplayVo::id);
         Map<Long, Doctor> doctors = BatchLookup.mapByIds(doctorMapper::selectBatchIds,
                 BatchLookup.ids(rows, MedicalRecord::getDoctorId), Doctor::getId);
         Map<Long, Department> depts = BatchLookup.mapByIds(departmentMapper::selectBatchIds,
                 BatchLookup.ids(rows, MedicalRecord::getDepartmentId), Department::getId);
-        return rows.stream().map(r -> {
-            MedicalRecordVo vo = new MedicalRecordVo();
-            BeanUtils.copyProperties(r, vo);
-            PetDisplayVo pet = pets.get(r.getPetId());
-            if (pet != null) {
-                vo.setPetName(pet.getName());
-                vo.setPetSpecies(pet.getSpecies());
-                vo.setPetBreed(pet.getBreed());
-                vo.setPetAvatar(pet.getAvatar());
-            }
-            Doctor d = doctors.get(r.getDoctorId());
-            if (d != null) {
-                vo.setDoctorName(d.getName());
-                vo.setDoctorTitle(d.getTitle());
-            }
-            Department dept = depts.get(r.getDepartmentId());
-            vo.setDepartmentName(dept == null ? null : dept.getName());
-            return vo;
-        }).toList();
+        return rows.stream()
+                .map(r -> toVo(
+                        r,
+                        r.getPetId() == null ? null : pets.get(r.getPetId()),
+                        r.getDoctorId() == null ? null : doctors.get(r.getDoctorId()),
+                        r.getDepartmentId() == null ? null : depts.get(r.getDepartmentId())))
+                .toList();
     }
 
     public MedicalRecordVo detail(Long id) {
@@ -166,25 +154,28 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
         if (u.isDoctor() && !Objects.equals(r.getDoctorId(), u.getDoctorId())) {
             throw BizException.forbidden("看不到别人的病历");
         }
-        MedicalRecordVo vo = new MedicalRecordVo();
-        BeanUtils.copyProperties(r, vo);
-        // 原因: 复用 selectHistoryDisplay 查询已软删宠物以完整展示历史病历，并借 BatchLookup 兜底 petId 为空场景
-        PetDisplayVo pet = BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
-                BatchLookup.ids(List.of(r), MedicalRecord::getPetId), PetDisplayVo::getId).get(r.getPetId());
-        if (pet != null) {
-            vo.setPetName(pet.getName());
-            vo.setPetSpecies(pet.getSpecies());
-            vo.setPetBreed(pet.getBreed());
-            vo.setPetAvatar(pet.getAvatar());
-        }
-        Doctor d = doctorMapper.selectById(r.getDoctorId());
-        if (d != null) {
-            vo.setDoctorName(d.getName());
-            vo.setDoctorTitle(d.getTitle());
-        }
+        return fillSingle(r);
+    }
+
+    public @Nullable MedicalRecordVo ofAppointmentForStaff(Long appointmentId) {
+        requireStaffAppointment(appointmentId);
+        MedicalRecord r = ofAppointment(appointmentId);
+        return r == null ? null : fillSingle(r);
+    }
+
+    public @Nullable MedicalRecordVo ofAppointmentForOwner(Long appointmentId) {
+        appointmentService.requireMine(appointmentId);
+        MedicalRecord r = ofAppointment(appointmentId);
+        return r == null ? null : fillSingle(r);
+    }
+
+    private MedicalRecordVo fillSingle(MedicalRecord r) {
+        // 原因: 复用 selectHistoryDisplay 查询已软删宠物以完整展示历史病历，并借 BatchLookup 复用批量映射签名
+        PetDisplayVo pet = r.getPetId() == null ? null : BatchLookup.mapByIds(petMapper::selectHistoryDisplay,
+                BatchLookup.ids(List.of(r), MedicalRecord::getPetId), PetDisplayVo::id).get(r.getPetId());
+        Doctor d = r.getDoctorId() == null ? null : doctorMapper.selectById(r.getDoctorId());
         Department dept = r.getDepartmentId() == null ? null : departmentMapper.selectById(r.getDepartmentId());
-        vo.setDepartmentName(dept == null ? null : dept.getName());
-        return vo;
+        return toVo(r, pet, d, dept);
     }
 
     public @Nullable MedicalRecord ofAppointment(Long appointmentId) {
@@ -192,14 +183,34 @@ public class MedicalRecordService extends ServiceImpl<MedicalRecordMapper, Medic
                 .eq(MedicalRecord::getAppointmentId, appointmentId), false);
     }
 
-    public @Nullable MedicalRecord ofAppointmentForStaff(Long appointmentId) {
-        requireStaffAppointment(appointmentId);
-        return ofAppointment(appointmentId);
-    }
-
-    public @Nullable MedicalRecord ofAppointmentForOwner(Long appointmentId) {
-        appointmentService.requireMine(appointmentId);
-        return ofAppointment(appointmentId);
+    private static MedicalRecordVo toVo(MedicalRecord r, @Nullable PetDisplayVo pet,
+                                        @Nullable Doctor d, @Nullable Department dept) {
+        return new MedicalRecordVo(
+                r.getId(),
+                r.getRecordNo(),
+                r.getAppointmentId(),
+                r.getUserId(),
+                r.getPetId(),
+                r.getDoctorId(),
+                r.getDepartmentId(),
+                r.getVisitDate(),
+                r.getChiefComplaint(),
+                r.getPhysicalExam(),
+                r.getDiagnosis(),
+                r.getPrescription(),
+                r.getTreatment(),
+                r.getAdvice(),
+                r.getNextVisitDate(),
+                r.getImages(),
+                r.getCreateTime(),
+                pet == null ? null : pet.name(),
+                pet == null ? null : pet.species(),
+                pet == null ? null : pet.breed(),
+                pet == null ? null : pet.avatar(),
+                d == null ? null : d.getName(),
+                d == null ? null : d.getTitle(),
+                dept == null ? null : dept.getName()
+        );
     }
 
     private Appointment requireStaffAppointment(Long appointmentId) {

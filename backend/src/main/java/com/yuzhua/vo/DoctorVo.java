@@ -1,16 +1,30 @@
 package com.yuzhua.vo;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.yuzhua.entity.Doctor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import com.yuzhua.domain.enums.EnableStatus;
 import org.jspecify.annotations.Nullable;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
-@JsonIgnoreProperties({"phone"})
-public class DoctorVo extends Doctor {
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
-    private @Nullable String departmentName;
-    private @Nullable String departmentIcon;
+public record DoctorVo(
+        @Nullable Long id,
+        @Nullable String name,
+        @Nullable String avatar,
+        @Nullable Integer gender,
+        @Nullable String title,
+        @Nullable Long departmentId,
+        @Nullable String specialty,
+        @Nullable String introduction,
+        @Nullable Integer workYears,
+        @Nullable BigDecimal consultationFee,
+        @Nullable BigDecimal rating,
+        @Nullable Integer reviewCount,
+        @Nullable Integer appointmentCount,
+        @Nullable Integer onlineStatus,
+        @Nullable EnableStatus status,
+        @Nullable Integer sort,
+        @Nullable LocalDateTime createTime,
+        @Nullable String departmentName,
+        @Nullable String departmentIcon
+) {
 }

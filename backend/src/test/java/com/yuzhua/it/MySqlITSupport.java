@@ -190,12 +190,7 @@ public abstract class MySqlITSupport {
     }
 
     protected AppointmentForm appointmentForm(long petId, long doctorId, long scheduleId, String symptom) {
-        AppointmentForm form = new AppointmentForm();
-        form.setPetId(petId);
-        form.setDoctorId(doctorId);
-        form.setScheduleId(scheduleId);
-        form.setSymptom(symptom);
-        return form;
+        return new AppointmentForm(petId, doctorId, scheduleId, symptom, null);
     }
 
     /** 用户端登录，断言 HTTP 200 + body.code=200，返回 data.token */

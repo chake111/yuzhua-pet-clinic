@@ -5,16 +5,16 @@ import com.yuzhua.common.Result;
 import com.yuzhua.domain.enums.NoticeType;
 import com.yuzhua.dto.DoctorQuery;
 import com.yuzhua.dto.PageQuery;
-import com.yuzhua.entity.Department;
-import com.yuzhua.entity.Notice;
 import com.yuzhua.security.PublicEndpoint;
 import com.yuzhua.service.DepartmentService;
 import com.yuzhua.service.DoctorReviewService;
 import com.yuzhua.service.DoctorScheduleService;
 import com.yuzhua.service.DoctorService;
 import com.yuzhua.service.NoticeService;
+import com.yuzhua.vo.DepartmentVo;
 import com.yuzhua.vo.DoctorVo;
 import com.yuzhua.vo.HomeVo;
+import com.yuzhua.vo.NoticeVo;
 import com.yuzhua.vo.ReviewVo;
 import com.yuzhua.vo.ScheduleVo;
 import io.swagger.v3.oas.annotations.Operation;
@@ -50,16 +50,16 @@ public class CatalogController {
     @Operation(summary = "首页聚合：科室导航 + 推荐医生 + 最新公告")
     @GetMapping("/home")
     public Result<HomeVo> home() {
-        HomeVo vo = new HomeVo();
-        vo.setDepartments(departmentService.listEnabled());
-        vo.setDoctors(doctorService.listTopVisible(HOME_DOCTOR_LIMIT));
-        vo.setNotices(noticeService.listLatest(HOME_NOTICE_LIMIT));
-        return Result.ok(vo);
+        return Result.ok(new HomeVo(
+                departmentService.listEnabled(),
+                doctorService.listTopVisible(HOME_DOCTOR_LIMIT),
+                noticeService.listLatest(HOME_NOTICE_LIMIT)
+        ));
     }
 
     @Operation(summary = "科室列表")
     @GetMapping("/departments")
-    public Result<List<Department>> departments() {
+    public Result<List<DepartmentVo>> departments() {
         return Result.ok(departmentService.listEnabled());
     }
 
@@ -92,15 +92,15 @@ public class CatalogController {
 
     @Operation(summary = "公告/科普列表。type: 1 公告 2 活动 3 养宠科普")
     @GetMapping("/notices")
-    public Result<PageResult<Notice>> notices(PageQuery query,
-                                             @RequestParam(required = false) @Nullable NoticeType type,
-                                             @RequestParam(required = false) @Nullable String keyword) {
+    public Result<PageResult<NoticeVo>> notices(PageQuery query,
+                                                @RequestParam(required = false) @Nullable NoticeType type,
+                                                @RequestParam(required = false) @Nullable String keyword) {
         return Result.ok(noticeService.pagePublished(query, type, keyword));
     }
 
     @Operation(summary = "公告/科普详情（累加阅读量）")
     @GetMapping("/notices/{id}")
-    public Result<Notice> noticeDetail(@PathVariable Long id) {
+    public Result<NoticeVo> noticeDetail(@PathVariable Long id) {
         return Result.ok(noticeService.readDetail(id));
     }
 }

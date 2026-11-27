@@ -44,7 +44,7 @@ public class AdminReviewController {
     @RequireRole({AdminRole.ADMIN, AdminRole.DOCTOR})
     @PostMapping("/{id}/reply")
     public Result<Void> reply(@PathVariable Long id, @Valid @RequestBody ReplyForm req) {
-        reviewService.reply(id, req.getReply());
+        reviewService.reply(id, req.reply());
         return Result.ok("已回复", null);
     }
 

@@ -16,9 +16,13 @@ import com.yuzhua.entity.Appointment;
 import com.yuzhua.entity.MedicalRecord;
 import com.yuzhua.entity.Notice;
 import com.yuzhua.entity.Pet;
+import com.yuzhua.mapper.DepartmentMapper;
+import com.yuzhua.mapper.DoctorMapper;
+import com.yuzhua.mapper.PetMapper;
 import com.yuzhua.mapper.SysUserMapper;
 import com.yuzhua.security.LoginUser;
 import com.yuzhua.security.UserContext;
+import com.yuzhua.vo.MedicalRecordVo;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -29,6 +33,7 @@ import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -112,15 +117,25 @@ class WriteSemanticsTest {
     }
 
     static NoticeForm noticeForm(String title, NoticeType type, int topFlag, NoticeStatus status) {
-        NoticeForm f = new NoticeForm();
-        f.setTitle(title);
-        f.setCover("/api/uploads/cover.png");
-        f.setSummary("摘要");
-        f.setContent("正文内容");
-        f.setType(type);
-        f.setTopFlag(topFlag);
-        f.setStatus(status);
-        return f;
+        return new NoticeForm(title, "/api/uploads/cover.png", "摘要", "正文内容", type, topFlag, status);
+    }
+
+    @Test
+    void noticeCreateAndUpdateHandleOmittedType() {
+        asAdmin();
+        NoticeSvc s = new NoticeSvc();
+        s.create(new NoticeForm("草稿", null, null, null, null, null, NoticeStatus.DRAFT));
+        assertEquals(NoticeType.NOTICE, s.saved.getType());
+
+        s.current = new Notice();
+        s.current.setId(9L);
+        s.current.setType(NoticeType.GUIDE);
+        s.current.setTopFlag(1);
+        s.current.setStatus(NoticeStatus.DRAFT);
+        s.update(9L, new NoticeForm("更新标题", null, null, null, null, null, null));
+        assertEquals(NoticeType.GUIDE, s.saved.getType());
+        assertEquals(1, s.saved.getTopFlag());
+        assertEquals(NoticeStatus.DRAFT, s.saved.getStatus());
     }
 
     @Test
@@ -304,7 +319,10 @@ class WriteSemanticsTest {
         Wrapper<MedicalRecord> updated;
 
         RecordSvc(AppointmentService appointmentService) {
-            super(appointmentService, null, null, null);
+            super(appointmentService,
+                    mapper(DoctorMapper.class, name -> null),
+                    mapper(PetMapper.class, name -> List.of()),
+                    mapper(DepartmentMapper.class, name -> null));
         }
 
         @Override
@@ -364,7 +382,7 @@ class WriteSemanticsTest {
         appt.appointment = acceptedAppointment();
         RecordSvc s = new RecordSvc(appt);
 
-        MedicalRecord created = s.saveOrUpdateForAppointment(11L, recordForm());
+        MedicalRecordVo created = s.saveOrUpdateForAppointment(11L, recordForm());
 
         assertEquals(7L, s.saved.getId());
         assertEquals(11L, s.saved.getAppointmentId());
@@ -374,7 +392,7 @@ class WriteSemanticsTest {
         assertEquals(1L, s.saved.getDepartmentId());
         assertEquals(LocalDate.of(2026, 10, 1), s.saved.getVisitDate(), "就诊日期来自预约单");
         assertTrue(s.saved.getRecordNo() != null && s.saved.getRecordNo().startsWith("MR"));
-        assertEquals(7L, created.getId());
+        assertEquals(7L, created.id());
     }
 
     @Test

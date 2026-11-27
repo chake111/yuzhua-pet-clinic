@@ -55,6 +55,7 @@ spring:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+    arg-name-based-constructor-auto-mapping: true
     default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 联调期用，生产改回空
   global-config:

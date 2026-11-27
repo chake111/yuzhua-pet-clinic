@@ -105,5 +105,34 @@ class ObservabilityIT extends MySqlITSupport {
                 .expectBody(String.class)
                 .returnResult().getResponseBody();
         assertThat(notFound).contains("\"code\":404");
+
+        String clientToken = loginToken(mockMvc, "ituser");
+        createAppointment(mockMvc, clientToken, 90001L, IT_DOCTOR_ID, IT_SCHEDULE_ID,
+                "IT 统计测试", "obs-dashboard-check-1");
+        jdbc.update("UPDATE appointment SET appointment_date = CURDATE(), status = 2, pay_status = 1 "
+                + "WHERE idem_key = ?", "obs-dashboard-check-1");
+
+        String dashboard = rest().get().uri("/admin/stats/dashboard?days=7")
+                .header(authHeaderName(), bearer(adminToken))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .returnResult().getResponseBody();
+        assertThat(dashboard)
+                .contains("\"code\":200")
+                .contains("\"statusDist\"")
+                .contains("\"deptDist\"")
+                .contains("IT内科")
+                .contains("IT医生");
+
+        String schedules = rest().get().uri("/admin/schedule/page?pageNum=1&pageSize=5")
+                .header(authHeaderName(), bearer(adminToken))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .returnResult().getResponseBody();
+        assertThat(schedules)
+                .contains("\"code\":200")
+                .contains("\"doctorName\":\"IT医生\"");
     }
 }

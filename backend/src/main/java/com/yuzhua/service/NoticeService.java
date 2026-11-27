@@ -13,6 +13,7 @@ import com.yuzhua.dto.PageQuery;
 import com.yuzhua.entity.Notice;
 import com.yuzhua.mapper.NoticeMapper;
 import com.yuzhua.security.UserContext;
+import com.yuzhua.vo.NoticeVo;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -27,21 +28,23 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
 
     private static final int MAX_LATEST_LIMIT = 20;
 
-    public PageResult<Notice> pagePublished(PageQuery q, @Nullable NoticeType type, @Nullable String keyword) {
+    public PageResult<NoticeVo> pagePublished(PageQuery q, @Nullable NoticeType type, @Nullable String keyword) {
         LambdaQueryWrapper<Notice> qw = publishedQuery(type, keyword)
                 .select(Notice::getId, Notice::getTitle, Notice::getCover, Notice::getSummary,
                         Notice::getType, Notice::getTopFlag, Notice::getPublishTime, Notice::getViewCount);
-        return PageResult.of(page(new Page<>(q.getPageNum(), q.getPageSize()), qw));
+        Page<Notice> page = page(new Page<>(q.getPageNum(), q.getPageSize()), qw);
+        return PageResult.of(page, page.getRecords().stream().map(NoticeService::toVo).toList());
     }
 
-    public List<Notice> listLatest(int limit) {
+    public List<NoticeVo> listLatest(int limit) {
         return list(publishedQuery(null, null)
                 .select(Notice::getId, Notice::getTitle, Notice::getSummary, Notice::getType,
                         Notice::getTopFlag, Notice::getPublishTime)
-                .last("LIMIT " + Math.max(1, Math.min(limit, MAX_LATEST_LIMIT))));
+                .last("LIMIT " + Math.max(1, Math.min(limit, MAX_LATEST_LIMIT))))
+                .stream().map(NoticeService::toVo).toList();
     }
 
-    public Notice readDetail(Long id) {
+    public NoticeVo readDetail(Long id) {
         Notice n = getById(id);
         if (n == null || n.getStatus() != NoticeStatus.PUBLISHED) {
             throw BizException.notFound("公告");
@@ -52,11 +55,11 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         int views = n.getViewCount() == null ? 0 : n.getViewCount();
         n.setViewCount(views + 1);
         n.setPublishBy(null);
-        return n;
+        return toVo(n);
     }
 
-    public PageResult<Notice> pageAdmin(PageQuery q, @Nullable NoticeStatus status,
-                                        @Nullable NoticeType type, @Nullable String keyword) {
+    public PageResult<NoticeVo> pageAdmin(PageQuery q, @Nullable NoticeStatus status,
+                                          @Nullable NoticeType type, @Nullable String keyword) {
         LambdaQueryWrapper<Notice> qw = Wrappers.<Notice>lambdaQuery()
                 .eq(status != null, Notice::getStatus, status)
                 .eq(type != null, Notice::getType, type)
@@ -64,7 +67,12 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
                 .orderByDesc(Notice::getTopFlag)
                 .orderByDesc(Notice::getPublishTime)
                 .orderByDesc(Notice::getId);
-        return PageResult.of(page(new Page<>(q.getPageNum(), q.getPageSize()), qw));
+        Page<Notice> page = page(new Page<>(q.getPageNum(), q.getPageSize()), qw);
+        return PageResult.of(page, page.getRecords().stream().map(NoticeService::toVo).toList());
+    }
+
+    public NoticeVo detail(Long id) {
+        return toVo(require(id));
     }
 
     public Notice require(Long id) {
@@ -75,18 +83,21 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         return n;
     }
 
-    /** 事务内新建公告；仅当初始状态为已发布时记录发布人与发布时间。 */
+    /**
+     * 事务内新建公告：缺省 {@code status}/{@code type}/{@code topFlag} 分别回退 {@code DRAFT}/{@code NOTICE}/0，
+     * 仅当初始状态为 {@code PUBLISHED} 时记录发布人与发布时间。
+     */
     @Transactional
-    public Notice create(NoticeForm form) {
-        requireTitle(form.getTitle());
-        NoticeStatus status = form.getStatus() == null ? NoticeStatus.DRAFT : form.getStatus();
+    public NoticeVo create(NoticeForm form) {
+        requireTitle(form.title());
+        NoticeStatus status = form.status() == null ? NoticeStatus.DRAFT : form.status();
         Notice n = new Notice();
-        n.setTitle(form.getTitle());
-        n.setCover(form.getCover());
-        n.setSummary(form.getSummary());
-        n.setContent(form.getContent());
-        n.setType(form.getType() == null ? NoticeType.NOTICE : form.getType());
-        n.setTopFlag(form.getTopFlag() == null ? 0 : form.getTopFlag());
+        n.setTitle(form.title());
+        n.setCover(form.cover());
+        n.setSummary(form.summary());
+        n.setContent(form.content());
+        n.setType(form.type() == null ? NoticeType.NOTICE : form.type());
+        n.setTopFlag(form.topFlag() == null ? 0 : form.topFlag());
         n.setStatus(status);
         validate(n);
         n.setViewCount(0);
@@ -95,24 +106,27 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
             n.setPublishBy(UserContext.requireId());
         }
         save(n);
-        return n;
+        return toVo(n);
     }
 
-    /** 事务内更新公告，首次发布才补写发布人/时间，阅读量由更新策略保留。 */
+    /**
+     * 事务内更新公告（不存在抛 404）：缺省 {@code status}/{@code type}/{@code topFlag} 沿用原记录值，
+     * 仅首次发布补写发布人与发布时间，{@code viewCount} 不写入以保留原阅读量。
+     */
     @Transactional
     public void update(Long id, NoticeForm form) {
         Notice cur = require(id);
-        requireTitle(form.getTitle());
-        NoticeStatus status = form.getStatus() != null ? form.getStatus()
+        requireTitle(form.title());
+        NoticeStatus status = form.status() != null ? form.status()
                 : (cur.getStatus() != null ? cur.getStatus() : NoticeStatus.DRAFT);
         Notice row = new Notice();
         row.setId(id);
-        row.setTitle(form.getTitle());
-        row.setCover(form.getCover());
-        row.setSummary(form.getSummary());
-        row.setContent(form.getContent());
-        row.setType(form.getType() == null ? cur.getType() : form.getType());
-        row.setTopFlag(form.getTopFlag() == null ? cur.getTopFlag() : form.getTopFlag());
+        row.setTitle(form.title());
+        row.setCover(form.cover());
+        row.setSummary(form.summary());
+        row.setContent(form.content());
+        row.setType(form.type() == null ? cur.getType() : form.type());
+        row.setTopFlag(form.topFlag() == null ? cur.getTopFlag() : form.topFlag());
         row.setStatus(status);
         validate(row);
         // 原因: 仅首次发布写入发布人与发布时间，重新发布保持原有首次发布时间与累计阅读量
@@ -173,5 +187,22 @@ public class NoticeService extends ServiceImpl<NoticeMapper, Notice> {
         if (n.getStatus() == NoticeStatus.PUBLISHED && (n.getContent() == null || n.getContent().isBlank())) {
             throw new BizException("发布前请填写正文");
         }
+    }
+
+    private static NoticeVo toVo(Notice n) {
+        return new NoticeVo(
+                n.getId(),
+                n.getTitle(),
+                n.getCover(),
+                n.getSummary(),
+                n.getContent(),
+                n.getType(),
+                n.getTopFlag(),
+                n.getStatus(),
+                n.getViewCount(),
+                n.getPublishTime(),
+                n.getPublishBy(),
+                n.getCreateTime()
+        );
     }
 }

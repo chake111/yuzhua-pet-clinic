@@ -1,12 +1,11 @@
 package com.yuzhua.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
-import org.jspecify.annotations.Nullable;
+import jakarta.validation.constraints.Size;
 
-@Data
-public class ReplyForm {
-
-    @NotBlank(message = "请填写回复内容")
-    private @Nullable String reply;
+public record ReplyForm(
+        @NotBlank(message = "请填写回复内容")
+        @Size(max = 500, message = "回复不超过 500 字")
+        String reply
+) {
 }

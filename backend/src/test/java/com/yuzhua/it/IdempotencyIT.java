@@ -83,7 +83,7 @@ class IdempotencyIT extends MySqlITSupport {
                     ready.countDown();
                     go.await();
                     AppointmentVo vo = appointmentService.create(appointmentForm(FIRST_PET_ID), key);
-                    ids.add(vo.getId());
+                    ids.add(vo.id());
                 } catch (Throwable t) {
                     failures.add(t);
                 } finally {
@@ -117,7 +117,7 @@ class IdempotencyIT extends MySqlITSupport {
         UserContext.set(clientUser());
         long first;
         try {
-            first = appointmentService.create(appointmentForm(FIRST_PET_ID), key).getId();
+            first = appointmentService.create(appointmentForm(FIRST_PET_ID), key).id();
         } finally {
             UserContext.clear();
         }
@@ -125,7 +125,7 @@ class IdempotencyIT extends MySqlITSupport {
         UserContext.set(secondUser());
         long second;
         try {
-            second = appointmentService.create(appointmentForm(SECOND_PET_ID), key).getId();
+            second = appointmentService.create(appointmentForm(SECOND_PET_ID), key).id();
         } finally {
             UserContext.clear();
         }
@@ -148,7 +148,7 @@ class IdempotencyIT extends MySqlITSupport {
         long first;
         try {
             first = appointmentService.create(
-                    appointmentForm(FIRST_PET_ID, IT_DOCTOR_ID, IT_SCHEDULE_ID, "IT 原时段"), key).getId();
+                    appointmentForm(FIRST_PET_ID, IT_DOCTOR_ID, IT_SCHEDULE_ID, "IT 原时段"), key).id();
         } finally {
             UserContext.clear();
         }
@@ -157,7 +157,7 @@ class IdempotencyIT extends MySqlITSupport {
         long replay;
         try {
             replay = appointmentService.create(
-                    appointmentForm(FIRST_PET_ID, IT_DOCTOR_ID, SECOND_SCHEDULE_ID, "IT 换时段"), key).getId();
+                    appointmentForm(FIRST_PET_ID, IT_DOCTOR_ID, SECOND_SCHEDULE_ID, "IT 换时段"), key).id();
         } finally {
             UserContext.clear();
         }
@@ -226,9 +226,9 @@ class IdempotencyIT extends MySqlITSupport {
             UserContext.clear();
         }
 
-        assertTrue(vo.getId() > 0);
+        assertTrue(vo.id() > 0);
         assertNull(jdbc.queryForObject("SELECT idem_key FROM appointment WHERE id = ?",
-                        String.class, vo.getId()),
+                        String.class, vo.id()),
                 "未带键的单 idem_key 应为 NULL");
         assertEquals(19, queryInt("SELECT remain_num FROM doctor_schedule WHERE id = ?", IT_SCHEDULE_ID));
     }
