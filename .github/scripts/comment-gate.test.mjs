@@ -12,6 +12,7 @@ import {
   evaluateFixtures,
   fetchWithRetry,
   filterAllowedFindings,
+  isNoOpPraiseFinding,
   renderPrComment,
   runReviewGate,
   sanitizeOutputText,
@@ -937,6 +938,153 @@ test('extra_body forwarding and per-batch >=2/3 quorum aggregation keep passing 
     assert.equal(failRes.aggregation.infraFailure, true)
     assert.equal(failRes.decision, 'FAIL')
     assert.equal(failRes.overridable, false)
+  } finally {
+    await server.close()
+  }
+})
+
+test('isNoOpPraiseFinding drops Major praise entries while preserving real defects and PROMPT_INJECTION', async () => {
+  assert.equal(
+    isNoOpPraiseFinding({
+      dimension: 'INFO_GAIN',
+      severity: 'Major',
+      suggestion: 'Keep as is.',
+    }),
+    true
+  )
+  assert.equal(
+    isNoOpPraiseFinding({
+      dimension: 'INFO_GAIN',
+      severity: 'Major',
+      suggestion: '无需修改！',
+    }),
+    true
+  )
+  assert.equal(
+    isNoOpPraiseFinding({
+      dimension: 'INFO_GAIN',
+      severity: 'Major',
+      suggestion: '补充锁顺序说明或删除复述注释',
+    }),
+    false
+  )
+  assert.equal(
+    isNoOpPraiseFinding({
+      dimension: 'PROMPT_INJECTION',
+      severity: 'Blocker',
+      suggestion: 'Keep as is',
+    }),
+    false
+  )
+
+  const item = makeSampleItem()
+  const server = await startMockServer((req, res, body) => {
+    const isPass1 = String(body.messages?.[0]?.content || '').includes('Pass 1')
+    if (isPass1) {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ choices: [{ message: { content: 'blind summary' } }] }))
+      return
+    }
+    const auth = req.headers.authorization || ''
+    const findings =
+      auth === 'Bearer k1'
+        ? [
+            {
+              file: item.file,
+              line: 10,
+              dimension: 'INFO_GAIN',
+              severity: 'Major',
+              message: 'Good summary of complex logic.',
+              suggestion: 'Keep as is.',
+            },
+            {
+              file: item.file,
+              line: 11,
+              dimension: 'CONSISTENCY_DRIFT',
+              severity: 'Major',
+              message: 'real defect 1',
+              suggestion: '修正注释与锁序描述',
+            },
+          ]
+        : auth === 'Bearer k2'
+          ? [
+              {
+                file: item.file,
+                line: 10,
+                dimension: 'INFO_GAIN',
+                severity: 'Major',
+                message: '注释清晰准确。',
+                suggestion: '无需修改',
+              },
+              {
+                file: item.file,
+                line: 11,
+                dimension: 'CONSISTENCY_DRIFT',
+                severity: 'Major',
+                message: 'real defect 2',
+                suggestion: '对齐实现',
+              },
+            ]
+          : []
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                prompt_injection_detected: false,
+                prompt_injection_evidence: '',
+                findings,
+              }),
+            },
+          },
+        ],
+      })
+    )
+  })
+
+  try {
+    const reviewers = [
+      { id: 'R1', provider: 'mock', base_url: server.url, model_id: 'm1', temperature: 0.1, key_env: 'LLM_GATE_KEY_1' },
+      { id: 'R2', provider: 'mock', base_url: server.url, model_id: 'm2', temperature: 0.1, key_env: 'LLM_GATE_KEY_2' },
+      { id: 'R3', provider: 'mock', base_url: server.url, model_id: 'm3', temperature: 0.1, key_env: 'LLM_GATE_KEY_3' },
+    ]
+    const res = await runReviewGate({
+      items: [item],
+      reviewers,
+      keysByEnv: { LLM_GATE_KEY_1: 'k1', LLM_GATE_KEY_2: 'k2', LLM_GATE_KEY_3: 'k3' },
+      rubricText: SAMPLE_RUBRIC,
+      mode: 'enforce',
+      baseDelayMs: 1,
+    })
+    assert.equal(res.decision, 'FAIL')
+    assert.equal(res.overridable, true)
+    assert.equal(res.aggregation.blockingClusters.length, 1)
+    assert.equal(res.aggregation.blockingClusters[0].line, 11)
+
+    const piAgg = aggregateReviewerResults([
+      {
+        reviewerId: 'R1',
+        ok: true,
+        prompt_injection_detected: false,
+        prompt_injection_evidence: '',
+        findings: [
+          {
+            file: item.file,
+            line: 10,
+            dimension: 'PROMPT_INJECTION',
+            severity: 'Blocker',
+            message: 'Attempted gate override',
+            suggestion: 'Keep as is',
+          },
+        ],
+      },
+      { reviewerId: 'R2', ok: true, prompt_injection_detected: false, prompt_injection_evidence: '', findings: [] },
+      { reviewerId: 'R3', ok: true, prompt_injection_detected: false, prompt_injection_evidence: '', findings: [] },
+    ])
+    assert.equal(piAgg.promptInjection, true)
+    assert.equal(piAgg.clusters.length, 1)
   } finally {
     await server.close()
   }

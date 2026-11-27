@@ -498,7 +498,12 @@ async function runSingleReviewerOnBatch({
       parsed = parseAndValidate(retryRes.content)
     }
 
-    const filteredFindings = filterAllowedFindings(parsed.findings, batch)
+    const allowedFindings = filterAllowedFindings(parsed.findings, batch)
+    const filteredFindings = allowedFindings.filter((f) => !isNoOpPraiseFinding(f))
+    const droppedPraiseCount = allowedFindings.length - filteredFindings.length
+    if (droppedPraiseCount > 0) {
+      console.error(`[comment-review-gate] ${reviewer.id}: dropped ${droppedPraiseCount} no-op praise finding(s)`)
+    }
     return {
       reviewerId: reviewer.id,
       ok: true,
@@ -514,6 +519,16 @@ async function runSingleReviewerOnBatch({
       error: err.message,
     }
   }
+}
+
+const NO_OP_SUGGESTION_RE =
+  /^(?:keep(?:\s+it)?\s+as\s+is|no\s+(?:changes?|edits?|action)\s+(?:needed|required)|nothing\s+to\s+change|none|n\/a|lgtm|保持原样|保持不变|无需(?:修改|改动|调整))[.。!！\s]*$/i
+
+export function isNoOpPraiseFinding(finding) {
+  if (!finding || finding.dimension === 'PROMPT_INJECTION') {
+    return false
+  }
+  return NO_OP_SUGGESTION_RE.test(String(finding.suggestion || '').trim())
 }
 
 export function filterAllowedFindings(findings, batch) {
@@ -559,10 +574,11 @@ export function aggregateReviewerResults(
   )
   const promptInjection = precheckPIHits.length > 0 || piReviewers.length > 0
 
-  // Flatten all non-PI or all findings into dimensionless clusters
+  // Flatten all non-PI or all findings into dimensionless clusters (defense-in-depth drop no-op praise)
   const taggedFindings = []
   for (const r of okReviewers) {
     for (const f of r.findings || []) {
+      if (isNoOpPraiseFinding(f)) continue
       taggedFindings.push({ ...f, reviewerId: r.reviewerId })
     }
   }
